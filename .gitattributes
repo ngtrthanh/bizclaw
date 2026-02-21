@@ -1,0 +1,21 @@
+# BizClaw — GitHub Linguist overrides
+# This project is 100% Rust. The .agent/ directory contains
+# AI development toolkit files (skills, workflows) that are NOT
+# part of the application source code.
+
+# Mark .agent/ as vendored (excluded from language stats)
+.agent/** linguist-vendored
+.agent/**/*.py linguist-vendored
+.agent/**/*.js linguist-vendored
+.agent/**/*.ts linguist-vendored
+.agent/**/*.sh linguist-vendored
+.agent/**/*.css linguist-vendored
+.agent/**/*.html linguist-vendored
+.agent/**/*.md linguist-documentation
+
+# Plans directory is documentation
+plans/** linguist-documentation
+
+# Lock files are generated
+*.lock linguist-generated
+Cargo.lock linguist-generated
