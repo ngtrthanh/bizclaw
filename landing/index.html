@@ -244,8 +244,8 @@ footer a{color:var(--accent2);text-decoration:none}
       </div>
       <div class="feature-card fade-up" style="--i:3">
         <span class="feature-icon">💬</span>
-        <h3 data-vi="Đa kênh" data-en="Multi-Channel">Đa kênh</h3>
-        <p data-vi="CLI, Zalo (Personal + OA), Telegram, Discord, Webhook. Bot của bạn có mặt trên mọi nền tảng." data-en="CLI, Zalo (Personal + OA), Telegram, Discord, Webhook. Your bot is present on every platform.">CLI, Zalo (Personal + OA), Telegram, Discord, Webhook. Bot của bạn có mặt trên mọi nền tảng.</p>
+        <h3 data-vi="🇻🇳 Zalo Bot & Zalo Cá nhân" data-en="🇻🇳 Zalo Bot & Personal Zalo">🇻🇳 Zalo Bot & Zalo Cá nhân</h3>
+        <p data-vi="Dành riêng cho thị trường Việt Nam — hỗ trợ Zalo OA Bot và Zalo cá nhân. Kết hợp Telegram, Discord, CLI, Webhook. AI agent nói chuyện trên Zalo như người thật." data-en="Built for Vietnam market — supports Zalo OA Bot and Personal Zalo messaging. Plus Telegram, Discord, CLI, Webhook. AI agent chats on Zalo like a real person.">Dành riêng cho thị trường Việt Nam — hỗ trợ Zalo OA Bot và Zalo cá nhân. Kết hợp Telegram, Discord, CLI, Webhook. AI agent nói chuyện trên Zalo như người thật.</p>
       </div>
       <div class="feature-card fade-up" style="--i:4">
         <span class="feature-icon">🔒</span>
@@ -253,9 +253,9 @@ footer a{color:var(--accent2);text-decoration:none}
         <p data-vi="Command allowlist, JWT + bcrypt, AES-256 encryption, HMAC-SHA256 signing, tenant isolation, audit logging." data-en="Command allowlist, JWT + bcrypt, AES-256 encryption, HMAC-SHA256 signing, tenant isolation, audit logging.">Command allowlist, JWT + bcrypt, AES-256 encryption, HMAC-SHA256 signing, tenant isolation, audit logging.</p>
       </div>
       <div class="feature-card fade-up" style="--i:5">
-        <span class="feature-icon">⚡</span>
-        <h3 data-vi="Tối ưu SIMD" data-en="SIMD Optimized">Tối ưu SIMD</h3>
-        <p data-vi="ARM NEON, x86 SSE2/AVX2 auto-dispatch. Chạy được trên Raspberry Pi đến cloud server. Dưới 10MB RAM idle." data-en="ARM NEON, x86 SSE2/AVX2 auto-dispatch. Runs from Raspberry Pi to cloud servers. Under 10MB RAM idle.">ARM NEON, x86 SSE2/AVX2 auto-dispatch. Chạy được trên Raspberry Pi đến cloud server. Dưới 10MB RAM idle.</p>
+        <span class="feature-icon">🔥</span>
+        <h3 data-vi="Chạy trên 512MB RAM" data-en="Runs on 512MB RAM">Chạy trên 512MB RAM</h3>
+        <p data-vi="Hoạt động độc lập trên BẤT KỲ phần cứng nào có 512MB RAM — từ Raspberry Pi đến VPS mini. LLM sẵn có, không cần cloud. SIMD auto-dispatch (ARM NEON, x86 AVX2)." data-en="Runs independently on ANY hardware with 512MB RAM — from Raspberry Pi to mini VPS. Built-in LLM, no cloud needed. SIMD auto-dispatch (ARM NEON, x86 AVX2).">Hoạt động độc lập trên BẤT KỲ phần cứng nào có 512MB RAM — từ Raspberry Pi đến VPS mini. LLM sẵn có, không cần cloud. SIMD auto-dispatch (ARM NEON, x86 AVX2).</p>
       </div>
     </div>
     <div class="providers-row fade-up" style="--i:6">
@@ -298,65 +298,92 @@ footer a{color:var(--accent2);text-decoration:none}
 <section id="pricing">
   <div class="container">
     <div class="section-label" data-vi="BẢNG GIÁ" data-en="PRICING">BẢNG GIÁ</div>
-    <div class="section-title" data-vi="Chọn plan phù hợp" data-en="Choose your plan">Chọn plan phù hợp</div>
+    <div class="section-title" data-vi="Chọn gói phù hợp" data-en="Choose your plan">Chọn gói phù hợp</div>
+    <div class="section-desc" data-vi="Bạn mua cấu hình + license — tự cài đặt trên VPS của bạn. Chạy trên bất kỳ máy nào có 512MB RAM với LLM sẵn có." data-en="You purchase config + license — self-deploy on your own VPS. Runs on any machine with 512MB RAM and built-in LLM.">Bạn mua cấu hình + license — tự cài đặt trên VPS của bạn. Chạy trên bất kỳ máy nào có 512MB RAM với LLM sẵn có.</div>
     <div class="pricing-grid">
       <div class="price-card fade-up" style="--i:0">
         <h3>Free</h3>
-        <div class="price">$0 <span data-vi="/tháng" data-en="/mo">/tháng</span></div>
+        <div class="price">0đ <span>/tháng</span></div>
         <div class="desc" data-vi="Dùng thử, dự án cá nhân" data-en="Try it out, personal projects">Dùng thử, dự án cá nhân</div>
         <ul>
+          <li data-vi="1 AI Agent" data-en="1 AI Agent">1 AI Agent</li>
           <li data-vi="100 tin nhắn/ngày" data-en="100 messages/day">100 tin nhắn/ngày</li>
-          <li data-vi="3 channels" data-en="3 channels">3 channels</li>
-          <li data-vi="5 thành viên" data-en="5 members">5 thành viên</li>
-          <li data-vi="SQLite memory" data-en="SQLite memory">SQLite memory</li>
-          <li data-vi="1 subdomain" data-en="1 subdomain">1 subdomain</li>
+          <li data-vi="Zalo Bot cơ bản" data-en="Basic Zalo Bot">Zalo Bot cơ bản</li>
+          <li data-vi="Telegram + Discord" data-en="Telegram + Discord">Telegram + Discord</li>
+          <li data-vi="Brain Engine (LLM sẵn có)" data-en="Brain Engine (Built-in LLM)">Brain Engine (LLM sẵn có)</li>
+          <li data-vi="512MB RAM là đủ" data-en="512MB RAM is enough">512MB RAM là đủ</li>
         </ul>
         <a href="#register" class="btn-secondary" style="width:100%;justify-content:center" data-vi="Bắt đầu miễn phí" data-en="Start Free">Bắt đầu miễn phí</a>
       </div>
       <div class="price-card popular fade-up" style="--i:1">
         <h3>Pro</h3>
-        <div class="price">$19 <span data-vi="/tháng" data-en="/mo">/tháng</span></div>
-        <div class="desc" data-vi="Cho startup và SMB" data-en="For startups and SMBs">Cho startup và SMB</div>
+        <div class="price">499K <span>/tháng</span></div>
+        <div class="desc" data-vi="Cho freelancer & startup" data-en="For freelancers & startups">Cho freelancer & startup</div>
         <ul>
+          <li data-vi="5 AI Agents" data-en="5 AI Agents">5 AI Agents</li>
           <li data-vi="1,000 tin nhắn/ngày" data-en="1,000 messages/day">1,000 tin nhắn/ngày</li>
-          <li data-vi="10 channels" data-en="10 channels">10 channels</li>
-          <li data-vi="20 thành viên" data-en="20 members">20 thành viên</li>
-          <li data-vi="Brain Engine (Local LLM)" data-en="Brain Engine (Local LLM)">Brain Engine (Local LLM)</li>
-          <li data-vi="Web Search tool" data-en="Web Search tool">Web Search tool</li>
-          <li data-vi="KV Cache Persistence" data-en="KV Cache Persistence">KV Cache Persistence</li>
+          <li data-vi="🇻🇳 Zalo Bot + Zalo Cá nhân" data-en="🇻🇳 Zalo Bot + Personal Zalo">🇻🇳 Zalo Bot + Zalo Cá nhân</li>
+          <li data-vi="Telegram, Discord, Webhook" data-en="Telegram, Discord, Webhook">Telegram, Discord, Webhook</li>
+          <li data-vi="Brain Engine + 8 Providers" data-en="Brain Engine + 8 Providers">Brain Engine + 8 Providers</li>
+          <li data-vi="Web Search + KV Cache" data-en="Web Search + KV Cache">Web Search + KV Cache</li>
+          <li data-vi="Tự deploy lên VPS của bạn" data-en="Self-deploy to your VPS">Tự deploy lên VPS của bạn</li>
         </ul>
-        <a href="#register" class="btn-primary" style="width:100%;justify-content:center" data-vi="Chọn Pro" data-en="Choose Pro">Chọn Pro</a>
+        <button onclick="openPayment('pro',499000)" class="btn-primary" style="width:100%;justify-content:center" data-vi="💳 Mua Pro — 499K" data-en="💳 Buy Pro — 499K">💳 Mua Pro — 499K</button>
       </div>
       <div class="price-card fade-up" style="--i:2">
         <h3>Business</h3>
-        <div class="price">$49 <span data-vi="/tháng" data-en="/mo">/tháng</span></div>
-        <div class="desc" data-vi="Cho doanh nghiệp" data-en="For enterprises">Cho doanh nghiệp</div>
+        <div class="price">999K <span>/tháng</span></div>
+        <div class="desc" data-vi="Cho doanh nghiệp" data-en="For businesses">Cho doanh nghiệp</div>
         <ul>
-          <li data-vi="10,000 tin nhắn/ngày" data-en="10,000 messages/day">10,000 tin nhắn/ngày</li>
-          <li data-vi="Unlimited channels" data-en="Unlimited channels">Unlimited channels</li>
-          <li data-vi="100 thành viên" data-en="100 members">100 thành viên</li>
-          <li data-vi="Postgres backend" data-en="Postgres backend">Postgres backend</li>
-          <li data-vi="Priority support" data-en="Priority support">Priority support</li>
+          <li data-vi="20 AI Agents" data-en="20 AI Agents">20 AI Agents</li>
+          <li data-vi="Unlimited tin nhắn" data-en="Unlimited messages">Unlimited tin nhắn</li>
+          <li data-vi="🇻🇳 Zalo Bot + nhiều Zalo Cá nhân" data-en="🇻🇳 Zalo Bot + multiple Personal Zalo">🇻🇳 Zalo Bot + nhiều Zalo Cá nhân</li>
+          <li data-vi="Tất cả channels" data-en="All channels">Tất cả channels</li>
+          <li data-vi="Brain Engine + Postgres" data-en="Brain Engine + Postgres">Brain Engine + Postgres</li>
           <li data-vi="Custom domain" data-en="Custom domain">Custom domain</li>
+          <li data-vi="Priority support" data-en="Priority support">Priority support</li>
         </ul>
-        <a href="#register" class="btn-secondary" style="width:100%;justify-content:center" data-vi="Chọn Business" data-en="Choose Business">Chọn Business</a>
+        <button onclick="openPayment('business',999000)" class="btn-primary" style="width:100%;justify-content:center;background:var(--grad2)" data-vi="💳 Mua Business — 999K" data-en="💳 Buy Business — 999K">💳 Mua Business — 999K</button>
       </div>
       <div class="price-card fade-up" style="--i:3">
         <h3>Enterprise</h3>
         <div class="price" data-vi="Liên hệ" data-en="Contact us">Liên hệ</div>
         <div class="desc" data-vi="Giải pháp tuỳ chỉnh" data-en="Custom solutions">Giải pháp tuỳ chỉnh</div>
         <ul>
+          <li data-vi="Unlimited AI Agents" data-en="Unlimited AI Agents">Unlimited AI Agents</li>
           <li data-vi="Unlimited mọi thứ" data-en="Unlimited everything">Unlimited mọi thứ</li>
-          <li data-vi="On-premise deploy" data-en="On-premise deploy">On-premise deploy</li>
+          <li data-vi="On-premise / Private cloud" data-en="On-premise / Private cloud">On-premise / Private cloud</li>
           <li data-vi="SLA 99.9%" data-en="SLA 99.9%">SLA 99.9%</li>
           <li data-vi="Dedicated support" data-en="Dedicated support">Dedicated support</li>
-          <li data-vi="Custom integration" data-en="Custom integration">Custom integration</li>
+          <li data-vi="Custom Zalo/Platform integration" data-en="Custom Zalo/Platform integration">Custom Zalo/Platform integration</li>
         </ul>
-        <a href="mailto:hello@bizclaw.vn" class="btn-secondary" style="width:100%;justify-content:center" data-vi="Liên hệ" data-en="Contact us">Liên hệ</a>
+        <a href="mailto:hello@bizclaw.vn" class="btn-secondary" style="width:100%;justify-content:center" data-vi="📞 Liên hệ tư vấn" data-en="📞 Contact us">📞 Liên hệ tư vấn</a>
       </div>
     </div>
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:24px" data-vi="💡 Tất cả gói đều bao gồm Brain Engine (LLM chạy local) — không cần API key bên ngoài. Chạy trên VPS 512MB RAM." data-en="💡 All plans include Brain Engine (local LLM) — no external API key needed. Runs on 512MB RAM VPS.">💡 Tất cả gói đều bao gồm Brain Engine (LLM chạy local) — không cần API key bên ngoài. Chạy trên VPS 512MB RAM.</p>
   </div>
 </section>
+
+<!-- PAYMENT MODAL (SePay VietQR) -->
+<div id="payment-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px;max-width:480px;width:100%;position:relative;text-align:center">
+    <button onclick="closePayment()" style="position:absolute;top:16px;right:20px;background:none;border:none;color:var(--muted);font-size:24px;cursor:pointer">&times;</button>
+    <h2 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;margin-bottom:4px" data-vi="💳 Thanh toán chuyển khoản" data-en="💳 Bank Transfer Payment">💳 Thanh toán chuyển khoản</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:24px" data-vi="Quét mã QR bằng app ngân hàng" data-en="Scan QR code with your banking app">Quét mã QR bằng app ngân hàng</p>
+    <div id="payment-qr" style="background:#fff;border-radius:12px;padding:12px;display:inline-block;margin-bottom:20px">
+      <img id="qr-img" src="" alt="VietQR Payment" style="width:220px;height:220px">
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:left;margin-bottom:16px">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px" data-vi="Thông tin chuyển khoản:" data-en="Transfer details:">Thông tin chuyển khoản:</p>
+      <p style="font-size:14px"><strong>Ngân hàng:</strong> MB Bank</p>
+      <p style="font-size:14px"><strong>STK:</strong> 0969597517</p>
+      <p style="font-size:14px"><strong>Chủ TK:</strong> NGUYEN DUC HOAI</p>
+      <p style="font-size:14px"><strong data-vi="Số tiền:" data-en="Amount:">Số tiền:</strong> <span id="modal-amount" style="color:var(--green);font-weight:700"></span></p>
+      <p style="font-size:14px"><strong data-vi="Nội dung:" data-en="Content:">Nội dung:</strong> <span id="modal-content" style="color:var(--accent2);font-weight:600"></span></p>
+    </div>
+    <p style="font-size:12px;color:var(--muted)" data-vi="⚡ Sau khi chuyển khoản, hệ thống sẽ tự động xác nhận qua SePay webhook. Bạn sẽ nhận được email hướng dẫn cài đặt trong vòng 5 phút." data-en="⚡ After transfer, our system auto-confirms via SePay webhook. You'll receive setup instructions via email within 5 minutes.">⚡ Sau khi chuyển khoản, hệ thống sẽ tự động xác nhận qua SePay webhook. Bạn sẽ nhận được email hướng dẫn cài đặt trong vòng 5 phút.</p>
+  </div>
+</div>
 
 <!-- SHOWCASE -->
 <section id="showcase">
@@ -529,7 +556,7 @@ footer a{color:var(--accent2);text-decoration:none}
   <div class="container">
     <div class="sponsor-label" data-vi="NHÀ TÀI TRỢ" data-en="SPONSOR">NHÀ TÀI TRỢ</div>
     <a href="https://bizino.ai" target="_blank" class="sponsor-logo">
-      <div class="sp-icon">🤖</div>
+      <img src="https://bizino.ai/assets/img/white-logo.png" alt="Bizino AI" style="height:40px;width:auto">
       <div class="sp-text">
         <div class="sp-name">Bizino AI</div>
         <div class="sp-desc" data-vi="Premium Software Company — AI Solutions" data-en="Premium Software Company — AI Solutions">Premium Software Company — AI Solutions</div>
@@ -627,6 +654,47 @@ async function handleRegister(e) {
     `;
   }
 }
+
+// ═══ SePay Payment Modal ═══
+const SEPAY_CONFIG = {
+  bank: 'MBBank',
+  account: '0969597517',
+  accountName: 'NGUYEN DUC HOAI'
+};
+
+function openPayment(plan, amount) {
+  const orderId = 'BC' + Date.now().toString(36).toUpperCase();
+  const content = `BIZCLAW ${plan.toUpperCase()} ${orderId}`;
+  
+  // Generate SePay VietQR
+  const qrUrl = `https://qr.sepay.vn/img?acc=${SEPAY_CONFIG.account}&bank=${SEPAY_CONFIG.bank}&amount=${amount}&des=${encodeURIComponent(content)}&template=compact`;
+  
+  document.getElementById('qr-img').src = qrUrl;
+  document.getElementById('modal-amount').textContent = amount.toLocaleString('vi-VN') + 'đ';
+  document.getElementById('modal-content').textContent = content;
+  
+  const modal = document.getElementById('payment-modal');
+  modal.style.display = 'flex';
+  
+  // Store pending order
+  const orders = JSON.parse(localStorage.getItem('bizclaw_orders') || '[]');
+  orders.push({ orderId, plan, amount, content, timestamp: new Date().toISOString() });
+  localStorage.setItem('bizclaw_orders', JSON.stringify(orders));
+}
+
+function closePayment() {
+  document.getElementById('payment-modal').style.display = 'none';
+}
+
+// Close modal on backdrop click
+document.getElementById('payment-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closePayment();
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closePayment();
+});
 
 // ═══ Smooth scroll for anchor links ═══
 document.querySelectorAll('a[href^="#"]').forEach(a => {
