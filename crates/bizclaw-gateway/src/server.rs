@@ -21,6 +21,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/config", get(super::routes::get_config))
         .route("/api/v1/providers", get(super::routes::list_providers))
         .route("/api/v1/channels", get(super::routes::list_channels))
+        .route("/ws", get(super::ws::ws_handler))
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
         .with_state(Arc::new(state))

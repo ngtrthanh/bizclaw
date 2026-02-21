@@ -3,6 +3,7 @@
 
 pub mod server;
 pub mod routes;
+pub mod ws;
 
 use bizclaw_core::config::GatewayConfig;
 
