@@ -7,6 +7,7 @@ pub mod registry;
 pub mod web_search;
 pub mod group_summarizer;
 pub mod calendar;
+pub mod document_reader;
 
 use bizclaw_core::traits::Tool;
 
@@ -44,6 +45,7 @@ impl ToolRegistry {
         reg.register(Box::new(calendar::CalendarTool::new(
             calendar::CalendarConfig::default(),
         )));
+        reg.register(Box::new(document_reader::DocumentReaderTool::new()));
         reg
     }
 }
@@ -64,6 +66,7 @@ mod tests {
         assert!(reg.get("web_search").is_some());
         assert!(reg.get("group_summarizer").is_some());
         assert!(reg.get("calendar").is_some());
+        assert!(reg.get("document_reader").is_some());
         assert!(reg.get("nonexistent").is_none());
     }
 
@@ -77,6 +80,7 @@ mod tests {
         assert!(defs.iter().any(|d| d.name == "web_search"));
         assert!(defs.iter().any(|d| d.name == "group_summarizer"));
         assert!(defs.iter().any(|d| d.name == "calendar"));
+        assert!(defs.iter().any(|d| d.name == "document_reader"));
     }
 
     #[test]
