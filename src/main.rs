@@ -90,6 +90,20 @@ enum Commands {
         #[arg(long)]
         model: Option<String>,
     },
+
+    /// Start web dashboard + API server
+    Serve {
+        /// Port number
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+
+        /// Open browser automatically
+        #[arg(long)]
+        open: bool,
+    },
+
+    /// Interactive setup wizard
+    Init,
 }
 
 #[derive(Subcommand)]
@@ -253,25 +267,8 @@ async fn main() -> Result<()> {
         }
 
         Commands::Onboard => {
-            println!("🦀 BizClaw — First-time Setup\n");
-            println!("Creating default configuration...");
-
-            let config = bizclaw_core::BizClawConfig::default();
-            config.save()?;
-            println!("✅ Config saved to: {}", bizclaw_core::BizClawConfig::default_path().display());
-
-            // Create directories
-            let home = bizclaw_core::BizClawConfig::home_dir();
-            std::fs::create_dir_all(home.join("models"))?;
-            std::fs::create_dir_all(home.join("cache"))?;
-            std::fs::create_dir_all(home.join("zalo"))?;
-            println!("✅ Directories created");
-
-            println!("\n📋 Next steps:");
-            println!("  1. Set your API key: bizclaw config set api_key sk-...");
-            println!("  2. Or use local brain: bizclaw brain download");
-            println!("  3. Start chatting: bizclaw agent --interactive");
-            println!("  4. For Zalo: configure ~/.bizclaw/config.toml [channel.zalo] section");
+            // Redirect to init
+            run_init_wizard().await?;
         }
 
         Commands::Brain { action } => {
@@ -450,7 +447,6 @@ async fn main() -> Result<()> {
         }
 
         Commands::Chat { provider, model } => {
-            // Apply overrides
             if let Some(p) = provider {
                 config.default_provider = p;
             }
@@ -507,7 +503,118 @@ async fn main() -> Result<()> {
 
             println!("\n👋 Goodbye!");
         }
+
+        Commands::Serve { port, open } => {
+            println!("🦀 BizClaw v{} — Web Dashboard", env!("CARGO_PKG_VERSION"));
+
+            let mut gw_config = config.gateway.clone();
+            gw_config.port = port;
+
+            let url = format!("http://{}:{}", gw_config.host, gw_config.port);
+            println!("   🌐 Dashboard: {url}");
+            println!("   📡 API:       {url}/api/v1/info");
+            println!("   🔌 WebSocket: ws://{}:{}/ws", gw_config.host, gw_config.port);
+            println!();
+
+            if open {
+                let _ = std::process::Command::new("open").arg(&url).spawn();
+            }
+
+            bizclaw_gateway::start_server(&gw_config).await?;
+        }
+
+        Commands::Init => {
+            run_init_wizard().await?;
+        }
     }
+
+    Ok(())
+}
+
+/// Interactive setup wizard.
+async fn run_init_wizard() -> Result<()> {
+    use std::io::{self, Write, BufRead};
+
+    println!("\n🦀 BizClaw — Setup Wizard\n");
+    println!("This will create your configuration file.\n");
+
+    let stdin = io::stdin();
+    let mut input = String::new();
+
+    // 1. Provider
+    println!("📡 Choose your AI provider:");
+    println!("  1. OpenAI (default)");
+    println!("  2. Anthropic Claude");
+    println!("  3. Ollama (local)");
+    println!("  4. Brain (built-in GGUF)");
+    print!("\n  Choice [1]: ");
+    io::stdout().flush()?;
+    input.clear();
+    stdin.lock().read_line(&mut input)?;
+
+    let (provider, default_model) = match input.trim() {
+        "2" => ("anthropic", "claude-sonnet-4-20250514"),
+        "3" => ("ollama", "llama3.2"),
+        "4" => ("brain", "tinyllama-1.1b"),
+        _ => ("openai", "gpt-4o-mini"),
+    };
+
+    // 2. API Key (if needed)
+    let mut api_key = String::new();
+    if provider != "brain" && provider != "ollama" {
+        print!("\n🔑 Enter your {} API key (or press Enter to skip): ", provider);
+        io::stdout().flush()?;
+        input.clear();
+        stdin.lock().read_line(&mut input)?;
+        api_key = input.trim().to_string();
+    }
+
+    // 3. Bot name
+    print!("\n🤖 Bot name [BizClaw]: ");
+    io::stdout().flush()?;
+    input.clear();
+    stdin.lock().read_line(&mut input)?;
+    let bot_name: String = if input.trim().is_empty() { "BizClaw".into() } else { input.trim().to_string() };
+
+    // 4. Gateway
+    print!("\n🌐 Enable web dashboard? [Y/n]: ");
+    io::stdout().flush()?;
+    input.clear();
+    stdin.lock().read_line(&mut input)?;
+    let enable_gateway = !input.trim().eq_ignore_ascii_case("n");
+
+    // Build config
+    let mut config = bizclaw_core::BizClawConfig::default();
+    config.default_provider = provider.into();
+    config.default_model = default_model.into();
+    config.api_key = api_key;
+    config.identity.name = bot_name.into();
+
+    // Save
+    config.save()?;
+
+    // Create directories
+    let home = bizclaw_core::BizClawConfig::home_dir();
+    std::fs::create_dir_all(home.join("models"))?;
+    std::fs::create_dir_all(home.join("cache"))?;
+    std::fs::create_dir_all(home.join("data"))?;
+
+    println!("\n✅ Setup complete!");
+    println!("   Config: {}", bizclaw_core::BizClawConfig::default_path().display());
+    println!("   Provider: {provider}");
+    println!("   Model: {default_model}");
+
+    if provider == "brain" {
+        println!("\n🧠 Download a model:");
+        println!("   bizclaw brain download tinyllama-1.1b");
+    }
+
+    println!("\n🚀 Quick start:");
+    println!("   bizclaw chat                  # Start chatting");
+    if enable_gateway {
+        println!("   bizclaw serve                 # Web dashboard at http://localhost:3000");
+    }
+    println!("   bizclaw serve --open           # Open in browser");
 
     Ok(())
 }

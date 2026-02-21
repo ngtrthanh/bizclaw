@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizClaw — Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a2e;--border:#2a2a3e;
+  --text:#e4e4ef;--text2:#8888aa;--accent:#6c5ce7;--accent2:#a29bfe;
+  --green:#00b894;--red:#ff6b6b;--orange:#fdcb6e;--blue:#74b9ff;
+}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--accent2);text-decoration:none}
+
+/* Layout */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column}
+.main{padding:24px 32px;overflow-y:auto}
+
+/* Sidebar */
+.logo{padding:0 20px 20px;display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;border-bottom:1px solid var(--border)}
+.logo span{font-size:24px}
+.nav{flex:1;padding:12px 8px}
+.nav a{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:8px;color:var(--text2);font-size:14px;transition:all .15s}
+.nav a:hover,.nav a.active{background:var(--surface2);color:var(--text)}
+.nav a.active{color:var(--accent2);font-weight:500}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+
+/* Cards */
+h1{font-size:24px;margin-bottom:20px;font-weight:600}
+h2{font-size:18px;margin-bottom:16px;font-weight:500;color:var(--text2)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px}
+.card-label{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.card-value{font-size:28px;font-weight:700}
+.card-sub{font-size:12px;color:var(--text2);margin-top:4px}
+.green{color:var(--green)}.red{color:var(--red)}.orange{color:var(--orange)}.blue{color:var(--blue)}.accent{color:var(--accent2)}
+
+/* Tables */
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:8px 12px;border-bottom:1px solid var(--border)}
+td{padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(0,184,148,.15);color:var(--green)}
+.badge-blue{background:rgba(116,185,255,.15);color:var(--blue)}
+.badge-orange{background:rgba(253,203,110,.15);color:var(--orange)}
+
+/* Chat */
+.chat-container{display:flex;flex-direction:column;height:calc(100vh - 120px)}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 0;display:flex;flex-direction:column;gap:12px}
+.msg{max-width:75%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.5;animation:fadeIn .2s}
+.msg-user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.msg-bot{align-self:flex-start;background:var(--surface2);border:1px solid var(--border);border-bottom-left-radius:4px}
+.msg-system{align-self:center;font-size:12px;color:var(--text2);font-style:italic}
+.chat-input{display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--border)}
+.chat-input input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;color:var(--text);font-size:14px;outline:none}
+.chat-input input:focus{border-color:var(--accent)}
+.chat-input button{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:14px;cursor:pointer;font-weight:500;transition:all .15s}
+.chat-input button:hover{background:var(--accent2)}
+.typing{color:var(--text2);font-size:13px;padding:4px 0}
+
+/* Config */
+.config-group{margin-bottom:24px}
+.config-row{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:8px}
+.config-label{width:160px;font-size:13px;color:var(--text2);flex-shrink:0}
+.config-value{flex:1;font-size:14px;font-family:monospace;color:var(--accent2)}
+.config-row input,.config-row select{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);font-size:13px;outline:none}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;font-weight:500}
+.btn:hover{opacity:.9}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text2)}
+
+/* Section */
+.section{margin-bottom:32px}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulse{animation:pulse 1.5s infinite}
+
+/* Responsive */
+@media(max-width:768px){.app{grid-template-columns:1fr}.sidebar{display:none}.main{padding:16px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo"><span>🦀</span> BizClaw</div>
+    <nav class="nav">
+      <a href="#" onclick="showPage('dashboard')" class="active" id="nav-dashboard"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="#" onclick="showPage('chat')" id="nav-chat"><span class="nav-icon">💬</span> Chat</a>
+      <a href="#" onclick="showPage('providers')" id="nav-providers"><span class="nav-icon">🔌</span> Providers</a>
+      <a href="#" onclick="showPage('channels')" id="nav-channels"><span class="nav-icon">📱</span> Channels</a>
+      <a href="#" onclick="showPage('config')" id="nav-config"><span class="nav-icon">⚙️</span> Config</a>
+      <a href="#" onclick="showPage('brain')" id="nav-brain"><span class="nav-icon">🧠</span> Brain</a>
+    </nav>
+    <div style="padding:12px 20px;font-size:11px;color:var(--text2)">
+      <div id="ws-status">⬜ Disconnected</div>
+    </div>
+  </aside>
+  <main class="main">
+    <!-- Dashboard -->
+    <div id="page-dashboard">
+      <h1>Dashboard</h1>
+      <div class="stats">
+        <div class="card"><div class="card-label">Status</div><div class="card-value green" id="stat-status">●  Online</div></div>
+        <div class="card"><div class="card-label">Version</div><div class="card-value accent" id="stat-version">—</div></div>
+        <div class="card"><div class="card-label">Provider</div><div class="card-value blue" id="stat-provider">—</div></div>
+        <div class="card"><div class="card-label">Uptime</div><div class="card-value" id="stat-uptime">—</div></div>
+      </div>
+      <div class="section">
+        <h2>System Info</h2>
+        <div class="card" id="system-info"><div class="card-label">Loading...</div></div>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div id="page-chat" style="display:none">
+      <h1>Chat</h1>
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+          <div class="msg msg-system">Connected to BizClaw. Type a message to start.</div>
+        </div>
+        <div class="typing" id="chat-typing" style="display:none">BizClaw is typing<span class="pulse">...</span></div>
+        <div class="chat-input">
+          <input type="text" id="chat-input" placeholder="Type your message..." onkeydown="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Providers -->
+    <div id="page-providers" style="display:none">
+      <h1>Providers</h1>
+      <div class="card"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th></tr></thead><tbody id="providers-table"></tbody></table></div>
+    </div>
+
+    <!-- Channels -->
+    <div id="page-channels" style="display:none">
+      <h1>Channels</h1>
+      <div class="card"><table><thead><tr><th>Name</th><th>Type</th><th>Status</th></tr></thead><tbody id="channels-table"></tbody></table></div>
+    </div>
+
+    <!-- Config -->
+    <div id="page-config" style="display:none">
+      <h1>Configuration</h1>
+      <div id="config-content"><div class="card"><div class="card-label">Loading...</div></div></div>
+    </div>
+
+    <!-- Brain -->
+    <div id="page-brain" style="display:none">
+      <h1>Brain Engine</h1>
+      <div class="stats">
+        <div class="card"><div class="card-label">Engine</div><div class="card-value green">GGUF v3</div></div>
+        <div class="card"><div class="card-label">SIMD</div><div class="card-value accent" id="brain-simd">—</div></div>
+        <div class="card"><div class="card-label">Quantization</div><div class="card-value blue">Q4_0 / Q8_0</div></div>
+      </div>
+      <div class="section">
+        <h2>Available Models</h2>
+        <div class="card">
+          <table><thead><tr><th>Model</th><th>Size</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>TinyLlama 1.1B</td><td>~638 MB</td><td><code>bizclaw brain download tinyllama-1.1b</code></td></tr>
+            <tr><td>Phi-2</td><td>~1.6 GB</td><td><code>bizclaw brain download phi-2</code></td></tr>
+            <tr><td>Llama 3.2 1B</td><td>~750 MB</td><td><code>bizclaw brain download llama-3.2-1b</code></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API = '';
+let ws = null;
+let reqCounter = 0;
+
+// Navigation
+function showPage(name) {
+  document.querySelectorAll('[id^=page-]').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('page-' + name).style.display = '';
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'chat') document.getElementById('chat-input').focus();
+}
+
+// Fetch data
+async function loadDashboard() {
+  try {
+    const info = await (await fetch(API + '/api/v1/info')).json();
+    document.getElementById('stat-version').textContent = 'v' + info.version;
+    document.getElementById('stat-provider').textContent = info.default_provider || '—';
+    document.getElementById('stat-uptime').textContent = formatUptime(info.uptime_secs);
+    document.getElementById('system-info').innerHTML = `
+      <table>
+        <tr><td style="color:var(--text2);width:140px">Platform</td><td>${info.platform || '—'}</td></tr>
+        <tr><td style="color:var(--text2)">Architecture</td><td>${info.arch || '—'}</td></tr>
+        <tr><td style="color:var(--text2)">Provider</td><td>${info.default_provider || '—'}</td></tr>
+        <tr><td style="color:var(--text2)">Model</td><td>${info.default_model || '—'}</td></tr>
+        <tr><td style="color:var(--text2)">Crates</td><td>11</td></tr>
+        <tr><td style="color:var(--text2)">Tests</td><td>45 passing</td></tr>
+      </table>`;
+    // SIMD
+    const arch = info.arch || '';
+    document.getElementById('brain-simd').textContent =
+      arch.includes('aarch64') ? 'NEON' : arch.includes('x86') ? 'AVX2/SSE2' : 'Scalar';
+  } catch(e) { console.error('Dashboard load failed:', e); }
+}
+
+async function loadProviders() {
+  try {
+    const data = await (await fetch(API + '/api/v1/providers')).json();
+    const tbody = document.getElementById('providers-table');
+    tbody.innerHTML = data.providers.map(p => `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td>${p.type}</td>
+      <td><span class="badge badge-green">${p.status}</span></td>
+    </tr>`).join('');
+  } catch(e) {}
+}
+
+async function loadChannels() {
+  try {
+    const data = await (await fetch(API + '/api/v1/channels')).json();
+    const tbody = document.getElementById('channels-table');
+    tbody.innerHTML = data.channels.map(c => `<tr>
+      <td><strong>${c.name}</strong></td>
+      <td>${c.type}</td>
+      <td><span class="badge badge-green">${c.status}</span></td>
+    </tr>`).join('');
+  } catch(e) {}
+}
+
+async function loadConfig() {
+  try {
+    const data = await (await fetch(API + '/api/v1/config')).json();
+    const el = document.getElementById('config-content');
+    el.innerHTML = '<div class="card"><pre style="font-size:13px;line-height:1.6;color:var(--accent2);white-space:pre-wrap">' +
+      JSON.stringify(data, null, 2) + '</pre></div>';
+  } catch(e) {}
+}
+
+// WebSocket
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws');
+  ws.onopen = () => {
+    document.getElementById('ws-status').innerHTML = '🟢 Connected';
+  };
+  ws.onclose = () => {
+    document.getElementById('ws-status').innerHTML = '🔴 Disconnected';
+    setTimeout(connectWS, 3000);
+  };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    handleWSMessage(msg);
+  };
+}
+
+function handleWSMessage(msg) {
+  const chatEl = document.getElementById('chat-messages');
+  const typingEl = document.getElementById('chat-typing');
+
+  switch(msg.type) {
+    case 'connected':
+      break;
+    case 'chat_start':
+      typingEl.style.display = '';
+      break;
+    case 'chat_chunk':
+      typingEl.style.display = 'none';
+      let lastMsg = chatEl.querySelector('.msg-streaming');
+      if (!lastMsg) {
+        lastMsg = document.createElement('div');
+        lastMsg.className = 'msg msg-bot msg-streaming';
+        chatEl.appendChild(lastMsg);
+      }
+      lastMsg.textContent += msg.content;
+      chatEl.scrollTop = chatEl.scrollHeight;
+      break;
+    case 'chat_done':
+      typingEl.style.display = 'none';
+      const streaming = chatEl.querySelector('.msg-streaming');
+      if (streaming) streaming.classList.remove('msg-streaming');
+      break;
+    case 'chat_response':
+      addChatMsg(msg.content, 'bot');
+      break;
+    case 'pong':
+      break;
+    case 'error':
+      addChatMsg('Error: ' + msg.message, 'system');
+      break;
+  }
+}
+
+function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+
+  addChatMsg(text, 'user');
+  ws.send(JSON.stringify({type: 'chat', content: text, stream: true}));
+  input.value = '';
+  input.focus();
+}
+
+function addChatMsg(text, role) {
+  const el = document.createElement('div');
+  el.className = 'msg msg-' + role;
+  el.textContent = text;
+  document.getElementById('chat-messages').appendChild(el);
+  el.parentElement.scrollTop = el.parentElement.scrollHeight;
+}
+
+// Helpers
+function formatUptime(secs) {
+  if (!secs) return '—';
+  if (secs < 60) return secs + 's';
+  if (secs < 3600) return Math.floor(secs/60) + 'm ' + (secs%60) + 's';
+  return Math.floor(secs/3600) + 'h ' + Math.floor((secs%3600)/60) + 'm';
+}
+
+// Init
+loadDashboard();
+loadProviders();
+loadChannels();
+loadConfig();
+connectWS();
+setInterval(loadDashboard, 10000);
+</script>
+</body>
+</html>

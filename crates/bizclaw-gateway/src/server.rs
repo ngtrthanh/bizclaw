@@ -1,6 +1,7 @@
 //! HTTP server implementation using Axum.
 
 use axum::{Router, routing::get};
+use axum::response::Html;
 use bizclaw_core::config::GatewayConfig;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
@@ -13,9 +14,15 @@ pub struct AppState {
     pub start_time: std::time::Instant,
 }
 
+/// Serve the dashboard HTML page.
+async fn dashboard_page() -> Html<&'static str> {
+    Html(super::dashboard::dashboard_html())
+}
+
 /// Build the Axum router with all routes.
 pub fn build_router(state: AppState) -> Router {
     Router::new()
+        .route("/", get(dashboard_page))
         .route("/health", get(super::routes::health_check))
         .route("/api/v1/info", get(super::routes::system_info))
         .route("/api/v1/config", get(super::routes::get_config))
