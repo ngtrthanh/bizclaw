@@ -105,6 +105,7 @@ bizclaw-tools.workspace = true
 bizclaw-security.workspace = true
 bizclaw-agent.workspace = true
 bizclaw-gateway.workspace = true
+bizclaw-platform = { path = "crates/bizclaw-platform" }
 tokio.workspace = true
 clap.workspace = true
 tracing.workspace = true
@@ -116,10 +117,15 @@ toml.workspace = true
 tokio-stream.workspace = true
 futures.workspace = true
 reqwest.workspace = true
+shellexpand.workspace = true
 
 [[bin]]
 name = "bizclaw"
 path = "src/main.rs"
+
+[[bin]]
+name = "bizclaw-platform"
+path = "src/platform_main.rs"
 
 [profile.release]
 opt-level = 3
