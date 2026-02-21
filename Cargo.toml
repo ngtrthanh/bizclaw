@@ -109,6 +109,8 @@ tracing-subscriber.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+toml.workspace = true
+tokio-stream.workspace = true
 
 [[bin]]
 name = "bizclaw"

@@ -7,9 +7,10 @@ pub mod context;
 use bizclaw_core::config::BizClawConfig;
 use bizclaw_core::error::Result;
 use bizclaw_core::traits::Provider;
+use bizclaw_core::traits::SecurityPolicy;
 use bizclaw_core::traits::memory::MemoryBackend;
 use bizclaw_core::traits::provider::GenerateParams;
-use bizclaw_core::types::{Message, OutgoingMessage, ThreadType};
+use bizclaw_core::types::{Message, OutgoingMessage};
 
 /// The BizClaw agent — processes messages using LLM providers and tools.
 pub struct Agent {

@@ -61,12 +61,9 @@ impl Channel for ZaloChannel {
 
     async fn listen(&self) -> Result<Box<dyn Stream<Item = IncomingMessage> + Send + Unpin>> {
         // Phase 4A: WebSocket event listener
-        let stream = async_stream::stream! {
-            tracing::info!("Zalo listener: waiting for messages (stub)...");
-            // Stub: no messages in initial build
-            tokio::time::sleep(tokio::time::Duration::from_secs(86400)).await;
-        };
-        Ok(Box::new(Box::pin(stream)))
+        // Stub: returns a stream that never produces items (pending indefinitely)
+        tracing::info!("Zalo listener: waiting for messages (stub)...");
+        Ok(Box::new(futures::stream::pending::<IncomingMessage>()))
     }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
