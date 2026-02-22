@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  bizclaw:
+    image: ghcr.io/ngtrthanh/bizclaw:latest
+    container_name: bizclaw
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/home/bizclaw/.bizclaw
+      - ./data:/home/bizclaw/data
+    environment:
+      - RUST_LOG=info
+      - BIZCLAW_HOST=0.0.0.0
+      - BIZCLAW_PORT=8080
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/bizclaw", "--version"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Optional: PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    container_name: bizclaw-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bizclaw
+      POSTGRES_USER: bizclaw
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bizclaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Redis cache
+  redis:
+    image: redis:7-alpine
+    container_name: bizclaw-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:
