@@ -57,6 +57,7 @@ jobs:
         env:
           OPENSSL_STATIC: "1"
           OPENSSL_VENDORED: "1"
+          CROSS_NO_WARNINGS: "0"
 
       - name: Package binary
         run: |
