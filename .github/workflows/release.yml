@@ -65,16 +65,13 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.tar.gz
 
-  # macOS builds (Intel and Apple Silicon)
+  # macOS build (Apple Silicon only)
   build-macos:
     name: Build macOS (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            runner: macos-13
-            artifact: bizclaw-darwin-amd64
           - target: aarch64-apple-darwin
             runner: macos-14
             artifact: bizclaw-darwin-arm64

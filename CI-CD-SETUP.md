@@ -131,13 +131,12 @@ Tag Push → Build All Platforms → Create Release → Build Docker → Push to
 | Linux | x86_64 | ubuntu-latest | bizclaw-linux-amd64.tar.gz |
 | Linux | aarch64 | ubuntu-latest (cross) | bizclaw-linux-arm64.tar.gz |
 | Linux | armv7 | ubuntu-latest (cross) | bizclaw-linux-armv7.tar.gz |
-| macOS | x86_64 | macos-13 | bizclaw-darwin-amd64.tar.gz |
 | macOS | aarch64 | macos-14 | bizclaw-darwin-arm64.tar.gz |
 | Windows | x86_64 | windows-latest | bizclaw-windows-amd64.zip |
 
 ## Features
 
-✅ **Multi-platform builds**: 6 different platform/architecture combinations
+✅ **Multi-platform builds**: 5 different platform/architecture combinations
 ✅ **Automated releases**: Tag-based release automation
 ✅ **Docker support**: Multi-arch images with single command
 ✅ **Caching**: Aggressive caching for faster builds

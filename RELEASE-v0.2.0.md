@@ -18,7 +18,6 @@ GitHub Actions is automatically building:
 - ✅ armv7-unknown-linux-gnueabihf → `bizclaw-linux-armv7.tar.gz`
 
 **macOS** (native builds):
-- ✅ x86_64-apple-darwin (Intel) → `bizclaw-darwin-amd64.tar.gz`
 - ✅ aarch64-apple-darwin (Apple Silicon) → `bizclaw-darwin-arm64.tar.gz`
 
 **Windows** (native build):
@@ -150,7 +149,7 @@ If the build fails:
 
 ## Success Criteria
 
-✅ All 6 platform binaries built successfully  
+✅ All 5 platform binaries built successfully  
 ✅ Docker images pushed to GHCR  
 ✅ GitHub release created with all artifacts  
 ✅ Release notes auto-generated  
