@@ -128,7 +128,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </style>
 </head>
 <body>
-<div class="app">
+<!-- Pairing Gate -->
+<div id="pairing-gate" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:300;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:380px;text-align:center">
+    <div style="font-size:32px;margin-bottom:12px">🔐</div>
+    <h2 style="color:var(--accent);margin-bottom:8px">BizClaw Agent</h2>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:24px">Nhập mã Pairing Code để truy cập Dashboard</p>
+    <div id="pairing-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
+    <input id="pairing-input" type="text" placeholder="Pairing Code (6 digits)" maxlength="10" style="width:100%;padding:12px 16px;margin-bottom:14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:18px;text-align:center;letter-spacing:4px;font-family:var(--mono)" onkeydown="if(event.key==='Enter')doPairing()">
+    <button style="width:100%;padding:12px;background:var(--grad1);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer" onclick="doPairing()">🔓 Xác nhận</button>
+  </div>
+</div>
+
+<div id="app-container" class="app" style="display:flex">
   <aside class="sidebar">
     <div class="logo"><span class="icon">⚡</span><span class="text">BizClaw</span></div>
     <nav class="nav">
@@ -275,6 +287,53 @@ tr:hover td{background:rgba(255,255,255,.02)}
 <script>
 const API = '';
 let ws = null, configData = {};
+let pairingCode = sessionStorage.getItem('bizclaw_pairing')||'';
+
+// ═══ AUTH ═══
+function authHeaders(extra={}){
+  return {...extra,'X-Pairing-Code':pairingCode,'Content-Type':'application/json'};
+}
+async function authFetch(url,opts={}){
+  if(!opts.headers) opts.headers={};
+  opts.headers['X-Pairing-Code']=pairingCode;
+  const res=await fetch(url,opts);
+  if(res.status===401){sessionStorage.removeItem('bizclaw_pairing');pairingCode='';showPairingGate();throw new Error('Invalid pairing code');}
+  return res;
+}
+function showPairingGate(){
+  document.getElementById('pairing-gate').style.display='flex';
+  document.getElementById('app-container').style.display='none';
+}
+function hidePairingGate(){
+  document.getElementById('pairing-gate').style.display='none';
+  document.getElementById('app-container').style.display='flex';
+}
+async function doPairing(){
+  const code=document.getElementById('pairing-input').value.trim();
+  const errEl=document.getElementById('pairing-error');
+  errEl.style.display='none';
+  if(!code){errEl.textContent='Vui l\xf2ng nh\u1eadp m\xe3 pairing';errEl.style.display='block';return;}
+  try{
+    const res=await fetch('/api/v1/verify-pairing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+    const r=await res.json();
+    if(r.ok){pairingCode=code;sessionStorage.setItem('bizclaw_pairing',code);hidePairingGate();initApp();}
+    else{errEl.textContent=r.error||'Sai m\xe3 pairing';errEl.style.display='block';}
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
+}
+async function checkPairing(){
+  // First check if pairing is required at all
+  try{
+    const res=await fetch('/api/v1/verify-pairing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:''})});
+    const r=await res.json();
+    if(r.ok){hidePairingGate();initApp();return;} // no pairing required
+  }catch(e){}
+  if(pairingCode){
+    try{const r=await(await fetch('/api/v1/verify-pairing',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:pairingCode})})).json();
+      if(r.ok){hidePairingGate();initApp();return;}
+    }catch(e){}
+  }
+  showPairingGate();
+}
 
 // ═══ NAVIGATION ═══
 function showPage(name) {
@@ -293,7 +352,7 @@ function showPage(name) {
 // ═══ DASHBOARD ═══
 async function loadDashboard() {
   try {
-    const info = await (await fetch(API + '/api/v1/info')).json();
+    const info = await (await authFetch(API + '/api/v1/info')).json();
     document.getElementById('s-version').textContent = 'v' + (info.version||'?');
     document.getElementById('s-provider').textContent = info.default_provider || '—';
     document.getElementById('s-model').textContent = info.default_model || '—';
@@ -304,7 +363,7 @@ async function loadDashboard() {
     document.getElementById('brain-simd').textContent = arch.includes('aarch64') ? 'NEON' : arch.includes('x86') ? 'AVX2/SSE2' : 'Auto';
   } catch(e) {}
   try {
-    const ch = await (await fetch(API + '/api/v1/channels')).json();
+    const ch = await (await authFetch(API + '/api/v1/channels')).json();
     document.getElementById('dash-channels').innerHTML = ch.channels.map(c => `<tr>
       <td><strong>${c.name}</strong></td><td>${c.type}</td>
       <td><span class="badge badge-${c.status==='active'?'green':c.status==='disabled'?'orange':'blue'}">${c.status}</span></td>
@@ -315,7 +374,7 @@ async function loadDashboard() {
 
 async function loadProviders() {
   try {
-    const data = await (await fetch(API + '/api/v1/providers')).json();
+    const data = await (await authFetch(API + '/api/v1/providers')).json();
     document.getElementById('providers-table').innerHTML = data.providers.map(p => `<tr>
       <td><strong>${p.name}</strong></td><td>${p.type}</td>
       <td><span class="badge badge-${p.status==='active'?'green':'blue'}">${p.status}</span></td>
@@ -327,7 +386,7 @@ async function loadProviders() {
 // ═══ SETTINGS ═══
 async function loadConfig() {
   try {
-    configData = await (await fetch(API + '/api/v1/config')).json();
+    configData = await (await authFetch(API + '/api/v1/config')).json();
   } catch(e) { configData = {}; }
 }
 
@@ -372,7 +431,7 @@ async function saveSettings() {
   };
   if (apiKeyVal && !apiKeyVal.startsWith('•')) body.api_key = apiKeyVal;
   try {
-    const res = await fetch(API + '/api/v1/config/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const res = await authFetch(API + '/api/v1/config/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const r = await res.json();
     toast(r.ok ? '✅ Settings saved!' : '❌ ' + r.error);
     if (r.ok) { await loadConfig(); loadDashboard(); }
@@ -450,7 +509,7 @@ async function saveChannel(type) {
     if (el) body[f.key] = el.value;
   });
   try {
-    const res = await fetch(API + '/api/v1/channels/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const res = await authFetch(API + '/api/v1/channels/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const r = await res.json();
     toast(r.ok ? `✅ ${type} config saved` : '❌ ' + r.error);
     if (r.ok) { await loadConfig(); renderChannelCards(); }
@@ -462,7 +521,7 @@ async function openZaloQR() {
   modal.style.display = 'flex';
   document.getElementById('zalo-qr-content').innerHTML = '<div class="pulse" style="color:var(--text2)">Đang kết nối đến Zalo...</div>';
   try {
-    const res = await fetch(API + '/api/v1/zalo/qr', {method:'POST',headers:{'Content-Type':'application/json'}});
+    const res = await authFetch(API + '/api/v1/zalo/qr', {method:'POST',headers:{'Content-Type':'application/json'}});
     const r = await res.json();
     if (r.ok) {
       document.getElementById('zalo-qr-content').innerHTML = r.qr_code.startsWith('data:') 
@@ -488,7 +547,7 @@ function closeZaloQR() {
 // ═══ CONFIG TOML ═══
 async function loadConfigToml() {
   try {
-    const data = await (await fetch(API + '/api/v1/config/full')).json();
+    const data = await (await authFetch(API + '/api/v1/config/full')).json();
     document.getElementById('config-toml-content').textContent = data.toml || 'No config loaded';
     document.getElementById('config-path').textContent = data.config_path || '';
   } catch(e) {}
@@ -560,13 +619,14 @@ function toast(msg) {
 }
 
 // ═══ INIT ═══
-(async () => {
+async function initApp(){
   await loadConfig();
   loadDashboard();
   loadProviders();
   connectWS();
   setInterval(loadDashboard, 15000);
-})();
+}
+checkPairing();
 </script>
 </body>
 </html>

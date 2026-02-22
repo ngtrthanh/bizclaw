@@ -112,17 +112,49 @@ impl ZaloAuth {
         let response = self.client
             .post("https://id.zalo.me/account/authen/qrlogin")
             .json(&body)
+            .header("user-agent", &self.credentials.user_agent)
             .send()
             .await
             .map_err(|e| BizClawError::AuthFailed(format!("QR code request failed: {e}")))?;
 
-        let data: serde_json::Value = response.json().await
-            .map_err(|e| BizClawError::AuthFailed(format!("QR code response error: {e}")))?;
+        // Read as text first to avoid JSON parse errors on HTML responses
+        let status = response.status();
+        let text = response.text().await
+            .map_err(|e| BizClawError::AuthFailed(format!("QR code response read error: {e}")))?;
 
-        data["data"]["qr_code"]
-            .as_str()
-            .map(String::from)
-            .ok_or_else(|| BizClawError::AuthFailed("No QR code in response".into()))
+        if !status.is_success() {
+            return Err(BizClawError::AuthFailed(format!(
+                "Zalo API returned status {}: {}",
+                status, text.chars().take(200).collect::<String>()
+            )));
+        }
+
+        // Try parsing as JSON
+        match serde_json::from_str::<serde_json::Value>(&text) {
+            Ok(data) => {
+                // Try multiple response formats
+                if let Some(qr) = data["data"]["qr_code"].as_str() {
+                    return Ok(qr.to_string());
+                }
+                if let Some(qr) = data["data"]["qrcode"].as_str() {
+                    return Ok(qr.to_string());
+                }
+                if let Some(qr) = data["qr_code"].as_str() {
+                    return Ok(qr.to_string());
+                }
+                // Return error with response body for debugging
+                Err(BizClawError::AuthFailed(format!(
+                    "No QR code field in Zalo response. Keys: {:?}",
+                    data.as_object().map(|o| o.keys().collect::<Vec<_>>()).unwrap_or_default()
+                )))
+            }
+            Err(_) => {
+                // Not JSON — likely HTML error page
+                Err(BizClawError::AuthFailed(format!(
+                    "Zalo trả về HTML thay vì JSON. Có thể API đã thay đổi. Vui lòng paste cookie thủ công."
+                )))
+            }
+        }
     }
 
     /// Get credentials reference.

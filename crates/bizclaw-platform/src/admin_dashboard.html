@@ -88,6 +88,19 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <a onclick="showPage('audit')" href="#"><span>📋</span> <span>Audit Log</span></a>
   <div class="bottom"><a href="#" onclick="logout()">⏏ Logout</a></div>
 </aside>
+
+<!-- Login Screen -->
+<div id="login-screen" style="position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:380px;text-align:center">
+    <h2 style="color:var(--accent);margin-bottom:8px">🔒 BizClaw Admin</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:24px">Đăng nhập để quản lý hệ thống</p>
+    <div id="login-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
+    <input id="login-email" type="email" placeholder="Email" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
+    <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-primary" style="width:100%;padding:12px" onclick="doLogin()">🔑 Login</button>
+  </div>
+</div>
+
 <main class="main">
   <!-- Dashboard -->
   <div id="page-dashboard">
@@ -170,8 +183,37 @@ const API='/api/admin';
 let currentPage='dashboard';
 let channelTenantId=null;
 let channelTenantName='';
+let authToken=localStorage.getItem('bizclaw_admin_token')||'';
 
-// ── Navigation ──────────────────────────────────
+// ── Auth helpers ───────────────────────────────────────
+function authHeaders(extra={}){
+  return {...extra,'Authorization':'Bearer '+authToken,'Content-Type':'application/json'};
+}
+async function authFetch(url,opts={}){
+  opts.headers=authHeaders(opts.headers||{});
+  const res=await fetch(url,opts);
+  if(res.status===401){localStorage.removeItem('bizclaw_admin_token');authToken='';showLogin();throw new Error('Session expired');}
+  return res;
+}
+function showLogin(){document.getElementById('login-screen').style.display='flex';}
+function hideLogin(){document.getElementById('login-screen').style.display='none';}
+async function doLogin(){
+  const email=document.getElementById('login-email').value;
+  const password=document.getElementById('login-password').value;
+  const errEl=document.getElementById('login-error');
+  errEl.style.display='none';
+  try{
+    const res=await fetch(API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const r=await res.json();
+    if(r.ok){authToken=r.token;localStorage.setItem('bizclaw_admin_token',authToken);hideLogin();loadPage();toast('\u2705 Login successful');}
+    else{errEl.textContent=r.error||'Login failed';errEl.style.display='block';}
+  }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
+}
+function checkAuth(){
+  if(!authToken){showLogin();}else{hideLogin();loadPage();}
+}
+
+// ── Navigation ──────────────────────────────────────────
 function showPage(p){
   document.querySelectorAll('.main>div').forEach(d=>d.classList.add('hidden'));
   document.getElementById('page-'+p).classList.remove('hidden');
@@ -195,24 +237,24 @@ function toast(msg,type='success'){
 
 // ── Dashboard ──────────────────────────────────
 async function loadDashboard(){
-  const s=await(await fetch(API+'/stats')).json();
+  const s=await(await authFetch(API+'/stats')).json();
   document.getElementById('stats-row').innerHTML=
     `<div class="stat"><label>Total Tenants</label><div class="val">${s.total_tenants}</div></div>`+
     `<div class="stat"><label>▶ Running</label><div class="val green">${s.running}</div></div>`+
     `<div class="stat"><label>⏹ Stopped</label><div class="val">${s.stopped}</div></div>`+
     `<div class="stat"><label>⚠ Error</label><div class="val red">${s.error}</div></div>`+
     `<div class="stat"><label>👥 Users</label><div class="val">${s.users}</div></div>`;
-  const t=await(await fetch(API+'/tenants')).json();
+  const t=await(await authFetch(API+'/tenants')).json();
   document.getElementById('health-list').innerHTML=t.tenants.slice(0,5).map(t=>
     `<div class="tenant-row"><div><span class="tenant-name">${t.name}</span><div class="tenant-slug">${t.slug}</div></div><span class="badge ${t.status}">${t.status}</span></div>`).join('');
-  const a=await(await fetch(API+'/activity')).json();
+  const a=await(await authFetch(API+'/activity')).json();
   document.getElementById('activity-list').innerHTML=(a.events||[]).slice(0,8).map(e=>
     `<div class="event"><div><div class="type">${e.event_type}</div><div class="meta">${e.actor_type} (${e.actor_id.slice(0,8)}…)</div></div><div class="time">${e.created_at}</div></div>`).join('')
 }
 
 // ── Tenants ──────────────────────────────────
 async function loadTenants(){
-  const d=await(await fetch(API+'/tenants')).json();
+  const d=await(await authFetch(API+'/tenants')).json();
   const baseDomain=location.hostname.replace(/^admin\./,'');
   const proto=location.protocol;
   document.getElementById('tenants-list').innerHTML=d.tenants.map(t=>{
@@ -240,15 +282,15 @@ async function loadTenants(){
 }
 
 // ── Users & Audit ──────────────────────────────────
-async function loadUsers(){const d=await(await fetch(API+'/users')).json();document.getElementById('users-list').innerHTML=(d.users||[]).map(u=>`<div class="card" style="margin-bottom:8px"><strong>${u.email}</strong> · ${u.role} · ${u.created_at}</div>`).join('')||'<p style="color:var(--muted)">No users yet</p>'}
-async function loadAudit(){const d=await(await fetch(API+'/activity')).json();document.getElementById('audit-full').innerHTML=(d.events||[]).map(e=>`<div class="event"><div><div class="type">${e.event_type}</div><div class="meta">${e.actor_type} · ${e.actor_id}</div></div><div class="time">${e.created_at}</div></div>`).join('')}
+async function loadUsers(){const d=await(await authFetch(API+'/users')).json();document.getElementById('users-list').innerHTML=(d.users||[]).map(u=>`<div class="card" style="margin-bottom:8px"><strong>${u.email}</strong> · ${u.role} · ${u.created_at}</div>`).join('')||'<p style="color:var(--muted)">No users yet</p>'}
+async function loadAudit(){const d=await(await authFetch(API+'/activity')).json();document.getElementById('audit-full').innerHTML=(d.events||[]).map(e=>`<div class="event"><div><div class="type">${e.event_type}</div><div class="meta">${e.actor_type} · ${e.actor_id}</div></div><div class="time">${e.created_at}</div></div>`).join('')}
 
 // ── Modals ──────────────────────────────────
 function showCreateModal(){document.getElementById('modal-create').classList.remove('hidden')}
 function hideModal(id){document.getElementById(id).classList.add('hidden')}
 
 async function createTenant(){
-  await fetch(API+'/tenants',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+  await authFetch(API+'/tenants',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('f-name').value,
     slug:document.getElementById('f-slug').value,
     provider:document.getElementById('f-provider').value,
@@ -262,9 +304,9 @@ async function tenantAction(id,action){
   if(action==='delete'&&!confirm('Delete this tenant?'))return;
   const method=action==='delete'?'DELETE':'POST';
   const url=action==='delete'?`${API}/tenants/${id}`:`${API}/tenants/${id}/${action}`;
-  await fetch(url,{method});toast(`Tenant ${action}ed`);loadPage();
+  await authFetch(url,{method});toast(`Tenant ${action}ed`);loadPage();
 }
-function logout(){location.reload()}
+function logout(){localStorage.removeItem('bizclaw_admin_token');authToken='';showLogin();}
 
 // ══════════════════════════════════════════════════
 // ── CHANNEL CONFIGURATION ──────────────────────
@@ -330,7 +372,7 @@ async function openChannels(tenantId, tenantName){
   document.getElementById('ch-tenant-name').textContent = tenantName;
 
   // Load existing channels from API
-  const res = await fetch(`${API}/tenants/${tenantId}/channels`);
+  const res = await authFetch(`${API}/tenants/${tenantId}/channels`);
   const data = await res.json();
   const existing = {};
   if(data.ok && data.channels){
@@ -404,7 +446,7 @@ async function saveChannel(type){
 
   const enabled = document.getElementById(`toggle-${type}`).checked;
 
-  const res = await fetch(`${API}/tenants/${channelTenantId}/channels`, {
+  const res = await authFetch(`${API}/tenants/${channelTenantId}/channels`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ channel_type: type, enabled, config })
@@ -413,7 +455,7 @@ async function saveChannel(type){
   if(data.ok){
     toast(`${def.name} — Đã lưu cấu hình!`);
     // Reload
-    const r2 = await fetch(`${API}/tenants/${channelTenantId}/channels`);
+    const r2 = await authFetch(`${API}/tenants/${channelTenantId}/channels`);
     const d2 = await r2.json();
     loadedChannels = {};
     if(d2.ok && d2.channels){
@@ -439,7 +481,7 @@ async function toggleChannel(type, enabled){
     if(el) config[f.key] = el.value;
   });
 
-  await fetch(`${API}/tenants/${channelTenantId}/channels`, {
+  await authFetch(`${API}/tenants/${channelTenantId}/channels`, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ channel_type: type, enabled, config })
@@ -449,7 +491,7 @@ async function toggleChannel(type, enabled){
 
 async function removeChannel(type, channelId){
   if(!confirm('Xoá cấu hình kênh này?')) return;
-  await fetch(`${API}/tenants/${channelTenantId}/channels/${channelId}`, {method:'DELETE'});
+  await authFetch(`${API}/tenants/${channelTenantId}/channels/${channelId}`, {method:'DELETE'});
   delete loadedChannels[type];
   renderChannelCards();
   toast('Đã xoá kênh');
@@ -462,7 +504,7 @@ async function openZaloQR(){
   document.getElementById('zalo-cookie-input').value = '';
 
   try {
-    const res = await fetch(`${API}/tenants/${channelTenantId}/channels/zalo/qr`, {method:'POST'});
+    const res = await authFetch(`${API}/tenants/${channelTenantId}/channels/zalo/qr`, {method:'POST'});
     const data = await res.json();
     if(data.ok && data.qr_code){
       document.getElementById('qr-display').innerHTML = `
@@ -501,7 +543,7 @@ async function saveZaloCookie(){
 }
 
 // ── Init ──────────────────────────────────
-loadDashboard();
+checkAuth();
 </script>
 </body>
 </html>
