@@ -114,11 +114,13 @@ pub fn multi_head_attention(
             q_slice,
             key_cache,
             value_cache,
-            cfg.seq_len,
-            cfg.head_dim,
-            kv_stride,
-            k_base,
-            v_base,
+            AttentionStridedParams {
+                seq_len: cfg.seq_len,
+                head_dim: cfg.head_dim,
+                kv_stride,
+                k_base,
+                v_base,
+            },
         );
     }
 }
@@ -137,20 +139,8 @@ fn attention_strided(
     q: &[f32],
     key_cache: &[f32],
     value_cache: &[f32],
-    seq_len: usize,
-    head_dim: usize,
-    kv_stride: usize,
-    k_base: usize,
-    v_base: usize,
+    params: AttentionStridedParams,
 ) {
-    let params = AttentionStridedParams {
-        seq_len,
-        head_dim,
-        kv_stride,
-        k_base,
-        v_base,
-    };
-
     if params.seq_len == 0 {
         for v in output.iter_mut() {
             *v = 0.0;

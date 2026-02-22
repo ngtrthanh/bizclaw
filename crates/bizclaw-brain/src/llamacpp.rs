@@ -38,6 +38,12 @@ pub struct LlamaCppBackend {
     loaded: bool,
 }
 
+impl Default for LlamaCppBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LlamaCppBackend {
     /// Create a new llama.cpp backend instance.
     pub fn new() -> Self {

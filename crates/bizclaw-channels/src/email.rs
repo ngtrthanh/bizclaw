@@ -112,16 +112,16 @@ impl EmailChannel {
         let last_seen_uid = self.last_seen_uid.clone();
 
         tokio::task::spawn_blocking(move || {
-            imap_fetch_sync(
-                &host,
+            imap_fetch_sync(ImapFetchParams {
+                host: &host,
                 port,
-                &email,
-                &password,
-                &mailbox,
+                email: &email,
+                password: &password,
+                mailbox: &mailbox,
                 unread_only,
                 mark_as_read,
-                &last_seen_uid,
-            )
+                last_seen_uid: &last_seen_uid,
+            })
         })
         .await
         .map_err(|e| BizClawError::Channel(format!("IMAP task panicked: {e}")))?
@@ -297,38 +297,40 @@ impl Channel for EmailChannel {
     }
 }
 
-/// Synchronous IMAP fetch — called inside spawn_blocking.
-fn imap_fetch_sync(
-    host: &str,
+struct ImapFetchParams<'a> {
+    host: &'a str,
     port: u16,
-    email: &str,
-    password: &str,
-    mailbox: &str,
+    email: &'a str,
+    password: &'a str,
+    mailbox: &'a str,
     unread_only: bool,
     mark_as_read: bool,
-    last_seen_uid: &Arc<Mutex<u32>>,
-) -> Result<Vec<ParsedEmail>> {
+    last_seen_uid: &'a Arc<Mutex<u32>>,
+}
+
+/// Synchronous IMAP fetch — called inside spawn_blocking.
+fn imap_fetch_sync(params: ImapFetchParams) -> Result<Vec<ParsedEmail>> {
     let tls = native_tls::TlsConnector::builder()
         .build()
         .map_err(|e| BizClawError::Channel(format!("TLS: {e}")))?;
 
-    let client = imap::connect((host, port), host, &tls)
+    let client = imap::connect((params.host, params.port), params.host, &tls)
         .map_err(|e| BizClawError::Channel(format!("IMAP connect: {e}")))?;
 
     let mut session = client
-        .login(email, password)
+        .login(params.email, params.password)
         .map_err(|e| BizClawError::Channel(format!("IMAP login: {}", e.0)))?;
 
     session
-        .select(mailbox)
+        .select(params.mailbox)
         .map_err(|e| BizClawError::Channel(format!("Select: {e}")))?;
 
-    let search = if unread_only { "UNSEEN" } else { "ALL" };
+    let search = if params.unread_only { "UNSEEN" } else { "ALL" };
     let uids = session
         .uid_search(search)
         .map_err(|e| BizClawError::Channel(format!("Search: {e}")))?;
 
-    let last = *last_seen_uid.lock().unwrap();
+    let last = *params.last_seen_uid.lock().unwrap();
     let new_uids: Vec<u32> = uids.into_iter().filter(|&u| u > last).collect();
 
     if new_uids.is_empty() {
@@ -360,11 +362,11 @@ fn imap_fetch_sync(
         }
     }
 
-    if mark_as_read && !new_uids.is_empty() {
+    if params.mark_as_read && !new_uids.is_empty() {
         session.uid_store(&uid_set, "+FLAGS (\\Seen)").ok();
     }
 
-    *last_seen_uid.lock().unwrap() = max_uid;
+    *params.last_seen_uid.lock().unwrap() = max_uid;
     session.logout().ok();
     tracing::info!("📧 Fetched {} email(s)", emails.len());
     Ok(emails)

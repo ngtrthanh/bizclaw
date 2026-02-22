@@ -12,8 +12,7 @@ pub fn dequantize_q4_0(block: &[u8], output: &mut [f32]) {
 
     let scale = half::f16::from_le_bytes([block[0], block[1]]).to_f32();
 
-    for i in 0..16 {
-        let byte = block[2 + i];
+    for (i, &byte) in block[2..18].iter().enumerate() {
         let lo = (byte & 0x0F) as f32 - 8.0;
         let hi = ((byte >> 4) & 0x0F) as f32 - 8.0;
         output[i * 2] = lo * scale;
@@ -29,8 +28,8 @@ pub fn dequantize_q8_0(block: &[u8], output: &mut [f32]) {
 
     let scale = half::f16::from_le_bytes([block[0], block[1]]).to_f32();
 
-    for i in 0..32 {
-        output[i] = block[2 + i] as i8 as f32 * scale;
+    for (out, &byte) in output.iter_mut().zip(&block[2..34]) {
+        *out = byte as i8 as f32 * scale;
     }
 }
 
@@ -45,24 +44,13 @@ pub fn dequantize_row(
     match ggml_type {
         crate::gguf::GgmlType::F32 => {
             // Direct copy from bytes to f32
-            for i in 0..n_elements {
-                let offset = i * 4;
-                if offset + 4 <= data.len() {
-                    output[i] = f32::from_le_bytes([
-                        data[offset],
-                        data[offset + 1],
-                        data[offset + 2],
-                        data[offset + 3],
-                    ]);
-                }
+            for (out, chunk) in output.iter_mut().zip(data.chunks_exact(4)).take(n_elements) {
+                *out = f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
             }
         }
         crate::gguf::GgmlType::F16 => {
-            for i in 0..n_elements {
-                let offset = i * 2;
-                if offset + 2 <= data.len() {
-                    output[i] = half::f16::from_le_bytes([data[offset], data[offset + 1]]).to_f32();
-                }
+            for (out, chunk) in output.iter_mut().zip(data.chunks_exact(2)).take(n_elements) {
+                *out = half::f16::from_le_bytes([chunk[0], chunk[1]]).to_f32();
             }
         }
         crate::gguf::GgmlType::Q4_0 => {

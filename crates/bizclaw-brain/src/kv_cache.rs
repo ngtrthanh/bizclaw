@@ -178,8 +178,8 @@ impl Fp16KvCache {
     pub fn load_keys(&self, layer: usize, seq_len: usize, output: &mut [f32]) {
         let offset = layer * self.max_seq_len * self.kv_dim;
         let count = seq_len * self.kv_dim;
-        for i in 0..count {
-            output[i] = fp16_to_fp32(self.key_cache[offset + i]);
+        for (out, &key) in output.iter_mut().zip(&self.key_cache[offset..]).take(count) {
+            *out = fp16_to_fp32(key);
         }
     }
 
@@ -187,8 +187,12 @@ impl Fp16KvCache {
     pub fn load_values(&self, layer: usize, seq_len: usize, output: &mut [f32]) {
         let offset = layer * self.max_seq_len * self.kv_dim;
         let count = seq_len * self.kv_dim;
-        for i in 0..count {
-            output[i] = fp16_to_fp32(self.value_cache[offset + i]);
+        for (out, &val) in output
+            .iter_mut()
+            .zip(&self.value_cache[offset..])
+            .take(count)
+        {
+            *out = fp16_to_fp32(val);
         }
     }
 
@@ -353,7 +357,15 @@ mod tests {
 
     #[test]
     fn test_fp16_roundtrip() {
-        let values = [0.0f32, 1.0, -1.0, 0.5, 3.141592, -0.001, 65504.0];
+        let values = [
+            0.0f32,
+            1.0,
+            -1.0,
+            0.5,
+            std::f32::consts::PI,
+            -0.001,
+            65504.0,
+        ];
         for &v in &values {
             let fp16 = fp32_to_fp16(v);
             let back = fp16_to_fp32(fp16);

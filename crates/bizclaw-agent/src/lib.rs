@@ -122,8 +122,7 @@ impl Agent {
 
         let prompt_cache = PromptCache::new(&system_prompt, &tools);
 
-        let mut conversation = vec![];
-        conversation.push(Message::system(&system_prompt));
+        let conversation = vec![Message::system(&system_prompt)];
 
         Ok(Self {
             config,
@@ -198,8 +197,7 @@ impl Agent {
 
         let prompt_cache = PromptCache::new(&system_prompt, &tools);
 
-        let mut conversation = vec![];
-        conversation.push(Message::system(&system_prompt));
+        let conversation = vec![Message::system(&system_prompt)];
 
         Ok(Self {
             config,

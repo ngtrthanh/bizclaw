@@ -97,10 +97,10 @@ pub fn forward(
         // If embedding is F32, direct copy. Otherwise dequantize.
         if embd_tensor.ggml_type == crate::gguf::GgmlType::F32 {
             let byte_offset = offset * 4;
-            for i in 0..dim {
+            for (i, xi) in x.iter_mut().enumerate().take(dim) {
                 let o = byte_offset + i * 4;
                 if o + 4 <= embd_data.len() {
-                    x[i] = f32::from_le_bytes([
+                    *xi = f32::from_le_bytes([
                         embd_data[o],
                         embd_data[o + 1],
                         embd_data[o + 2],
