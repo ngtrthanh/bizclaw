@@ -1,5 +1,6 @@
 # Multi-stage Dockerfile for BizClaw
-# Supports multi-arch: linux/amd64, linux/arm64, linux/arm/v7
+# Supports multi-arch: linux/amd64, linux/arm64, linux/arm/v7, linux/arm/v6
+# Compatible with: x86_64, Raspberry Pi 4 (arm64), Pi 3 (armv7), Pi Zero/1 (armv6)
 
 FROM debian:bookworm-slim
 

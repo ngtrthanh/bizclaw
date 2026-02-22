@@ -18,17 +18,19 @@ Runs on every push and PR:
 
 #### Release Workflow (`.github/workflows/release.yml`)
 Triggers on version tags (e.g., `v0.1.0`):
-- ✅ **Linux builds**: x86_64, aarch64, armv7
-- ✅ **macOS builds**: Intel (x86_64), Apple Silicon (aarch64)
+- ✅ **Linux builds**: x86_64, aarch64 (ARM64), armv7, armv6
+  - Full Raspberry Pi support: Pi Zero/1 (ARMv6), Pi 2/3 (ARMv7), Pi 4/5 (ARM64)
+- ✅ **macOS builds**: Apple Silicon (aarch64)
 - ✅ **Windows build**: x86_64
 - ✅ **GitHub Release**: Automatic release creation with all binaries
-- ✅ **Docker**: Multi-arch images pushed to GHCR
+- ✅ **Docker**: Multi-arch images (amd64, arm64, armv7, armv6) pushed to GHCR
 
 ### 3. Docker Support
 
 #### Dockerfile
 - Multi-stage build optimized for size
-- Multi-arch support: amd64, arm64, armv7
+- Multi-arch support: amd64, arm64, armv7, armv6
+- Raspberry Pi compatible: All models from Pi Zero to Pi 5
 - Non-root user for security
 - Health checks included
 
@@ -86,7 +88,7 @@ cargo build --release
 ### Using Docker
 
 ```bash
-# Pull latest image
+# Pull latest image (automatically selects correct architecture)
 docker pull ghcr.io/ngtrthanh/bizclaw:latest
 
 # Run with docker-compose
@@ -98,6 +100,21 @@ docker-compose logs -f bizclaw
 # Stop
 docker-compose down
 ```
+
+### Raspberry Pi Support
+
+See [RASPBERRY-PI.md](RASPBERRY-PI.md) for detailed instructions on:
+- Installing pre-built binaries for your Pi model
+- Running via Docker on Raspberry Pi
+- Performance optimization tips
+- Building from source on Pi
+
+Supported models:
+- **Pi Zero, Pi 1**: ARMv6 binary (`bizclaw-linux-armv6`)
+- **Pi 2, Pi 3**: ARMv7 binary (`bizclaw-linux-armv7`)
+- **Pi 4, Pi 5**: ARM64 binary (`bizclaw-linux-arm64`)
+
+Docker images automatically work on all Pi models.
 
 ### Docker Images
 

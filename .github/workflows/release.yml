@@ -12,7 +12,7 @@ permissions:
   packages: write
 
 jobs:
-  # Linux builds (x86_64, aarch64, armv7)
+  # Linux builds (x86_64, aarch64, armv7, armv6)
   build-linux:
     name: Build Linux (${{ matrix.target }})
     runs-on: ubuntu-latest
@@ -21,10 +21,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             artifact: bizclaw-linux-amd64
+            platform: linux/amd64
           - target: aarch64-unknown-linux-gnu
             artifact: bizclaw-linux-arm64
+            platform: linux/arm64
           - target: armv7-unknown-linux-gnueabihf
             artifact: bizclaw-linux-armv7
+            platform: linux/arm/v7
+          - target: arm-unknown-linux-gnueabihf
+            artifact: bizclaw-linux-armv6
+            platform: linux/arm/v6
     steps:
       - uses: actions/checkout@v4
 
@@ -201,10 +207,11 @@ jobs:
 
       - name: Prepare binaries for Docker
         run: |
-          mkdir -p docker-bin/linux/amd64 docker-bin/linux/arm64 docker-bin/linux/arm/v7
+          mkdir -p docker-bin/linux/amd64 docker-bin/linux/arm64 docker-bin/linux/arm/v7 docker-bin/linux/arm/v6
           tar xzf artifacts/bizclaw-linux-amd64/bizclaw-linux-amd64.tar.gz -C docker-bin/linux/amd64
           tar xzf artifacts/bizclaw-linux-arm64/bizclaw-linux-arm64.tar.gz -C docker-bin/linux/arm64
           tar xzf artifacts/bizclaw-linux-armv7/bizclaw-linux-armv7.tar.gz -C docker-bin/linux/arm/v7
+          tar xzf artifacts/bizclaw-linux-armv6/bizclaw-linux-armv6.tar.gz -C docker-bin/linux/arm/v6
           # Rename all to just "bizclaw"
           for dir in docker-bin/linux/*/; do
             mv "$dir"/bizclaw-* "$dir"/bizclaw 2>/dev/null || true
@@ -215,10 +222,12 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
           build-args: |
             TARGETPLATFORM
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

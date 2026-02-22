@@ -6,11 +6,12 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 
 [![Rust](https://img.shields.io/badge/Rust-100%25-orange?logo=rust)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-82%20passing-brightgreen)]()
 [![Crates](https://img.shields.io/badge/crates-14-success)]()
 [![LOC](https://img.shields.io/badge/lines-19958-informational)]()
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20Raspberry%20Pi-blue)]()
 
-<!-- AUTO-GENERATED STATS — updated 2026-02-22 @ 2f77b17 -->
+<!-- AUTO-GENERATED STATS — updated 2026-02-23 @ 18668a7 -->
 
 ---
 
@@ -21,6 +22,7 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 - **100% Độc lập:** Clone về là chạy — laptop, VPS, hay Raspberry Pi. Không token khoá, không telemetry.
 - **Dữ liệu nội bộ:** Chat history, API Keys mã hoá AES-256 lưu local.
 - **Offline AI:** Brain Engine chạy LLM offline (Llama, DeepSeek) — tối ưu cho 512MB RAM.
+- **🍓 Raspberry Pi:** Hỗ trợ đầy đủ Pi Zero/1 (ARMv6), Pi 2/3 (ARMv7), Pi 4/5 (ARM64) — [xem hướng dẫn](RASPBERRY-PI.md)
 
 ### 🎯 Tính năng
 
