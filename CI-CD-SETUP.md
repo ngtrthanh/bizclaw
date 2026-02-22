@@ -169,6 +169,29 @@ Tag Push → Build All Platforms → Create Release → Build Docker → Push to
 - Check platform-specific builds completed
 - Ensure GHCR permissions are set
 
+### OpenSSL Cross-Compilation Issues
+- **Solution**: Switched to rustls for most TLS needs (lettre, websockets)
+- **IMAP**: Still uses native-tls with vendored OpenSSL
+- **Configuration**: `openssl-sys` with `vendored` feature in workspace dependencies
+- **Cross.toml**: Passes `OPENSSL_STATIC=1` and `OPENSSL_VENDORED=1` to cross builds
+- **Result**: No system OpenSSL dependencies required for Linux cross-compilation
+
+## TLS Configuration
+
+The project uses a hybrid TLS approach for optimal cross-platform compatibility:
+
+- **rustls**: Used for SMTP (lettre) and WebSocket (tokio-tungstenite)
+  - Pure Rust implementation
+  - No system dependencies
+  - Excellent cross-compilation support
+  
+- **native-tls + vendored OpenSSL**: Used for IMAP
+  - Required by `imap` crate
+  - OpenSSL compiled from source during build
+  - Configured via `openssl-sys` with `vendored` feature
+
+This approach minimizes OpenSSL dependencies while maintaining full functionality.
+
 ## Files Created/Modified
 
 ```

@@ -105,6 +105,8 @@ docker-compose up -d
 - ✅ Docker multi-arch support (amd64, arm64, armv7)
 - ✅ Automated GitHub releases
 - ✅ All compiler warnings fixed
+- ✅ Switched to rustls for better cross-platform compatibility
+- ✅ Vendored OpenSSL for IMAP support
 
 ### Build System
 - ✅ Cross-compilation support via `cross` tool
