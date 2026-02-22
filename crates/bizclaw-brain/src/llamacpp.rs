@@ -33,8 +33,8 @@ pub struct LlamaCppBackend {
     context_size: u32,
     n_threads: u32,
     n_gpu_layers: i32,
-    temperature: f32,
-    top_p: f32,
+    _temperature: f32,
+    _top_p: f32,
     loaded: bool,
 }
 
@@ -46,8 +46,8 @@ impl LlamaCppBackend {
             context_size: 2048,
             n_threads: 4,
             n_gpu_layers: 0,
-            temperature: 0.7,
-            top_p: 0.9,
+            _temperature: 0.7,
+            _top_p: 0.9,
             loaded: false,
         }
     }
@@ -65,8 +65,8 @@ impl LlamaCppBackend {
             context_size,
             n_threads,
             n_gpu_layers,
-            temperature,
-            top_p,
+            _temperature: temperature,
+            _top_p: top_p,
             loaded: false,
         }
     }

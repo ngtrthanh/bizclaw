@@ -13,7 +13,7 @@ use std::path::Path;
 pub struct KvCache {
     key_cache: Vec<f32>,
     value_cache: Vec<f32>,
-    n_layers: usize,
+    _n_layers: usize,
     max_seq_len: usize,
     kv_dim: usize,
     pos: usize,
@@ -23,7 +23,7 @@ impl KvCache {
     pub fn new(n_layers: usize, max_seq_len: usize, n_kv_heads: usize, head_dim: usize) -> Self {
         let kv_dim = n_kv_heads * head_dim;
         let total = n_layers * max_seq_len * kv_dim;
-        Self { key_cache: vec![0.0; total], value_cache: vec![0.0; total], n_layers, max_seq_len, kv_dim, pos: 0 }
+        Self { key_cache: vec![0.0; total], value_cache: vec![0.0; total], _n_layers: n_layers, max_seq_len, kv_dim, pos: 0 }
     }
 
     pub fn key_at_mut(&mut self, layer: usize, pos: usize) -> &mut [f32] {

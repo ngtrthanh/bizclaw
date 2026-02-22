@@ -8,8 +8,6 @@ use bizclaw_core::traits::Channel;
 use bizclaw_core::types::{IncomingMessage, OutgoingMessage, ThreadType};
 use futures::stream::{self, Stream};
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
 /// Webhook channel configuration.
@@ -32,7 +30,7 @@ pub struct WebhookChannel {
     connected: bool,
     /// Sender for injecting inbound messages.
     inbound_tx: mpsc::UnboundedSender<IncomingMessage>,
-    inbound_rx: Option<mpsc::UnboundedReceiver<IncomingMessage>>,
+    _inbound_rx: Option<mpsc::UnboundedReceiver<IncomingMessage>>,
 }
 
 impl WebhookChannel {
@@ -43,7 +41,7 @@ impl WebhookChannel {
             client: reqwest::Client::new(),
             connected: false,
             inbound_tx: tx,
-            inbound_rx: Some(rx),
+            _inbound_rx: Some(rx),
         }
     }
 

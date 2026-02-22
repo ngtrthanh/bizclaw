@@ -39,7 +39,7 @@ pub struct McpToolInfo {
 
 /// JSON-RPC 2.0 request.
 #[derive(Debug, Serialize)]
-pub(crate) struct JsonRpcRequest {
+pub struct JsonRpcRequest {
     pub jsonrpc: &'static str,
     pub id: u64,
     pub method: String,
@@ -60,7 +60,7 @@ impl JsonRpcRequest {
 
 /// JSON-RPC 2.0 response.
 #[derive(Debug, Deserialize)]
-pub(crate) struct JsonRpcResponse {
+pub struct JsonRpcResponse {
     #[allow(dead_code)]
     pub jsonrpc: String,
     #[allow(dead_code)]
@@ -71,7 +71,7 @@ pub(crate) struct JsonRpcResponse {
 
 /// JSON-RPC 2.0 error.
 #[derive(Debug, Deserialize)]
-pub(crate) struct JsonRpcError {
+pub struct JsonRpcError {
     pub code: i64,
     pub message: String,
 }
