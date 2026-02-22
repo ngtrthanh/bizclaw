@@ -30,5 +30,6 @@ async-stream = "0.3"
 lettre.workspace = true
 imap.workspace = true
 native-tls.workspace = true
+openssl-sys.workspace = true
 mail-parser.workspace = true
 regex = "1"

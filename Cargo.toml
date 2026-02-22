@@ -71,15 +71,16 @@ shellexpand = "3"
 hostname = "0.4"
 whoami = "1"
 # WebSocket
-tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
 # HTTP server
 axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 # Email
-lettre = { version = "0.11", features = ["tokio1-native-tls", "builder"] }
+lettre = { version = "0.11", features = ["tokio1-rustls-tls", "builder"] }
 imap = "2"
 native-tls = "0.2"
+openssl-sys = { version = "0.9", features = ["vendored"] }
 mail-parser = "0.9"
 
 # Internal crates
