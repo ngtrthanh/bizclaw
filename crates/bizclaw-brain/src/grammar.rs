@@ -26,6 +26,7 @@ pub struct TokenJsonProps {
 
 /// JSON parsing state — tracks structure validity.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct JsonState {
     pub brace_depth: i32,
     pub bracket_depth: i32,
@@ -35,50 +36,44 @@ pub struct JsonState {
     pub completed: bool,
 }
 
-impl Default for JsonState {
-    fn default() -> Self {
-        Self {
-            brace_depth: 0,
-            bracket_depth: 0,
-            in_string: false,
-            expect_value: false,
-            started: false,
-            completed: false,
-        }
-    }
-}
 
 impl JsonGrammar {
     /// Analyze all tokens in vocabulary for JSON properties (done once at load).
     pub fn new(vocab: &[String]) -> Self {
-        let token_props: Vec<TokenJsonProps> = vocab.iter().map(|token| {
-            let mut props = TokenJsonProps::default();
-            let mut in_str = false;
-            let mut prev_escape = false;
+        let token_props: Vec<TokenJsonProps> = vocab
+            .iter()
+            .map(|token| {
+                let mut props = TokenJsonProps::default();
+                let mut in_str = false;
+                let mut prev_escape = false;
 
-            for ch in token.chars() {
-                if in_str {
-                    if ch == '"' && !prev_escape {
-                        in_str = false;
-                        props.quote_toggle = !props.quote_toggle;
-                    }
-                    prev_escape = ch == '\\' && !prev_escape;
-                } else {
-                    match ch {
-                        '{' => props.brace_delta += 1,
-                        '}' => props.brace_delta -= 1,
-                        '[' => props.bracket_delta += 1,
-                        ']' => props.bracket_delta -= 1,
-                        '"' => { in_str = true; props.quote_toggle = !props.quote_toggle; }
-                        ':' => props.is_colon = true,
-                        ',' => props.is_comma = true,
-                        _ => {}
+                for ch in token.chars() {
+                    if in_str {
+                        if ch == '"' && !prev_escape {
+                            in_str = false;
+                            props.quote_toggle = !props.quote_toggle;
+                        }
+                        prev_escape = ch == '\\' && !prev_escape;
+                    } else {
+                        match ch {
+                            '{' => props.brace_delta += 1,
+                            '}' => props.brace_delta -= 1,
+                            '[' => props.bracket_delta += 1,
+                            ']' => props.bracket_delta -= 1,
+                            '"' => {
+                                in_str = true;
+                                props.quote_toggle = !props.quote_toggle;
+                            }
+                            ':' => props.is_colon = true,
+                            ',' => props.is_comma = true,
+                            _ => {}
+                        }
                     }
                 }
-            }
-            props.is_whitespace_only = token.trim().is_empty();
-            props
-        }).collect();
+                props.is_whitespace_only = token.trim().is_empty();
+                props
+            })
+            .collect();
 
         Self {
             token_props,
@@ -93,7 +88,9 @@ impl JsonGrammar {
         }
 
         for (i, logit) in logits.iter_mut().enumerate() {
-            if i >= self.token_props.len() { break; }
+            if i >= self.token_props.len() {
+                break;
+            }
             let props = &self.token_props[i];
 
             let allowed = self.is_token_allowed(props);
@@ -132,7 +129,9 @@ impl JsonGrammar {
 
     /// Update state after a token is selected.
     pub fn accept_token(&mut self, token_id: usize) {
-        if token_id >= self.token_props.len() { return; }
+        if token_id >= self.token_props.len() {
+            return;
+        }
         let props = &self.token_props[token_id];
 
         self.state.brace_depth += props.brace_delta;
@@ -146,8 +145,11 @@ impl JsonGrammar {
             self.state.started = true;
         }
 
-        if self.state.started && self.state.brace_depth == 0 && self.state.bracket_depth == 0
-            && !self.state.in_string {
+        if self.state.started
+            && self.state.brace_depth == 0
+            && self.state.bracket_depth == 0
+            && !self.state.in_string
+        {
             self.state.completed = true;
         }
     }
@@ -190,8 +192,10 @@ mod tests {
     #[test]
     fn test_grammar_completion() {
         let vocab = vec![
-            "{".to_string(), "}".to_string(),
-            "\"key\"".to_string(), ":".to_string(),
+            "{".to_string(),
+            "}".to_string(),
+            "\"key\"".to_string(),
+            ":".to_string(),
             "\"val\"".to_string(),
         ];
         let mut grammar = JsonGrammar::new(&vocab);
@@ -210,8 +214,10 @@ mod tests {
     #[test]
     fn test_grammar_mask_initial() {
         let vocab = vec![
-            "{".to_string(), "}".to_string(),
-            "hello".to_string(), "[".to_string(),
+            "{".to_string(),
+            "}".to_string(),
+            "hello".to_string(),
+            "[".to_string(),
         ];
         let grammar = JsonGrammar::new(&vocab);
 

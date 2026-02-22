@@ -19,8 +19,12 @@ pub struct TelegramConfig {
     pub poll_interval: u64,
 }
 
-fn default_true() -> bool { true }
-fn default_poll_interval() -> u64 { 1 }
+fn default_true() -> bool {
+    true
+}
+fn default_poll_interval() -> u64 {
+    1
+}
 
 /// Telegram Bot channel with polling loop.
 pub struct TelegramChannel {
@@ -41,13 +45,17 @@ impl TelegramChannel {
     }
 
     fn api_url(&self, method: &str) -> String {
-        format!("https://api.telegram.org/bot{}/{}", self.config.bot_token, method)
+        format!(
+            "https://api.telegram.org/bot{}/{}",
+            self.config.bot_token, method
+        )
     }
 
     /// Get updates using long polling.
     pub async fn get_updates(&mut self) -> Result<Vec<TelegramUpdate>> {
-        let response = self.client
-            .get(&self.api_url("getUpdates"))
+        let response = self
+            .client
+            .get(self.api_url("getUpdates"))
             .query(&[
                 ("offset", (self.last_update_id + 1).to_string()),
                 ("timeout", "30".into()),
@@ -57,12 +65,15 @@ impl TelegramChannel {
             .await
             .map_err(|e| BizClawError::Channel(format!("Telegram getUpdates failed: {e}")))?;
 
-        let body: TelegramApiResponse<Vec<TelegramUpdate>> = response.json().await
+        let body: TelegramApiResponse<Vec<TelegramUpdate>> = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid Telegram response: {e}")))?;
 
         if !body.ok {
             return Err(BizClawError::Channel(format!(
-                "Telegram API error: {}", body.description.unwrap_or_default()
+                "Telegram API error: {}",
+                body.description.unwrap_or_default()
             )));
         }
 
@@ -81,19 +92,23 @@ impl TelegramChannel {
             "parse_mode": "Markdown",
         });
 
-        let response = self.client
-            .post(&self.api_url("sendMessage"))
+        let response = self
+            .client
+            .post(self.api_url("sendMessage"))
             .json(&body)
             .send()
             .await
             .map_err(|e| BizClawError::Channel(format!("sendMessage failed: {e}")))?;
 
-        let result: TelegramApiResponse<serde_json::Value> = response.json().await
+        let result: TelegramApiResponse<serde_json::Value> = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid send response: {e}")))?;
 
         if !result.ok {
             return Err(BizClawError::Channel(format!(
-                "Send failed: {}", result.description.unwrap_or_default()
+                "Send failed: {}",
+                result.description.unwrap_or_default()
             )));
         }
         Ok(())
@@ -105,8 +120,9 @@ impl TelegramChannel {
             "chat_id": chat_id,
             "action": "typing",
         });
-        let _ = self.client
-            .post(&self.api_url("sendChatAction"))
+        let _ = self
+            .client
+            .post(self.api_url("sendChatAction"))
             .json(&body)
             .send()
             .await;
@@ -115,11 +131,18 @@ impl TelegramChannel {
 
     /// Get bot info.
     pub async fn get_me(&self) -> Result<TelegramUser> {
-        let response = self.client.get(&self.api_url("getMe")).send().await
+        let response = self
+            .client
+            .get(self.api_url("getMe"))
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("getMe failed: {e}")))?;
-        let body: TelegramApiResponse<TelegramUser> = response.json().await
+        let body: TelegramApiResponse<TelegramUser> = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid getMe response: {e}")))?;
-        body.result.ok_or_else(|| BizClawError::Channel("No bot info".into()))
+        body.result
+            .ok_or_else(|| BizClawError::Channel("No bot info".into()))
     }
 
     /// Start polling loop — returns a stream of IncomingMessages.
@@ -135,12 +158,11 @@ impl TelegramChannel {
                 match channel.get_updates().await {
                     Ok(updates) => {
                         for update in updates {
-                            if let Some(msg) = update.to_incoming() {
-                                if tx.send(msg).is_err() {
+                            if let Some(msg) = update.to_incoming()
+                                && tx.send(msg).is_err() {
                                     tracing::info!("Telegram polling stopped (receiver dropped)");
                                     return;
                                 }
-                            }
                         }
                     }
                     Err(e) => {
@@ -149,7 +171,10 @@ impl TelegramChannel {
                     }
                 }
 
-                tokio::time::sleep(tokio::time::Duration::from_secs(channel.config.poll_interval)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(
+                    channel.config.poll_interval,
+                ))
+                .await;
             }
         });
 
@@ -174,12 +199,17 @@ impl Unpin for TelegramPollingStream {}
 
 #[async_trait]
 impl Channel for TelegramChannel {
-    fn name(&self) -> &str { "telegram" }
+    fn name(&self) -> &str {
+        "telegram"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         let me = self.get_me().await?;
-        tracing::info!("Telegram bot: @{} ({})",
-            me.username.as_deref().unwrap_or("unknown"), me.first_name);
+        tracing::info!(
+            "Telegram bot: @{} ({})",
+            me.username.as_deref().unwrap_or("unknown"),
+            me.first_name
+        );
         self.connected = true;
         Ok(())
     }
@@ -189,10 +219,14 @@ impl Channel for TelegramChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        let chat_id: i64 = message.thread_id.parse()
+        let chat_id: i64 = message
+            .thread_id
+            .parse()
             .map_err(|_| BizClawError::Channel("Invalid chat_id".into()))?;
         self.send_message(chat_id, &message.content).await
     }
@@ -261,21 +295,31 @@ impl TelegramUpdate {
         let from = msg.from.as_ref()?;
 
         // Skip bot messages
-        if from.is_bot { return None; }
+        if from.is_bot {
+            return None;
+        }
 
         Some(IncomingMessage {
             channel: "telegram".into(),
             thread_id: msg.chat.id.to_string(),
             sender_id: from.id.to_string(),
-            sender_name: Some(format!("{}{}", from.first_name,
-                from.last_name.as_deref().map(|l| format!(" {l}")).unwrap_or_default())),
+            sender_name: Some(format!(
+                "{}{}",
+                from.first_name,
+                from.last_name
+                    .as_deref()
+                    .map(|l| format!(" {l}"))
+                    .unwrap_or_default()
+            )),
             content: text.clone(),
             thread_type: match msg.chat.chat_type.as_str() {
                 "private" => ThreadType::Direct,
                 _ => ThreadType::Group,
             },
             timestamp: chrono::Utc::now(),
-            reply_to: msg.reply_to_message.as_ref()
+            reply_to: msg
+                .reply_to_message
+                .as_ref()
                 .map(|r| r.message_id.to_string()),
         })
     }

@@ -33,11 +33,9 @@ impl McpClient {
         tracing::info!("🔗 Connecting to MCP server '{}'...", self.name);
 
         // Spawn the server process
-        let transport = StdioTransport::spawn(
-            &self.config.command,
-            &self.config.args,
-            &self.config.env,
-        ).await?;
+        let transport =
+            StdioTransport::spawn(&self.config.command, &self.config.args, &self.config.env)
+                .await?;
         self.transport = Some(transport);
 
         // Initialize the MCP session
@@ -46,8 +44,11 @@ impl McpClient {
         // Discover available tools
         self.discover_tools().await?;
 
-        tracing::info!("✅ MCP server '{}' connected — {} tools available",
-            self.name, self.tools.len());
+        tracing::info!(
+            "✅ MCP server '{}' connected — {} tools available",
+            self.name,
+            self.tools.len()
+        );
 
         Ok(())
     }
@@ -56,22 +57,28 @@ impl McpClient {
     async fn initialize(&mut self) -> Result<(), String> {
         let id1 = self.next_id();
         let id2 = self.next_id();
-        let transport = self.transport.as_mut()
-            .ok_or("Not connected")?;
+        let transport = self.transport.as_mut().ok_or("Not connected")?;
 
-        let req = JsonRpcRequest::new(id1, "initialize", Some(serde_json::json!({
-            "protocolVersion": "2024-11-05",
-            "capabilities": {},
-            "clientInfo": {
-                "name": "bizclaw",
-                "version": env!("CARGO_PKG_VERSION")
-            }
-        })));
+        let req = JsonRpcRequest::new(
+            id1,
+            "initialize",
+            Some(serde_json::json!({
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "bizclaw",
+                    "version": env!("CARGO_PKG_VERSION")
+                }
+            })),
+        );
 
         let res = transport.request(&req).await?;
 
         if let Some(err) = res.error {
-            return Err(format!("MCP initialize error: {} (code {})", err.message, err.code));
+            return Err(format!(
+                "MCP initialize error: {} (code {})",
+                err.message, err.code
+            ));
         }
 
         // Send initialized notification (no response expected, but send via request for simplicity)
@@ -86,49 +93,65 @@ impl McpClient {
     async fn discover_tools(&mut self) -> Result<(), String> {
         let id = self.next_id();
         let server_name = self.name.clone();
-        let transport = self.transport.as_mut()
-            .ok_or("Not connected")?;
+        let transport = self.transport.as_mut().ok_or("Not connected")?;
 
         let req = JsonRpcRequest::new(id, "tools/list", None);
         let res = transport.request(&req).await?;
 
         if let Some(err) = res.error {
-            return Err(format!("tools/list error: {} (code {})", err.message, err.code));
+            return Err(format!(
+                "tools/list error: {} (code {})",
+                err.message, err.code
+            ));
         }
 
         if let Some(result) = res.result {
-            let tools_result: ToolsListResult = serde_json::from_value(result)
-                .map_err(|e| format!("Parse tools error: {e}"))?;
+            let tools_result: ToolsListResult =
+                serde_json::from_value(result).map_err(|e| format!("Parse tools error: {e}"))?;
 
-            self.tools = tools_result.tools.into_iter().map(|t| McpToolInfo {
-                name: t.name,
-                description: t.description.unwrap_or_default(),
-                input_schema: t.input_schema.unwrap_or(serde_json::json!({
-                    "type": "object",
-                    "properties": {}
-                })),
-                server_name: server_name.clone(),
-            }).collect();
+            self.tools = tools_result
+                .tools
+                .into_iter()
+                .map(|t| McpToolInfo {
+                    name: t.name,
+                    description: t.description.unwrap_or_default(),
+                    input_schema: t.input_schema.unwrap_or(serde_json::json!({
+                        "type": "object",
+                        "properties": {}
+                    })),
+                    server_name: server_name.clone(),
+                })
+                .collect();
         }
 
         Ok(())
     }
 
     /// Call a tool on the MCP server.
-    pub async fn call_tool(&mut self, tool_name: &str, arguments: serde_json::Value) -> Result<String, String> {
+    pub async fn call_tool(
+        &mut self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<String, String> {
         let id = self.next_id();
-        let transport = self.transport.as_mut()
-            .ok_or("MCP server not connected")?;
+        let transport = self.transport.as_mut().ok_or("MCP server not connected")?;
 
-        let req = JsonRpcRequest::new(id, "tools/call", Some(serde_json::json!({
-            "name": tool_name,
-            "arguments": arguments
-        })));
+        let req = JsonRpcRequest::new(
+            id,
+            "tools/call",
+            Some(serde_json::json!({
+                "name": tool_name,
+                "arguments": arguments
+            })),
+        );
 
         let res = transport.request(&req).await?;
 
         if let Some(err) = res.error {
-            return Err(format!("Tool '{}' error: {} (code {})", tool_name, err.message, err.code));
+            return Err(format!(
+                "Tool '{}' error: {} (code {})",
+                tool_name, err.message, err.code
+            ));
         }
 
         if let Some(result) = res.result {
@@ -136,7 +159,9 @@ impl McpClient {
                 .map_err(|e| format!("Parse tool result error: {e}"))?;
 
             if call_result.is_error {
-                let text = call_result.content.iter()
+                let text = call_result
+                    .content
+                    .iter()
                     .filter_map(|c| c.text.as_ref())
                     .cloned()
                     .collect::<Vec<_>>()
@@ -145,9 +170,15 @@ impl McpClient {
             }
 
             // Collect text content
-            let output = call_result.content.iter()
+            let output = call_result
+                .content
+                .iter()
                 .filter_map(|c| {
-                    if c.content_type == "text" { c.text.clone() } else { None }
+                    if c.content_type == "text" {
+                        c.text.clone()
+                    } else {
+                        None
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join("\n");
@@ -165,7 +196,7 @@ impl McpClient {
 
     /// Check if connected and alive.
     pub fn is_connected(&mut self) -> bool {
-        self.transport.as_mut().map_or(false, |t| t.is_alive())
+        self.transport.as_mut().is_some_and(|t| t.is_alive())
     }
 
     /// Disconnect from the MCP server.

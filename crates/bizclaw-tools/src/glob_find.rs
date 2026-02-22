@@ -9,16 +9,22 @@ use std::path::Path;
 pub struct GlobTool;
 
 impl GlobTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for GlobTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for GlobTool {
-    fn name(&self) -> &str { "glob" }
+    fn name(&self) -> &str {
+        "glob"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -49,7 +55,8 @@ impl Tool for GlobTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let pattern = args["pattern"].as_str()
+        let pattern = args["pattern"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'pattern'".into()))?;
         let directory = args["directory"].as_str().unwrap_or(".");
         let max_results = args["max_results"].as_u64().unwrap_or(50) as usize;
@@ -75,7 +82,8 @@ impl Tool for GlobTool {
             }
 
             let path = &entry;
-            let relative = path.strip_prefix(base)
+            let relative = path
+                .strip_prefix(base)
                 .unwrap_or(path)
                 .to_string_lossy()
                 .to_string();
@@ -89,9 +97,17 @@ impl Tool for GlobTool {
         }
 
         let output = if results.is_empty() {
-            format!("No files matching pattern '{}' in {}", pattern, full_pattern)
+            format!(
+                "No files matching pattern '{}' in {}",
+                pattern, full_pattern
+            )
         } else {
-            format!("Found {} file(s) matching '{}':\n{}", results.len(), pattern, results.join("\n"))
+            format!(
+                "Found {} file(s) matching '{}':\n{}",
+                results.len(),
+                pattern,
+                results.join("\n")
+            )
         };
 
         Ok(ToolResult {
@@ -109,8 +125,15 @@ fn walkdir_sync(base: &Path, max_depth: usize) -> Vec<std::path::PathBuf> {
     result
 }
 
-fn walk_recursive(dir: &Path, depth: usize, max_depth: usize, result: &mut Vec<std::path::PathBuf>) {
-    if depth > max_depth { return; }
+fn walk_recursive(
+    dir: &Path,
+    depth: usize,
+    max_depth: usize,
+    result: &mut Vec<std::path::PathBuf>,
+) {
+    if depth > max_depth {
+        return;
+    }
 
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
@@ -125,7 +148,10 @@ fn walk_recursive(dir: &Path, depth: usize, max_depth: usize, result: &mut Vec<s
                 continue;
             }
             // Skip common large/noisy directories
-            if matches!(name, "node_modules" | "target" | ".git" | "__pycache__" | "dist" | "build") {
+            if matches!(
+                name,
+                "node_modules" | "target" | ".git" | "__pycache__" | "dist" | "build"
+            ) {
                 continue;
             }
         }
@@ -163,5 +189,6 @@ fn glob_to_regex(pattern: &str) -> regex::Regex {
         }
     }
 
-    regex::Regex::new(&format!("^{regex_str}$")).unwrap_or_else(|_| regex::Regex::new(".*").unwrap())
+    regex::Regex::new(&format!("^{regex_str}$"))
+        .unwrap_or_else(|_| regex::Regex::new(".*").unwrap())
 }

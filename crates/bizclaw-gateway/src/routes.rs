@@ -1,14 +1,18 @@
 //! API route handlers for the gateway.
 
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use std::sync::Arc;
 
 use super::server::AppState;
 
 /// Mask a secret string for display — show first 4 chars + •••
 fn mask_secret(s: &str) -> String {
-    if s.is_empty() { return String::new(); }
-    if s.len() <= 4 { return "••••".to_string(); }
+    if s.is_empty() {
+        return String::new();
+    }
+    if s.len() <= 4 {
+        return "••••".to_string();
+    }
     format!("{}••••", &s[..4])
 }
 
@@ -22,9 +26,7 @@ pub async fn health_check() -> Json<serde_json::Value> {
 }
 
 /// System information endpoint.
-pub async fn system_info(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn system_info(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let uptime = state.start_time.elapsed();
     let cfg = state.full_config.lock().unwrap();
     Json(serde_json::json!({
@@ -43,9 +45,7 @@ pub async fn system_info(
 }
 
 /// Get current configuration (sanitized — no API keys).
-pub async fn get_config(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let cfg = state.full_config.lock().unwrap();
     Json(serde_json::json!({
         "default_provider": cfg.default_provider,
@@ -145,9 +145,7 @@ pub async fn get_config(
 }
 
 /// Get full config as TOML string for export/display.
-pub async fn get_full_config(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn get_full_config(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let cfg = state.full_config.lock().unwrap();
     let toml_str = toml::to_string_pretty(&*cfg).unwrap_or_default();
     Json(serde_json::json!({
@@ -234,11 +232,12 @@ pub async fn update_config(
     }
 
     // Update MCP servers
-    if let Some(mcp) = req.get("mcp_servers") {
-        if let Ok(servers) = serde_json::from_value::<Vec<bizclaw_core::config::McpServerEntry>>(mcp.clone()) {
+    if let Some(mcp) = req.get("mcp_servers")
+        && let Ok(servers) =
+            serde_json::from_value::<Vec<bizclaw_core::config::McpServerEntry>>(mcp.clone())
+        {
             cfg.mcp_servers = servers;
         }
-    }
 
     // Save to disk
     let content = toml::to_string_pretty(&*cfg).unwrap_or_default();
@@ -255,8 +254,11 @@ pub async fn update_config(
                 match bizclaw_agent::Agent::new_with_mcp(new_cfg).await {
                     Ok(new_agent) => {
                         let mut guard = agent_lock.lock().await;
-                        tracing::info!("🔄 Agent re-initialized: provider={}, tools={}",
-                            new_agent.provider_name(), new_agent.tool_count());
+                        tracing::info!(
+                            "🔄 Agent re-initialized: provider={}, tools={}",
+                            new_agent.provider_name(),
+                            new_agent.tool_count()
+                        );
                         *guard = Some(new_agent);
                     }
                     Err(e) => tracing::warn!("⚠️ Agent re-init failed: {e}"),
@@ -274,24 +276,39 @@ pub async fn update_channel(
     State(state): State<Arc<AppState>>,
     Json(req): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    let channel_type = req.get("channel_type").and_then(|v| v.as_str()).unwrap_or("");
-    let enabled = req.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+    let channel_type = req
+        .get("channel_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let enabled = req
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let mut cfg = state.full_config.lock().unwrap();
 
     match channel_type {
         "telegram" => {
             let token_val = req.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
             let token = if token_val.contains('•') {
-                cfg.channel.telegram.as_ref().map(|t| t.bot_token.clone()).unwrap_or_default()
-            } else { token_val.to_string() };
-            let chat_ids: Vec<i64> = req.get("allowed_chat_ids")
+                cfg.channel
+                    .telegram
+                    .as_ref()
+                    .map(|t| t.bot_token.clone())
+                    .unwrap_or_default()
+            } else {
+                token_val.to_string()
+            };
+            let chat_ids: Vec<i64> = req
+                .get("allowed_chat_ids")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .split(',')
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
             cfg.channel.telegram = Some(bizclaw_core::config::TelegramChannelConfig {
-                enabled, bot_token: token, allowed_chat_ids: chat_ids,
+                enabled,
+                bot_token: token,
+                allowed_chat_ids: chat_ids,
             });
         }
         "zalo" => {
@@ -299,7 +316,9 @@ pub async fn update_channel(
             zalo_cfg.enabled = enabled;
             if let Some(v) = req.get("cookie").and_then(|v| v.as_str()) {
                 // Save cookie to file
-                let cookie_dir = state.config_path.parent()
+                let cookie_dir = state
+                    .config_path
+                    .parent()
                     .unwrap_or(std::path::Path::new("."));
                 let cookie_path = cookie_dir.join("zalo_cookie.txt");
                 std::fs::write(&cookie_path, v).ok();
@@ -314,61 +333,115 @@ pub async fn update_channel(
             let token_val = req.get("bot_token").and_then(|v| v.as_str()).unwrap_or("");
             let token = if token_val.contains('•') {
                 // Keep existing token if masked value sent
-                cfg.channel.discord.as_ref().map(|d| d.bot_token.clone()).unwrap_or_default()
-            } else { token_val.to_string() };
-            let ids: Vec<u64> = req.get("allowed_channel_ids")
+                cfg.channel
+                    .discord
+                    .as_ref()
+                    .map(|d| d.bot_token.clone())
+                    .unwrap_or_default()
+            } else {
+                token_val.to_string()
+            };
+            let ids: Vec<u64> = req
+                .get("allowed_channel_ids")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .split(',')
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
             cfg.channel.discord = Some(bizclaw_core::config::DiscordChannelConfig {
-                enabled, bot_token: token, allowed_channel_ids: ids,
+                enabled,
+                bot_token: token,
+                allowed_channel_ids: ids,
             });
         }
         "email" => {
-            let smtp_host = req.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let smtp_port = req.get("smtp_port").and_then(|v| v.as_str()).unwrap_or("587")
-                .parse::<u16>().unwrap_or(587);
-            let email_addr = req.get("smtp_user").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let smtp_host = req
+                .get("smtp_host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let smtp_port = req
+                .get("smtp_port")
+                .and_then(|v| v.as_str())
+                .unwrap_or("587")
+                .parse::<u16>()
+                .unwrap_or(587);
+            let email_addr = req
+                .get("smtp_user")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             let pass_val = req.get("smtp_pass").and_then(|v| v.as_str()).unwrap_or("");
             let password = if pass_val.contains('•') {
-                cfg.channel.email.as_ref().map(|e| e.password.clone()).unwrap_or_default()
-            } else { pass_val.to_string() };
-            let imap_host = req.get("imap_host").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                cfg.channel
+                    .email
+                    .as_ref()
+                    .map(|e| e.password.clone())
+                    .unwrap_or_default()
+            } else {
+                pass_val.to_string()
+            };
+            let imap_host = req
+                .get("imap_host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             cfg.channel.email = Some(bizclaw_core::config::EmailChannelConfig {
-                enabled, smtp_host, smtp_port, email: email_addr, password,
-                imap_host, imap_port: 993,
+                enabled,
+                smtp_host,
+                smtp_port,
+                email: email_addr,
+                password,
+                imap_host,
+                imap_port: 993,
             });
         }
         "whatsapp" => {
-            let phone_val = req.get("phone_number_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let token_val = req.get("access_token").and_then(|v| v.as_str()).unwrap_or("");
+            let phone_val = req
+                .get("phone_number_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let token_val = req
+                .get("access_token")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let token = if token_val.contains('•') {
-                cfg.channel.whatsapp.as_ref().map(|w| w.access_token.clone()).unwrap_or_default()
-            } else { token_val.to_string() };
+                cfg.channel
+                    .whatsapp
+                    .as_ref()
+                    .map(|w| w.access_token.clone())
+                    .unwrap_or_default()
+            } else {
+                token_val.to_string()
+            };
             cfg.channel.whatsapp = Some(bizclaw_core::config::WhatsAppChannelConfig {
-                enabled, phone_number_id: phone_val, access_token: token,
-                webhook_verify_token: String::new(), business_id: String::new(),
+                enabled,
+                phone_number_id: phone_val,
+                access_token: token,
+                webhook_verify_token: String::new(),
+                business_id: String::new(),
             });
         }
         _ => {
-            return Json(serde_json::json!({"ok": false, "error": format!("Unknown channel: {channel_type}")}));
+            return Json(
+                serde_json::json!({"ok": false, "error": format!("Unknown channel: {channel_type}")}),
+            );
         }
     }
 
     // Save to disk
     let content = toml::to_string_pretty(&*cfg).unwrap_or_default();
     match std::fs::write(&state.config_path, &content) {
-        Ok(_) => Json(serde_json::json!({"ok": true, "message": format!("{channel_type} config saved")})),
+        Ok(_) => {
+            Json(serde_json::json!({"ok": true, "message": format!("{channel_type} config saved")}))
+        }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
     }
 }
 
 /// List available providers.
-pub async fn list_providers(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn list_providers(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let cfg = state.full_config.lock().unwrap();
     let active = &cfg.default_provider;
     Json(serde_json::json!({
@@ -386,19 +459,17 @@ pub async fn list_providers(
 }
 
 /// List available channels with config status.
-pub async fn list_channels(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn list_channels(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let cfg = state.full_config.lock().unwrap();
     Json(serde_json::json!({
         "channels": [
             {"name": "cli", "type": "interactive", "status": "active", "configured": true},
-            {"name": "telegram", "type": "messaging", "status": if cfg.channel.telegram.as_ref().map_or(false, |t| t.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.telegram.is_some()},
-            {"name": "zalo", "type": "messaging", "status": if cfg.channel.zalo.as_ref().map_or(false, |z| z.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.zalo.is_some()},
-            {"name": "discord", "type": "messaging", "status": if cfg.channel.discord.as_ref().map_or(false, |d| d.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.discord.is_some()},
-            {"name": "email", "type": "messaging", "status": if cfg.channel.email.as_ref().map_or(false, |e| e.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.email.is_some()},
+            {"name": "telegram", "type": "messaging", "status": if cfg.channel.telegram.as_ref().is_some_and(|t| t.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.telegram.is_some()},
+            {"name": "zalo", "type": "messaging", "status": if cfg.channel.zalo.as_ref().is_some_and(|z| z.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.zalo.is_some()},
+            {"name": "discord", "type": "messaging", "status": if cfg.channel.discord.as_ref().is_some_and(|d| d.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.discord.is_some()},
+            {"name": "email", "type": "messaging", "status": if cfg.channel.email.as_ref().is_some_and(|e| e.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.email.is_some()},
             {"name": "webhook", "type": "api", "status": "available", "configured": false},
-            {"name": "whatsapp", "type": "messaging", "status": if cfg.channel.whatsapp.as_ref().map_or(false, |w| w.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.whatsapp.is_some()},
+            {"name": "whatsapp", "type": "messaging", "status": if cfg.channel.whatsapp.as_ref().is_some_and(|w| w.enabled) { "active" } else { "disabled" }, "configured": cfg.channel.whatsapp.is_some()},
         ]
     }))
 }
@@ -406,22 +477,37 @@ pub async fn list_channels(
 /// List installed Ollama models.
 pub async fn ollama_models() -> Json<serde_json::Value> {
     let url = "http://localhost:11434/api/tags";
-    match reqwest::Client::new().get(url).timeout(std::time::Duration::from_secs(5)).send().await {
+    match reqwest::Client::new()
+        .get(url)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
         Ok(resp) => {
             if let Ok(body) = resp.json::<serde_json::Value>().await {
-                let models: Vec<serde_json::Value> = body.get("models")
+                let models: Vec<serde_json::Value> = body
+                    .get("models")
                     .and_then(|m| m.as_array())
                     .unwrap_or(&vec![])
                     .iter()
                     .map(|m| {
-                        let name = m.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let name = m
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         let size_bytes = m.get("size").and_then(|v| v.as_u64()).unwrap_or(0);
                         let size = if size_bytes > 1_000_000_000 {
                             format!("{:.1} GB", size_bytes as f64 / 1e9)
                         } else {
                             format!("{} MB", size_bytes / 1_000_000)
                         };
-                        let family = m.get("details").and_then(|d| d.get("family")).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                        let family = m
+                            .get("details")
+                            .and_then(|d| d.get("family"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
                         serde_json::json!({"name": name, "size": size, "family": family})
                     })
                     .collect();
@@ -430,51 +516,59 @@ pub async fn ollama_models() -> Json<serde_json::Value> {
                 Json(serde_json::json!({"ok": true, "models": []}))
             }
         }
-        Err(e) => Json(serde_json::json!({"ok": false, "error": format!("Ollama not running: {e}")})),
+        Err(e) => {
+            Json(serde_json::json!({"ok": false, "error": format!("Ollama not running: {e}")}))
+        }
     }
 }
 
 /// Scan for GGUF model files in standard directories.
-pub async fn brain_scan_models(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
-    let config_dir = state.config_path.parent()
+pub async fn brain_scan_models(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let config_dir = state
+        .config_path
+        .parent()
         .unwrap_or(std::path::Path::new("."));
     let models_dir = config_dir.join("models");
-    
+
     // Scan paths: ~/.bizclaw/models/, cwd, common locations
     let scan_dirs = vec![
         models_dir.clone(),
         config_dir.to_path_buf(),
         std::path::PathBuf::from("/root/.bizclaw/models"),
         std::path::PathBuf::from(std::env::var("HOME").unwrap_or_default())
-            .join(".bizclaw").join("models"),
+            .join(".bizclaw")
+            .join("models"),
     ];
 
     let mut found_models: Vec<serde_json::Value> = Vec::new();
     let mut seen_paths = std::collections::HashSet::new();
 
     for dir in &scan_dirs {
-        if !dir.exists() { continue; }
+        if !dir.exists() {
+            continue;
+        }
         if let Ok(entries) = std::fs::read_dir(dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if let Some(ext) = path.extension() {
-                    if ext == "gguf" || ext == "bin" {
+                if let Some(ext) = path.extension()
+                    && (ext == "gguf" || ext == "bin") {
                         let abs = path.canonicalize().unwrap_or(path.clone());
-                        if seen_paths.contains(&abs) { continue; }
+                        if seen_paths.contains(&abs) {
+                            continue;
+                        }
                         seen_paths.insert(abs.clone());
-                        
+
                         let size_bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
                         let size_str = if size_bytes > 1_000_000_000 {
                             format!("{:.1} GB", size_bytes as f64 / 1e9)
                         } else {
                             format!("{} MB", size_bytes / 1_000_000)
                         };
-                        let name = path.file_name()
+                        let name = path
+                            .file_name()
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_default();
-                        
+
                         found_models.push(serde_json::json!({
                             "name": name,
                             "path": abs.display().to_string(),
@@ -482,14 +576,16 @@ pub async fn brain_scan_models(
                             "size_bytes": size_bytes,
                         }));
                     }
-                }
             }
         }
     }
 
     // Sort by name
     found_models.sort_by(|a, b| {
-        a["name"].as_str().unwrap_or("").cmp(b["name"].as_str().unwrap_or(""))
+        a["name"]
+            .as_str()
+            .unwrap_or("")
+            .cmp(b["name"].as_str().unwrap_or(""))
     });
 
     Json(serde_json::json!({
@@ -501,9 +597,7 @@ pub async fn brain_scan_models(
 }
 
 /// Generate Zalo QR code for login.
-pub async fn zalo_qr_code(
-    State(_state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn zalo_qr_code(State(_state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     use bizclaw_channels::zalo::client::auth::{ZaloAuth, ZaloCredentials};
 
     let creds = ZaloCredentials::default();
@@ -537,12 +631,20 @@ pub async fn whatsapp_webhook_verify(
     State(state): State<Arc<AppState>>,
 ) -> axum::response::Response {
     let mode = params.get("hub.mode").map(|s| s.as_str()).unwrap_or("");
-    let token = params.get("hub.verify_token").map(|s| s.as_str()).unwrap_or("");
-    let challenge = params.get("hub.challenge").map(|s| s.as_str()).unwrap_or("");
+    let token = params
+        .get("hub.verify_token")
+        .map(|s| s.as_str())
+        .unwrap_or("");
+    let challenge = params
+        .get("hub.challenge")
+        .map(|s| s.as_str())
+        .unwrap_or("");
 
     let expected_token = {
         let cfg = state.full_config.lock().unwrap();
-        cfg.channel.whatsapp.as_ref()
+        cfg.channel
+            .whatsapp
+            .as_ref()
             .map(|w| w.webhook_verify_token.clone())
             .unwrap_or_default()
     };
@@ -577,13 +679,17 @@ pub async fn whatsapp_webhook(
                     if let Some(messages) = value["messages"].as_array() {
                         for msg in messages {
                             let msg_type = msg["type"].as_str().unwrap_or("");
-                            if msg_type != "text" { continue; }
+                            if msg_type != "text" {
+                                continue;
+                            }
 
                             let from = msg["from"].as_str().unwrap_or("").to_string();
                             let text = msg["text"]["body"].as_str().unwrap_or("").to_string();
                             let msg_id = msg["id"].as_str().unwrap_or("").to_string();
 
-                            if text.is_empty() { continue; }
+                            if text.is_empty() {
+                                continue;
+                            }
 
                             tracing::info!("[whatsapp] Message from {from}: {text}");
 
@@ -625,7 +731,10 @@ pub async fn whatsapp_webhook(
                                     let client = reqwest::Client::new();
                                     if let Err(e) = client
                                         .post(&url)
-                                        .header("Authorization", format!("Bearer {}", wa_cfg.access_token))
+                                        .header(
+                                            "Authorization",
+                                            format!("Bearer {}", wa_cfg.access_token),
+                                        )
                                         .json(&reply)
                                         .send()
                                         .await
@@ -647,21 +756,23 @@ pub async fn whatsapp_webhook(
 // ---- Scheduler API ----
 
 /// List all scheduled tasks.
-pub async fn scheduler_list_tasks(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn scheduler_list_tasks(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let engine = state.scheduler.lock().await;
-    let tasks: Vec<_> = engine.list_tasks().iter().map(|t| {
-        serde_json::json!({
-            "id": t.id,
-            "name": t.name,
-            "status": format!("{:?}", t.status),
-            "enabled": t.enabled,
-            "run_count": t.run_count,
-            "next_run": t.next_run.map(|d| d.to_rfc3339()),
-            "last_run": t.last_run.map(|d| d.to_rfc3339()),
+    let tasks: Vec<_> = engine
+        .list_tasks()
+        .iter()
+        .map(|t| {
+            serde_json::json!({
+                "id": t.id,
+                "name": t.name,
+                "status": format!("{:?}", t.status),
+                "enabled": t.enabled,
+                "run_count": t.run_count,
+                "next_run": t.next_run.map(|d| d.to_rfc3339()),
+                "last_run": t.last_run.map(|d| d.to_rfc3339()),
+            })
         })
-    }).collect();
+        .collect();
     Json(serde_json::json!({"ok": true, "tasks": tasks, "count": tasks.len()}))
 }
 
@@ -681,9 +792,8 @@ pub async fn scheduler_add_task(
             bizclaw_scheduler::Task::cron(name, expr, action)
         }
         "once" => {
-            let at = chrono::Utc::now() + chrono::Duration::seconds(
-                body["delay_secs"].as_i64().unwrap_or(60)
-            );
+            let at = chrono::Utc::now()
+                + chrono::Duration::seconds(body["delay_secs"].as_i64().unwrap_or(60));
             bizclaw_scheduler::Task::once(name, at, action)
         }
         _ => {
@@ -711,15 +821,20 @@ pub async fn scheduler_notifications(
     State(state): State<Arc<AppState>>,
 ) -> Json<serde_json::Value> {
     let engine = state.scheduler.lock().await;
-    let history: Vec<_> = engine.router.history().iter().map(|n| {
-        serde_json::json!({
-            "title": n.title,
-            "body": n.body,
-            "source": n.source,
-            "priority": format!("{:?}", n.priority),
-            "timestamp": n.timestamp.to_rfc3339(),
+    let history: Vec<_> = engine
+        .router
+        .history()
+        .iter()
+        .map(|n| {
+            serde_json::json!({
+                "title": n.title,
+                "body": n.body,
+                "source": n.source,
+                "priority": format!("{:?}", n.priority),
+                "timestamp": n.timestamp.to_rfc3339(),
+            })
         })
-    }).collect();
+        .collect();
     Json(serde_json::json!({"ok": true, "notifications": history}))
 }
 
@@ -737,14 +852,17 @@ pub async fn knowledge_search(
     match kb.as_ref() {
         Some(store) => {
             let results = store.search(query, limit);
-            let items: Vec<_> = results.iter().map(|r| {
-                serde_json::json!({
-                    "doc_name": r.doc_name,
-                    "content": r.content,
-                    "score": r.score,
-                    "chunk_idx": r.chunk_idx,
+            let items: Vec<_> = results
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "doc_name": r.doc_name,
+                        "content": r.content,
+                        "score": r.score,
+                        "chunk_idx": r.chunk_idx,
+                    })
                 })
-            }).collect();
+                .collect();
             Json(serde_json::json!({"ok": true, "results": items, "count": items.len()}))
         }
         None => Json(serde_json::json!({"ok": false, "error": "Knowledge base not available"})),
@@ -752,9 +870,7 @@ pub async fn knowledge_search(
 }
 
 /// List all knowledge documents.
-pub async fn knowledge_list_docs(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn knowledge_list_docs(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let kb = state.knowledge.lock().await;
     match kb.as_ref() {
         Some(store) => {
@@ -782,12 +898,10 @@ pub async fn knowledge_add_doc(
 
     let kb = state.knowledge.lock().await;
     match kb.as_ref() {
-        Some(store) => {
-            match store.add_document(name, content, source) {
-                Ok(chunks) => Json(serde_json::json!({"ok": true, "chunks": chunks})),
-                Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
-            }
-        }
+        Some(store) => match store.add_document(name, content, source) {
+            Ok(chunks) => Json(serde_json::json!({"ok": true, "chunks": chunks})),
+            Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
+        },
         None => Json(serde_json::json!({"ok": false, "error": "Knowledge base not available"})),
     }
 }
@@ -799,12 +913,10 @@ pub async fn knowledge_remove_doc(
 ) -> Json<serde_json::Value> {
     let kb = state.knowledge.lock().await;
     match kb.as_ref() {
-        Some(store) => {
-            match store.remove_document(id) {
-                Ok(()) => Json(serde_json::json!({"ok": true})),
-                Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
-            }
-        }
+        Some(store) => match store.remove_document(id) {
+            Ok(()) => Json(serde_json::json!({"ok": true})),
+            Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
+        },
         None => Json(serde_json::json!({"ok": false, "error": "Knowledge base not available"})),
     }
 }
@@ -812,9 +924,7 @@ pub async fn knowledge_remove_doc(
 // ---- Multi-Agent Orchestrator API ----
 
 /// List all agents in the orchestrator.
-pub async fn list_agents(
-    State(state): State<Arc<AppState>>,
-) -> Json<serde_json::Value> {
+pub async fn list_agents(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let orch = state.orchestrator.lock().await;
     Json(serde_json::json!({
         "ok": true,
@@ -833,7 +943,7 @@ pub async fn create_agent(
     let name = body["name"].as_str().unwrap_or("agent");
     let role = body["role"].as_str().unwrap_or("assistant");
     let description = body["description"].as_str().unwrap_or("A helpful AI agent");
-    
+
     // Use current config as base, optionally override provider/model
     let mut agent_config = state.full_config.lock().unwrap().clone();
     if let Some(provider) = body["provider"].as_str() {
@@ -849,7 +959,7 @@ pub async fn create_agent(
         agent_config.identity.system_prompt = sys_prompt.to_string();
     }
     agent_config.identity.name = name.to_string();
-    
+
     match bizclaw_agent::Agent::new_with_mcp(agent_config).await {
         Ok(agent) => {
             let mut orch = state.orchestrator.lock().await;
@@ -892,7 +1002,7 @@ pub async fn agent_chat(
     if message.is_empty() {
         return Json(serde_json::json!({"ok": false, "error": "Empty message"}));
     }
-    
+
     let mut orch = state.orchestrator.lock().await;
     match orch.send_to(&name, message).await {
         Ok(response) => Json(serde_json::json!({
@@ -916,11 +1026,12 @@ pub async fn agent_broadcast(
     if message.is_empty() {
         return Json(serde_json::json!({"ok": false, "error": "Empty message"}));
     }
-    
+
     let mut orch = state.orchestrator.lock().await;
     let results = orch.broadcast(message).await;
-    let responses: Vec<serde_json::Value> = results.into_iter().map(|(name, result)| {
-        match result {
+    let responses: Vec<serde_json::Value> = results
+        .into_iter()
+        .map(|(name, result)| match result {
             Ok(response) => serde_json::json!({
                 "agent": name,
                 "ok": true,
@@ -931,9 +1042,9 @@ pub async fn agent_broadcast(
                 "ok": false,
                 "error": e.to_string(),
             }),
-        }
-    }).collect();
-    
+        })
+        .collect();
+
     Json(serde_json::json!({
         "ok": true,
         "responses": responses,
@@ -955,10 +1066,12 @@ mod tests {
             pairing_code: None,
             agent: std::sync::Arc::new(tokio::sync::Mutex::new(None)),
             orchestrator: std::sync::Arc::new(tokio::sync::Mutex::new(
-                bizclaw_agent::orchestrator::Orchestrator::new()
+                bizclaw_agent::orchestrator::Orchestrator::new(),
             )),
             scheduler: Arc::new(tokio::sync::Mutex::new(
-                bizclaw_scheduler::SchedulerEngine::new(&std::env::temp_dir().join("bizclaw-test-sched"))
+                bizclaw_scheduler::SchedulerEngine::new(
+                    &std::env::temp_dir().join("bizclaw-test-sched"),
+                ),
             )),
             knowledge: Arc::new(tokio::sync::Mutex::new(None)),
         }))

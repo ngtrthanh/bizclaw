@@ -8,16 +8,22 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 pub struct FileTool;
 
 impl FileTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for FileTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for FileTool {
-    fn name(&self) -> &str { "file" }
+    fn name(&self) -> &str {
+        "file"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -46,13 +52,15 @@ impl Tool for FileTool {
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
         let action = args["action"].as_str().unwrap_or("read");
-        let path = args["path"].as_str()
+        let path = args["path"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'path'".into()))?;
 
         let result = match action {
             "read" => {
-                let content = tokio::fs::read_to_string(path).await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Read failed: {e}")))?;
+                let content = tokio::fs::read_to_string(path).await.map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Read failed: {e}"))
+                })?;
 
                 // Support partial reads with line ranges
                 let start = args["start_line"].as_u64().map(|l| l as usize);
@@ -63,17 +71,30 @@ impl Tool for FileTool {
                     let s = s.saturating_sub(1).min(lines.len());
                     let e = e.min(lines.len());
                     let total = lines.len();
-                    let selected: Vec<String> = lines[s..e].iter()
+                    let selected: Vec<String> = lines[s..e]
+                        .iter()
                         .enumerate()
                         .map(|(i, l)| format!("{:>4}: {}", s + i + 1, l))
                         .collect();
-                    format!("File: {} ({} total lines, showing {}-{}):\n{}", path, total, s + 1, e, selected.join("\n"))
+                    format!(
+                        "File: {} ({} total lines, showing {}-{}):\n{}",
+                        path,
+                        total,
+                        s + 1,
+                        e,
+                        selected.join("\n")
+                    )
                 } else {
                     // If file is very large, show line count
                     let line_count = content.lines().count();
                     if content.len() > 10000 {
-                        format!("File: {} ({} lines, {} bytes):\n{}...\n[truncated at 10000 bytes]",
-                            path, line_count, content.len(), &content[..10000])
+                        format!(
+                            "File: {} ({} lines, {} bytes):\n{}...\n[truncated at 10000 bytes]",
+                            path,
+                            line_count,
+                            content.len(),
+                            &content[..10000]
+                        )
                     } else {
                         content
                     }
@@ -83,10 +104,12 @@ impl Tool for FileTool {
                 let content = args["content"].as_str().unwrap_or("");
                 // Create parent directories if needed
                 if let Some(parent) = std::path::Path::new(path).parent() {
-                    tokio::fs::create_dir_all(parent).await
-                        .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Create dir: {e}")))?;
+                    tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                        bizclaw_core::error::BizClawError::Tool(format!("Create dir: {e}"))
+                    })?;
                 }
-                tokio::fs::write(path, content).await
+                tokio::fs::write(path, content)
+                    .await
                     .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
                 format!("Written {} bytes to {path}", content.len())
             }
@@ -98,23 +121,31 @@ impl Tool for FileTool {
                     .append(true)
                     .open(path)
                     .await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Open failed: {e}")))?;
-                file.write_all(content.as_bytes()).await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Write failed: {e}")))?;
+                    .map_err(|e| {
+                        bizclaw_core::error::BizClawError::Tool(format!("Open failed: {e}"))
+                    })?;
+                file.write_all(content.as_bytes()).await.map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Write failed: {e}"))
+                })?;
                 format!("Appended {} bytes to {path}", content.len())
             }
             "list" => {
-                let mut entries_result = tokio::fs::read_dir(path).await
+                let mut entries_result = tokio::fs::read_dir(path)
+                    .await
                     .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
                 let mut items = Vec::new();
-                while let Some(entry) = entries_result.next_entry().await
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))? {
+                while let Some(entry) = entries_result
+                    .next_entry()
+                    .await
+                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?
+                {
                     let name = entry.file_name().to_string_lossy().to_string();
                     let meta = entry.metadata().await.ok();
                     let is_dir = meta.as_ref().map(|m| m.is_dir()).unwrap_or(false);
                     let size = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-                    let modified = meta.as_ref()
+                    let modified = meta
+                        .as_ref()
                         .and_then(|m| m.modified().ok())
                         .map(|t| {
                             let dt: chrono::DateTime<chrono::Utc> = t.into();
@@ -136,10 +167,19 @@ impl Tool for FileTool {
                 if items.is_empty() {
                     format!("Directory {} is empty", path)
                 } else {
-                    format!("Directory: {} ({} entries)\n{}", path, items.len(), items.join("\n"))
+                    format!(
+                        "Directory: {} ({} entries)\n{}",
+                        path,
+                        items.len(),
+                        items.join("\n")
+                    )
                 }
             }
-            _ => return Err(bizclaw_core::error::BizClawError::Tool(format!("Unknown action: {action}"))),
+            _ => {
+                return Err(bizclaw_core::error::BizClawError::Tool(format!(
+                    "Unknown action: {action}"
+                )));
+            }
         };
 
         Ok(ToolResult {

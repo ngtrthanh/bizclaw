@@ -5,13 +5,16 @@
 //!
 //! Designed for PicoClaw-level simplicity — no cron crate dependency.
 
-use chrono::{DateTime, Timelike, Utc, Duration};
+use chrono::{DateTime, Duration, Timelike, Utc};
 
 /// Parse a simple cron expression and compute the next run time.
 pub fn next_run_from_cron(expression: &str, after: DateTime<Utc>) -> Option<DateTime<Utc>> {
-    let parts: Vec<&str> = expression.trim().split_whitespace().collect();
+    let parts: Vec<&str> = expression.split_whitespace().collect();
     if parts.len() != 5 {
-        tracing::warn!("Invalid cron expression: '{}' (need 5 fields: MIN HOUR DOM MON DOW)", expression);
+        tracing::warn!(
+            "Invalid cron expression: '{}' (need 5 fields: MIN HOUR DOM MON DOW)",
+            expression
+        );
         return None;
     }
 
@@ -38,7 +41,7 @@ pub fn next_run_from_cron(expression: &str, after: DateTime<Utc>) -> Option<Date
         if minutes.contains(&m) && hours.contains(&h) {
             return Some(candidate);
         }
-        candidate = candidate + Duration::minutes(1);
+        candidate += Duration::minutes(1);
     }
 
     None
@@ -53,14 +56,18 @@ fn parse_field(field: &str, min: u32, max: u32) -> Option<Vec<u32>> {
     // */N — every N
     if let Some(step) = field.strip_prefix("*/") {
         let n: u32 = step.parse().ok()?;
-        if n == 0 { return None; }
+        if n == 0 {
+            return None;
+        }
         return Some((min..=max).step_by(n as usize).collect());
     }
 
     // Comma-separated: "0,15,30,45"
     if field.contains(',') {
         let vals: Result<Vec<u32>, _> = field.split(',').map(|s| s.trim().parse()).collect();
-        return vals.ok().map(|v| v.into_iter().filter(|x| *x >= min && *x <= max).collect());
+        return vals
+            .ok()
+            .map(|v| v.into_iter().filter(|x| *x >= min && *x <= max).collect());
     }
 
     // Single number

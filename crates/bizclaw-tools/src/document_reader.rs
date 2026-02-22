@@ -24,13 +24,17 @@ impl DocumentReaderTool {
     }
 
     fn read_docx(&self, path: &Path) -> Result<String> {
-        let file = fs::File::open(path).map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Invalid zip archive: {e}")))?;
+        let file = fs::File::open(path)
+            .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
+        let mut archive = zip::ZipArchive::new(file).map_err(|e| {
+            bizclaw_core::error::BizClawError::Tool(format!("Invalid zip archive: {e}"))
+        })?;
 
         let mut xml_content = String::new();
         if let Ok(mut doc_file) = archive.by_name("word/document.xml") {
-            doc_file.read_to_string(&mut xml_content).map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
+            doc_file
+                .read_to_string(&mut xml_content)
+                .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
         } else {
             return Err(bizclaw_core::error::BizClawError::Tool(
                 "Not a valid DOCX file (missing word/document.xml)".into(),
@@ -39,7 +43,7 @@ impl DocumentReaderTool {
 
         let p_re = Regex::new(r"<w:p\b[^>]*>(.*?)</w:p>").unwrap();
         let t_re = Regex::new(r"<w:t\b[^>]*>(.*?)</w:t>").unwrap();
-        
+
         let mut full_text = String::new();
         for p_cap in p_re.captures_iter(&xml_content) {
             if let Some(m) = p_cap.get(1) {
@@ -47,7 +51,8 @@ impl DocumentReaderTool {
                 let mut line = String::new();
                 for t_cap in t_re.captures_iter(p_content) {
                     if let Some(t_m) = t_cap.get(1) {
-                        let text = t_m.as_str()
+                        let text = t_m
+                            .as_str()
                             .replace("&lt;", "<")
                             .replace("&gt;", ">")
                             .replace("&amp;", "&")
@@ -67,20 +72,22 @@ impl DocumentReaderTool {
     }
 
     fn read_excel(&self, path: &Path) -> Result<String> {
-        use calamine::{open_workbook_auto, Reader, Data};
-        
-        let mut workbook = open_workbook_auto(path)
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Failed to open Excel: {e}")))?;
-        
+        use calamine::{Data, Reader, open_workbook_auto};
+
+        let mut workbook = open_workbook_auto(path).map_err(|e| {
+            bizclaw_core::error::BizClawError::Tool(format!("Failed to open Excel: {e}"))
+        })?;
+
         let sheet_names = workbook.sheet_names().to_owned();
         let mut full_text = String::new();
-        
+
         for sheet_name in sheet_names {
             full_text.push_str(&format!("--- Sheet: {} ---\n", sheet_name));
             if let Ok(range) = workbook.worksheet_range(&sheet_name) {
                 for row in range.rows() {
-                    let cols: Vec<String> = row.iter().map(|cell| {
-                        match cell {
+                    let cols: Vec<String> = row
+                        .iter()
+                        .map(|cell| match cell {
                             Data::String(s) => s.to_string(),
                             Data::Float(f) => f.to_string(),
                             Data::Int(i) => i.to_string(),
@@ -90,20 +97,22 @@ impl DocumentReaderTool {
                             Data::DateTime(v) => v.as_f64().to_string(),
                             Data::DateTimeIso(v) => v.to_string(),
                             Data::DurationIso(v) => v.to_string(),
-                        }
-                    }).collect();
+                        })
+                        .collect();
                     full_text.push_str(&cols.join("\t"));
                     full_text.push('\n');
                 }
             }
         }
-        
+
         Ok(full_text)
     }
 }
 
 impl Default for DocumentReaderTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
@@ -173,14 +182,16 @@ impl Tool for DocumentReaderTool {
             "xlsx" | "xls" | "csv" => self.read_excel(path)?,
             "txt" | "md" | "json" | "xml" | "rs" | "log" => {
                 fs::read_to_string(path).map_err(|e| {
-                    bizclaw_core::error::BizClawError::Tool(format!("Failed to read text file: {e}"))
+                    bizclaw_core::error::BizClawError::Tool(format!(
+                        "Failed to read text file: {e}"
+                    ))
                 })?
             }
             _ => {
                 return Err(bizclaw_core::error::BizClawError::Tool(format!(
                     "Unsupported file extension: {}",
                     ext
-                )))
+                )));
             }
         };
 

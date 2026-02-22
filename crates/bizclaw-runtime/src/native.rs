@@ -1,7 +1,7 @@
 //! Native runtime module — process management utilities.
 
-use std::process::Stdio;
 use bizclaw_core::error::Result;
+use std::process::Stdio;
 
 /// Runtime environment information.
 pub struct RuntimeInfo {
@@ -32,14 +32,14 @@ pub async fn execute_with_stderr(
         c.arg("/C").arg(command);
         c
     };
-    
+
     #[cfg(not(windows))]
     let mut cmd = {
         let mut c = tokio::process::Command::new("sh");
         c.arg("-c").arg(command);
         c
     };
-    
+
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 

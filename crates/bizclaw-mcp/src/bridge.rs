@@ -29,9 +29,10 @@ impl McpToolBridge {
 
     /// Create bridges for all tools from an MCP client.
     pub fn from_client(client: Arc<Mutex<McpClient>>, tools: &[McpToolInfo]) -> Vec<Box<dyn Tool>> {
-        tools.iter().map(|tool| {
-            Box::new(McpToolBridge::new(tool.clone(), client.clone())) as Box<dyn Tool>
-        }).collect()
+        tools
+            .iter()
+            .map(|tool| Box::new(McpToolBridge::new(tool.clone(), client.clone())) as Box<dyn Tool>)
+            .collect()
     }
 }
 
@@ -44,19 +45,15 @@ impl Tool for McpToolBridge {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: self.info.name.clone(),
-            description: format!(
-                "[MCP:{}] {}",
-                self.info.server_name,
-                self.info.description
-            ),
+            description: format!("[MCP:{}] {}", self.info.server_name, self.info.description),
             parameters: self.info.input_schema.clone(),
         }
     }
 
     async fn execute(&self, arguments: &str) -> Result<ToolResult> {
         // Parse arguments from JSON string
-        let args: serde_json::Value = serde_json::from_str(arguments)
-            .unwrap_or(serde_json::json!({}));
+        let args: serde_json::Value =
+            serde_json::from_str(arguments).unwrap_or(serde_json::json!({}));
 
         // Call the MCP tool
         let mut client = self.client.lock().await;
@@ -93,7 +90,11 @@ pub async fn connect_mcp_servers(
                 let tools = client.tools().to_vec();
                 let client_arc = Arc::new(Mutex::new(client));
                 let bridges = McpToolBridge::from_client(client_arc.clone(), &tools);
-                tracing::info!("🔗 MCP '{}': {} tools registered", config.name, bridges.len());
+                tracing::info!(
+                    "🔗 MCP '{}': {} tools registered",
+                    config.name,
+                    bridges.len()
+                );
                 results.push((client_arc, bridges));
             }
             Err(e) => {

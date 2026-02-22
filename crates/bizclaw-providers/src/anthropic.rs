@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use bizclaw_core::config::BizClawConfig;
 use bizclaw_core::error::{BizClawError, Result};
 use bizclaw_core::traits::provider::{GenerateParams, Provider};
-use bizclaw_core::types::{Message, ModelInfo, ProviderResponse, ToolDefinition, Role};
+use bizclaw_core::types::{Message, ModelInfo, ProviderResponse, Role, ToolDefinition};
 
 pub struct AnthropicProvider {
     api_key: String,
@@ -67,7 +67,9 @@ impl AnthropicProvider {
 
 #[async_trait]
 impl Provider for AnthropicProvider {
-    fn name(&self) -> &str { "anthropic" }
+    fn name(&self) -> &str {
+        "anthropic"
+    }
 
     async fn chat(
         &self,
@@ -99,17 +101,21 @@ impl Provider for AnthropicProvider {
         }
 
         if !tools.is_empty() {
-            let tool_defs: Vec<serde_json::Value> = tools.iter().map(|t| {
-                serde_json::json!({
-                    "name": t.name,
-                    "description": t.description,
-                    "input_schema": t.parameters,
+            let tool_defs: Vec<serde_json::Value> = tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "name": t.name,
+                        "description": t.description,
+                        "input_schema": t.parameters,
+                    })
                 })
-            }).collect();
+                .collect();
             body["tools"] = serde_json::Value::Array(tool_defs);
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post("https://api.anthropic.com/v1/messages")
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -122,10 +128,14 @@ impl Provider for AnthropicProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(BizClawError::Provider(format!("Anthropic API error {status}: {text}")));
+            return Err(BizClawError::Provider(format!(
+                "Anthropic API error {status}: {text}"
+            )));
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| BizClawError::Http(e.to_string()))?;
 
         // Parse Anthropic response format
@@ -141,7 +151,9 @@ impl Provider for AnthropicProvider {
                         }
                     }
                     Some("tool_use") => {
-                        if let (Some(id), Some(name)) = (block["id"].as_str(), block["name"].as_str()) {
+                        if let (Some(id), Some(name)) =
+                            (block["id"].as_str(), block["name"].as_str())
+                        {
                             tool_calls.push(bizclaw_core::types::ToolCall {
                                 id: id.to_string(),
                                 r#type: "function".to_string(),
@@ -157,15 +169,23 @@ impl Provider for AnthropicProvider {
             }
         }
 
-        let usage = json["usage"].as_object().map(|u| bizclaw_core::types::Usage {
-            prompt_tokens: u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            completion_tokens: u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
-            total_tokens: (u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0)
-                + u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0)) as u32,
-        });
+        let usage = json["usage"]
+            .as_object()
+            .map(|u| bizclaw_core::types::Usage {
+                prompt_tokens: u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                completion_tokens: u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0)
+                    as u32,
+                total_tokens: (u.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0)
+                    + u.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0))
+                    as u32,
+            });
 
         Ok(ProviderResponse {
-            content: if content_text.is_empty() { None } else { Some(content_text) },
+            content: if content_text.is_empty() {
+                None
+            } else {
+                Some(content_text)
+            },
             tool_calls,
             finish_reason: json["stop_reason"].as_str().map(String::from),
             usage,
@@ -174,9 +194,27 @@ impl Provider for AnthropicProvider {
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>> {
         Ok(vec![
-            ModelInfo { id: "claude-sonnet-4-20250514".into(), name: "Claude Sonnet 4".into(), provider: "anthropic".into(), context_length: 200000, max_output_tokens: Some(8192) },
-            ModelInfo { id: "claude-3-5-haiku-20241022".into(), name: "Claude 3.5 Haiku".into(), provider: "anthropic".into(), context_length: 200000, max_output_tokens: Some(8192) },
-            ModelInfo { id: "claude-3-5-sonnet-20241022".into(), name: "Claude 3.5 Sonnet".into(), provider: "anthropic".into(), context_length: 200000, max_output_tokens: Some(8192) },
+            ModelInfo {
+                id: "claude-sonnet-4-20250514".into(),
+                name: "Claude Sonnet 4".into(),
+                provider: "anthropic".into(),
+                context_length: 200000,
+                max_output_tokens: Some(8192),
+            },
+            ModelInfo {
+                id: "claude-3-5-haiku-20241022".into(),
+                name: "Claude 3.5 Haiku".into(),
+                provider: "anthropic".into(),
+                context_length: 200000,
+                max_output_tokens: Some(8192),
+            },
+            ModelInfo {
+                id: "claude-3-5-sonnet-20241022".into(),
+                name: "Claude 3.5 Sonnet".into(),
+                provider: "anthropic".into(),
+                context_length: 200000,
+                max_output_tokens: Some(8192),
+            },
         ])
     }
 

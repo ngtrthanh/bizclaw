@@ -4,13 +4,13 @@
 //! then uses the AI provider to generate a summary.
 
 use async_trait::async_trait;
+use bizclaw_core::error::{BizClawError, Result};
 use bizclaw_core::traits::Tool;
 use bizclaw_core::types::{ToolDefinition, ToolResult};
-use bizclaw_core::error::{BizClawError, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use chrono::{DateTime, Utc};
 
 /// A single buffered message from a Zalo group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,10 +39,18 @@ pub struct SummarizerConfig {
     pub summary_style: String,
 }
 
-fn default_buffer_window() -> u64 { 3600 } // 1 hour
-fn default_max_messages() -> usize { 200 }
-fn default_language() -> String { "vi".into() }
-fn default_style() -> String { "bullet_points".into() }
+fn default_buffer_window() -> u64 {
+    3600
+} // 1 hour
+fn default_max_messages() -> usize {
+    200
+}
+fn default_language() -> String {
+    "vi".into()
+}
+fn default_style() -> String {
+    "bullet_points".into()
+}
 
 impl Default for SummarizerConfig {
     fn default() -> Self {
@@ -72,9 +80,7 @@ impl MessageBuffer {
     /// Add a message to the buffer.
     pub fn push(&self, msg: BufferedMessage) {
         let mut groups = self.groups.lock().unwrap();
-        groups.entry(msg.group_id.clone())
-            .or_default()
-            .push(msg);
+        groups.entry(msg.group_id.clone()).or_default().push(msg);
     }
 
     /// Get and clear messages for a specific group.
@@ -90,7 +96,9 @@ impl MessageBuffer {
 
     /// Get message count for a group.
     pub fn count(&self, group_id: &str) -> usize {
-        self.groups.lock().unwrap()
+        self.groups
+            .lock()
+            .unwrap()
             .get(group_id)
             .map(|v| v.len())
             .unwrap_or(0)
@@ -98,10 +106,7 @@ impl MessageBuffer {
 
     /// Get total message count across all groups.
     pub fn total_count(&self) -> usize {
-        self.groups.lock().unwrap()
-            .values()
-            .map(|v| v.len())
-            .sum()
+        self.groups.lock().unwrap().values().map(|v| v.len()).sum()
     }
 
     /// Prune old messages beyond the buffer window.
@@ -140,7 +145,11 @@ impl GroupSummarizerTool {
 
     /// Format messages into a prompt for the LLM.
     fn format_messages_for_llm(&self, messages: &[BufferedMessage], group_name: &str) -> String {
-        let lang = if self.config.language == "vi" { "tiếng Việt" } else { "English" };
+        let lang = if self.config.language == "vi" {
+            "tiếng Việt"
+        } else {
+            "English"
+        };
         let style_instruction = match self.config.summary_style.as_str() {
             "brief" => "Tóm tắt ngắn gọn trong 2-3 câu.",
             "detailed" => "Tóm tắt chi tiết, nêu rõ ai nói gì, chủ đề chính.",
@@ -161,10 +170,7 @@ impl GroupSummarizerTool {
 
         for msg in messages.iter().take(self.config.max_messages_per_group) {
             let time = msg.timestamp.format("%H:%M");
-            prompt.push_str(&format!(
-                "[{time}] {}: {}\n",
-                msg.sender_name, msg.content
-            ));
+            prompt.push_str(&format!("[{time}] {}: {}\n", msg.sender_name, msg.content));
         }
 
         prompt.push_str("--- HẾT TIN NHẮN ---\n\nTÓM TẮT:");
@@ -174,7 +180,9 @@ impl GroupSummarizerTool {
 
 #[async_trait]
 impl Tool for GroupSummarizerTool {
-    fn name(&self) -> &str { "group_summarizer" }
+    fn name(&self) -> &str {
+        "group_summarizer"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -210,7 +218,8 @@ impl Tool for GroupSummarizerTool {
                 if group_ids.is_empty() {
                     "Không có nhóm nào có tin nhắn đang buffer.".into()
                 } else {
-                    let mut out = format!("📋 {} nhóm có tin nhắn đang buffer:\n\n", group_ids.len());
+                    let mut out =
+                        format!("📋 {} nhóm có tin nhắn đang buffer:\n\n", group_ids.len());
                     for gid in &group_ids {
                         let count = self.buffer.count(gid);
                         out.push_str(&format!("  • {gid}: {count} tin nhắn\n"));
@@ -219,14 +228,16 @@ impl Tool for GroupSummarizerTool {
                 }
             }
             "summarize" => {
-                let group_id = args["group_id"].as_str()
+                let group_id = args["group_id"]
+                    .as_str()
                     .ok_or_else(|| BizClawError::Tool("Missing group_id".into()))?;
 
                 let messages = self.buffer.drain_group(group_id);
                 if messages.is_empty() {
                     format!("Nhóm {group_id} không có tin nhắn nào trong buffer.")
                 } else {
-                    let group_name = messages.first()
+                    let group_name = messages
+                        .first()
                         .map(|m| m.group_name.as_str())
                         .unwrap_or(group_id);
 
@@ -236,7 +247,9 @@ impl Tool for GroupSummarizerTool {
                     format!(
                         "📊 Đã buffer {} tin nhắn từ nhóm \"{}\". \
                          Dưới đây là nội dung cần tóm tắt:\n\n{}",
-                        messages.len(), group_name, prompt
+                        messages.len(),
+                        group_name,
+                        prompt
                     )
                 }
             }
@@ -247,8 +260,7 @@ impl Tool for GroupSummarizerTool {
                     "📊 Buffer: {total} tin nhắn từ {groups} nhóm\n\
                      ⏰ Window: {}s\n\
                      📝 Style: {}",
-                    self.config.buffer_window_secs,
-                    self.config.summary_style
+                    self.config.buffer_window_secs, self.config.summary_style
                 )
             }
             _ => format!("Unknown action: {action}"),

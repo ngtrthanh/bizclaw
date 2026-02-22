@@ -7,6 +7,10 @@ pub trait Tunnel: Send + Sync {
 
 pub struct NoopTunnel;
 impl Tunnel for NoopTunnel {
-    fn name(&self) -> &str { "none" }
-    fn public_url(&self) -> Option<&str> { None }
+    fn name(&self) -> &str {
+        "none"
+    }
+    fn public_url(&self) -> Option<&str> {
+        None
+    }
 }

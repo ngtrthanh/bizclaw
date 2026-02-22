@@ -21,22 +21,22 @@
 //! | document_reader | Offline PDF/DOCX/XLSX/CSV reader |
 //! + MCP server tools (dynamic)
 
-pub mod shell;
-pub mod file;
+pub mod calendar;
+pub mod config_manager;
+pub mod document_reader;
 pub mod edit_file;
+pub mod execute_code;
+pub mod file;
 pub mod glob_find;
 pub mod grep_search;
-pub mod web_search;
-pub mod http_request;
-pub mod config_manager;
-pub mod memory_search;
-pub mod execute_code;
-pub mod plan_tool;
-pub mod session_context;
-pub mod registry;
 pub mod group_summarizer;
-pub mod calendar;
-pub mod document_reader;
+pub mod http_request;
+pub mod memory_search;
+pub mod plan_tool;
+pub mod registry;
+pub mod session_context;
+pub mod shell;
+pub mod web_search;
 
 use bizclaw_core::traits::Tool;
 
@@ -55,7 +55,10 @@ impl ToolRegistry {
     }
 
     pub fn get(&self, name: &str) -> Option<&dyn Tool> {
-        self.tools.iter().find(|t| t.name() == name).map(|t| t.as_ref())
+        self.tools
+            .iter()
+            .find(|t| t.name() == name)
+            .map(|t| t.as_ref())
     }
 
     pub fn list(&self) -> Vec<bizclaw_core::types::ToolDefinition> {
@@ -97,16 +100,15 @@ impl ToolRegistry {
     /// Register the memory_search tool with a shared memory backend.
     pub fn register_memory_search(
         &mut self,
-        memory: std::sync::Arc<tokio::sync::Mutex<Option<Box<dyn bizclaw_core::traits::memory::MemoryBackend>>>>,
+        memory: std::sync::Arc<
+            tokio::sync::Mutex<Option<Box<dyn bizclaw_core::traits::memory::MemoryBackend>>>,
+        >,
     ) {
         self.register(Box::new(memory_search::MemorySearchTool::new(memory)));
     }
 
     /// Register the session_context tool with shared session info.
-    pub fn register_session_context(
-        &mut self,
-        info: session_context::SharedSessionInfo,
-    ) {
+    pub fn register_session_context(&mut self, info: session_context::SharedSessionInfo) {
         self.register(Box::new(session_context::SessionContextTool::new(info)));
     }
 
@@ -130,7 +132,9 @@ impl ToolRegistry {
 }
 
 impl Default for ToolRegistry {
-    fn default() -> Self { Self::with_defaults() }
+    fn default() -> Self {
+        Self::with_defaults()
+    }
 }
 
 #[cfg(test)]

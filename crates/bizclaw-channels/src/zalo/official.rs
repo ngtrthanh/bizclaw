@@ -35,13 +35,13 @@ impl ZaloOfficialChannel {
 
 #[async_trait]
 impl Channel for ZaloOfficialChannel {
-    fn name(&self) -> &str { "zalo-oa" }
+    fn name(&self) -> &str {
+        "zalo-oa"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         if self.access_token.is_none() {
-            return Err(BizClawError::AuthFailed(
-                "Set access_token first".into()
-            ));
+            return Err(BizClawError::AuthFailed("Set access_token first".into()));
         }
         tracing::info!("Zalo OA channel connected");
         Ok(())
@@ -52,12 +52,18 @@ impl Channel for ZaloOfficialChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        let token = self.access_token.as_ref()
+        let token = self
+            .access_token
+            .as_ref()
             .ok_or_else(|| BizClawError::Channel("No access token".into()))?;
-        self.business.send_oa_message(&message.thread_id, &message.content, token).await
+        self.business
+            .send_oa_message(&message.thread_id, &message.content, token)
+            .await
     }
 
     async fn listen(&self) -> Result<Box<dyn Stream<Item = IncomingMessage> + Send + Unpin>> {
@@ -66,5 +72,7 @@ impl Channel for ZaloOfficialChannel {
 }
 
 impl Default for ZaloOfficialChannel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

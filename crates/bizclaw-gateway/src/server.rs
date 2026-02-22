@@ -1,11 +1,15 @@
 //! HTTP server implementation using Axum.
 
-use axum::{Router, Json, routing::{get, post}, extract::State};
 use axum::response::Html;
-use bizclaw_core::config::{GatewayConfig, BizClawConfig};
-use std::sync::{Arc, Mutex};
+use axum::{
+    Json, Router,
+    extract::State,
+    routing::{get, post},
+};
+use bizclaw_core::config::{BizClawConfig, GatewayConfig};
 use std::path::PathBuf;
-use tower_http::cors::{CorsLayer, Any};
+use std::sync::{Arc, Mutex};
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 /// Shared state for the gateway server.
@@ -43,7 +47,8 @@ async fn require_pairing(
     };
 
     // Check header first
-    let from_header = req.headers()
+    let from_header = req
+        .headers()
         .get("X-Pairing-Code")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
@@ -54,11 +59,10 @@ async fn require_pairing(
     // Check query param ?code=
     if let Some(query) = req.uri().query() {
         for pair in query.split('&') {
-            if let Some(code) = pair.strip_prefix("code=") {
-                if code == expected {
+            if let Some(code) = pair.strip_prefix("code=")
+                && code == expected {
                     return next.run(req).await;
                 }
-            }
         }
     }
 
@@ -96,28 +100,70 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/config/full", get(super::routes::get_full_config))
         .route("/api/v1/providers", get(super::routes::list_providers))
         .route("/api/v1/channels", get(super::routes::list_channels))
-        .route("/api/v1/channels/update", post(super::routes::update_channel))
+        .route(
+            "/api/v1/channels/update",
+            post(super::routes::update_channel),
+        )
         .route("/api/v1/ollama/models", get(super::routes::ollama_models))
-        .route("/api/v1/brain/models", get(super::routes::brain_scan_models))
+        .route(
+            "/api/v1/brain/models",
+            get(super::routes::brain_scan_models),
+        )
         .route("/api/v1/zalo/qr", post(super::routes::zalo_qr_code))
         // Scheduler API
-        .route("/api/v1/scheduler/tasks", get(super::routes::scheduler_list_tasks))
-        .route("/api/v1/scheduler/tasks", post(super::routes::scheduler_add_task))
-        .route("/api/v1/scheduler/tasks/{id}", axum::routing::delete(super::routes::scheduler_remove_task))
-        .route("/api/v1/scheduler/notifications", get(super::routes::scheduler_notifications))
+        .route(
+            "/api/v1/scheduler/tasks",
+            get(super::routes::scheduler_list_tasks),
+        )
+        .route(
+            "/api/v1/scheduler/tasks",
+            post(super::routes::scheduler_add_task),
+        )
+        .route(
+            "/api/v1/scheduler/tasks/{id}",
+            axum::routing::delete(super::routes::scheduler_remove_task),
+        )
+        .route(
+            "/api/v1/scheduler/notifications",
+            get(super::routes::scheduler_notifications),
+        )
         // Knowledge Base API
-        .route("/api/v1/knowledge/search", post(super::routes::knowledge_search))
-        .route("/api/v1/knowledge/documents", get(super::routes::knowledge_list_docs))
-        .route("/api/v1/knowledge/documents", post(super::routes::knowledge_add_doc))
-        .route("/api/v1/knowledge/documents/{id}", axum::routing::delete(super::routes::knowledge_remove_doc))
+        .route(
+            "/api/v1/knowledge/search",
+            post(super::routes::knowledge_search),
+        )
+        .route(
+            "/api/v1/knowledge/documents",
+            get(super::routes::knowledge_list_docs),
+        )
+        .route(
+            "/api/v1/knowledge/documents",
+            post(super::routes::knowledge_add_doc),
+        )
+        .route(
+            "/api/v1/knowledge/documents/{id}",
+            axum::routing::delete(super::routes::knowledge_remove_doc),
+        )
         // Multi-Agent Orchestrator API
         .route("/api/v1/agents", get(super::routes::list_agents))
         .route("/api/v1/agents", post(super::routes::create_agent))
-        .route("/api/v1/agents/{name}", axum::routing::delete(super::routes::delete_agent))
-        .route("/api/v1/agents/{name}/chat", post(super::routes::agent_chat))
-        .route("/api/v1/agents/broadcast", post(super::routes::agent_broadcast))
+        .route(
+            "/api/v1/agents/{name}",
+            axum::routing::delete(super::routes::delete_agent),
+        )
+        .route(
+            "/api/v1/agents/{name}/chat",
+            post(super::routes::agent_chat),
+        )
+        .route(
+            "/api/v1/agents/broadcast",
+            post(super::routes::agent_broadcast),
+        )
         .route("/ws", get(super::ws::ws_handler))
-        .route_layer(axum::middleware::from_fn_with_state(shared.clone(), require_pairing));
+        .route_layer(axum::middleware::from_fn_with_state(
+            shared.clone(),
+            require_pairing,
+        ));
 
     // Public routes — no auth
     let public = Router::new()
@@ -125,16 +171,18 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(super::routes::health_check))
         .route("/api/v1/verify-pairing", post(verify_pairing))
         // WhatsApp webhook — must be public for Meta verification
-        .route("/api/v1/webhook/whatsapp",
-            get(super::routes::whatsapp_webhook_verify)
-                .post(super::routes::whatsapp_webhook));
+        .route(
+            "/api/v1/webhook/whatsapp",
+            get(super::routes::whatsapp_webhook_verify).post(super::routes::whatsapp_webhook),
+        );
 
     // SPA fallback — serve dashboard HTML for all frontend routes
     // so that /dashboard, /chat, /settings etc. all work with path-based routing
-    let spa_fallback = Router::new()
-        .fallback(get(dashboard_page));
+    let spa_fallback = Router::new().fallback(get(dashboard_page));
 
-    protected.merge(public).merge(spa_fallback)
+    protected
+        .merge(public)
+        .merge(spa_fallback)
         .layer({
             let cors = CorsLayer::new()
                 .allow_methods([
@@ -150,7 +198,8 @@ pub fn build_router(state: AppState) -> Router {
             // Restrict CORS origins in production via env var
             // Example: BIZCLAW_CORS_ORIGINS=https://bizclaw.vn,https://sales.bizclaw.vn
             if let Ok(origins_str) = std::env::var("BIZCLAW_CORS_ORIGINS") {
-                let origins: Vec<_> = origins_str.split(',')
+                let origins: Vec<_> = origins_str
+                    .split(',')
                     .filter_map(|s| s.trim().parse::<axum::http::HeaderValue>().ok())
                     .collect();
                 cors.allow_origin(origins)
@@ -176,21 +225,28 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
     };
 
     // Try to create the Agent engine (with MCP support)
-    let agent: Option<bizclaw_agent::Agent> = match bizclaw_agent::Agent::new_with_mcp(full_config.clone()).await {
-        Ok(a) => {
-            let tool_count = a.tool_count();
-            tracing::info!("✅ Agent engine initialized (provider={}, tools={})",
-                a.provider_name(), tool_count);
-            Some(a)
-        }
-        Err(e) => {
-            tracing::warn!("⚠️ Agent engine not available: {e} — falling back to direct provider calls");
-            None
-        }
-    };
+    let agent: Option<bizclaw_agent::Agent> =
+        match bizclaw_agent::Agent::new_with_mcp(full_config.clone()).await {
+            Ok(a) => {
+                let tool_count = a.tool_count();
+                tracing::info!(
+                    "✅ Agent engine initialized (provider={}, tools={})",
+                    a.provider_name(),
+                    tool_count
+                );
+                Some(a)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "⚠️ Agent engine not available: {e} — falling back to direct provider calls"
+                );
+                None
+            }
+        };
 
     // Initialize Scheduler engine
-    let sched_dir = config_path.parent()
+    let sched_dir = config_path
+        .parent()
         .unwrap_or(std::path::Path::new("."))
         .join("scheduler");
     let scheduler = bizclaw_scheduler::SchedulerEngine::new(&sched_dir);
@@ -205,7 +261,8 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
     tokio::spawn(bizclaw_scheduler::engine::spawn_scheduler(sched_clone, 30));
 
     // Initialize Knowledge Base
-    let kb_path = config_path.parent()
+    let kb_path = config_path
+        .parent()
         .unwrap_or(std::path::Path::new("."))
         .join("knowledge.db");
     let knowledge = match bizclaw_knowledge::KnowledgeStore::open(&kb_path) {
@@ -232,14 +289,15 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         config_path: config_path.clone(),
         start_time: std::time::Instant::now(),
         pairing_code: if config.require_pairing {
-            let code = std::env::var("BIZCLAW_PAIRING_CODE").ok()
-                .or_else(|| {
-                    config_path.parent().and_then(|d| {
-                        let pc = d.join(".pairing_code");
-                        std::fs::read_to_string(pc).ok().map(|s| s.trim().to_string())
-                    })
-                });
-            code
+            
+            std::env::var("BIZCLAW_PAIRING_CODE").ok().or_else(|| {
+                config_path.parent().and_then(|d| {
+                    let pc = d.join(".pairing_code");
+                    std::fs::read_to_string(pc)
+                        .ok()
+                        .map(|s| s.trim().to_string())
+                })
+            })
         } else {
             None
         },

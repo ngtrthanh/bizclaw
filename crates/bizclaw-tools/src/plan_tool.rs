@@ -103,7 +103,7 @@ pub struct PlanTask {
     pub description: String,
     pub task_type: TaskType,
     pub status: TaskStatus,
-    pub complexity: u8, // 1-5
+    pub complexity: u8,           // 1-5
     pub dependencies: Vec<usize>, // IDs of tasks this depends on
     pub created_at: String,
     pub completed_at: Option<String>,
@@ -124,7 +124,9 @@ pub struct Plan {
 
 impl Plan {
     fn new(title: &str, description: &str) -> Self {
-        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+        let now = chrono::Utc::now()
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string();
         Self {
             id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
             title: title.to_string(),
@@ -136,7 +138,14 @@ impl Plan {
         }
     }
 
-    fn add_task(&mut self, title: &str, description: &str, task_type: TaskType, complexity: u8, dependencies: Vec<usize>) {
+    fn add_task(
+        &mut self,
+        title: &str,
+        description: &str,
+        task_type: TaskType,
+        complexity: u8,
+        dependencies: Vec<usize>,
+    ) {
         let id = self.tasks.len() + 1;
         self.tasks.push(PlanTask {
             id,
@@ -146,11 +155,15 @@ impl Plan {
             status: TaskStatus::Pending,
             complexity: complexity.clamp(1, 5),
             dependencies,
-            created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+            created_at: chrono::Utc::now()
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string(),
             completed_at: None,
             result: None,
         });
-        self.updated_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+        self.updated_at = chrono::Utc::now()
+            .format("%Y-%m-%d %H:%M:%S UTC")
+            .to_string();
     }
 
     fn total_complexity(&self) -> u32 {
@@ -168,7 +181,11 @@ impl Plan {
     }
 
     fn progress(&self) -> (usize, usize) {
-        let completed = self.tasks.iter().filter(|t| t.status == TaskStatus::Completed).count();
+        let completed = self
+            .tasks
+            .iter()
+            .filter(|t| t.status == TaskStatus::Completed)
+            .count();
         (completed, self.tasks.len())
     }
 
@@ -178,7 +195,13 @@ impl Plan {
 
         let mut out = format!(
             "📋 Plan: {}\n{}\nStatus: {} • Tasks: {} • Complexity: {} • Progress: {}/{}\n",
-            self.title, self.description, self.status, total, self.complexity_label(), done, total
+            self.title,
+            self.description,
+            self.status,
+            total,
+            self.complexity_label(),
+            done,
+            total
         );
         out.push_str(&"─".repeat(60));
         out.push('\n');
@@ -187,11 +210,23 @@ impl Plan {
             let deps = if task.dependencies.is_empty() {
                 String::new()
             } else {
-                format!(" → depends on #{}", task.dependencies.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(", #"))
+                format!(
+                    " → depends on #{}",
+                    task.dependencies
+                        .iter()
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", #")
+                )
             };
             out.push_str(&format!(
                 "  {}. [{}] {} ({}) {}{}\n",
-                task.id, task.status, task.title, task.task_type, stars(task.complexity), deps
+                task.id,
+                task.status,
+                task.title,
+                task.task_type,
+                stars(task.complexity),
+                deps
             ));
             if !task.description.is_empty() {
                 out.push_str(&format!("     {}\n", task.description));
@@ -224,7 +259,9 @@ impl PlanTool {
 
 #[async_trait]
 impl Tool for PlanTool {
-    fn name(&self) -> &str { "plan" }
+    fn name(&self) -> &str {
+        "plan"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -285,7 +322,8 @@ impl Tool for PlanTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let operation = args["operation"].as_str()
+        let operation = args["operation"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'operation'".into()))?;
 
         let mut store = self.store.lock().await;
@@ -299,7 +337,10 @@ impl Tool for PlanTool {
                 store.push(plan);
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("✅ Plan created (ID: {}). Use add_task to add tasks, then finalize.", id),
+                    output: format!(
+                        "✅ Plan created (ID: {}). Use add_task to add tasks, then finalize.",
+                        id
+                    ),
                     success: true,
                 })
             }
@@ -309,7 +350,9 @@ impl Tool for PlanTool {
                 if plan.status != PlanStatus::Draft {
                     return Ok(ToolResult {
                         tool_call_id: String::new(),
-                        output: "Cannot add tasks — plan is not in Draft status. Create a new plan.".into(),
+                        output:
+                            "Cannot add tasks — plan is not in Draft status. Create a new plan."
+                                .into(),
                         success: false,
                     });
                 }
@@ -328,8 +371,13 @@ impl Tool for PlanTool {
                     _ => TaskType::Other,
                 };
                 let complexity = args["complexity"].as_u64().unwrap_or(2) as u8;
-                let dependencies: Vec<usize> = args["dependencies"].as_array()
-                    .map(|arr| arr.iter().filter_map(|v| v.as_u64().map(|n| n as usize)).collect())
+                let dependencies: Vec<usize> = args["dependencies"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_u64().map(|n| n as usize))
+                            .collect()
+                    })
                     .unwrap_or_default();
 
                 plan.add_task(title, description, task_type, complexity, dependencies);
@@ -351,7 +399,9 @@ impl Tool for PlanTool {
                     });
                 }
                 plan.status = PlanStatus::PendingApproval;
-                plan.updated_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+                plan.updated_at = chrono::Utc::now()
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string();
                 let display = plan.display();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
@@ -365,15 +415,23 @@ impl Tool for PlanTool {
                 if plan.status != PlanStatus::PendingApproval {
                     return Ok(ToolResult {
                         tool_call_id: String::new(),
-                        output: format!("Cannot approve — plan is in '{}' status, not PendingApproval.", plan.status),
+                        output: format!(
+                            "Cannot approve — plan is in '{}' status, not PendingApproval.",
+                            plan.status
+                        ),
                         success: false,
                     });
                 }
                 plan.status = PlanStatus::Approved;
-                plan.updated_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+                plan.updated_at = chrono::Utc::now()
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("✅ Plan '{}' approved! Start executing tasks with start_task.", plan.title),
+                    output: format!(
+                        "✅ Plan '{}' approved! Start executing tasks with start_task.",
+                        plan.title
+                    ),
                     success: true,
                 })
             }
@@ -381,7 +439,9 @@ impl Tool for PlanTool {
             "reject" => {
                 let plan = find_plan_mut(&mut store, &args)?;
                 plan.status = PlanStatus::Rejected;
-                plan.updated_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+                plan.updated_at = chrono::Utc::now()
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string();
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: format!("❌ Plan '{}' rejected.", plan.title),
@@ -406,15 +466,17 @@ impl Tool for PlanTool {
                 if let Some(idx) = task_idx {
                     let deps = plan.tasks[idx].dependencies.clone();
                     for dep_id in &deps {
-                        if let Some(dep) = plan.tasks.iter().find(|t| t.id == *dep_id) {
-                            if dep.status != TaskStatus::Completed {
+                        if let Some(dep) = plan.tasks.iter().find(|t| t.id == *dep_id)
+                            && dep.status != TaskStatus::Completed {
                                 return Ok(ToolResult {
                                     tool_call_id: String::new(),
-                                    output: format!("🚫 Cannot start task #{} — dependency #{} is not completed ({})", task_id, dep_id, dep.status),
+                                    output: format!(
+                                        "🚫 Cannot start task #{} — dependency #{} is not completed ({})",
+                                        task_id, dep_id, dep.status
+                                    ),
                                     success: false,
                                 });
                             }
-                        }
                     }
                     // Now mutate
                     plan.tasks[idx].status = TaskStatus::InProgress;
@@ -439,7 +501,11 @@ impl Tool for PlanTool {
                 let result_text = args["result"].as_str().map(|s| s.to_string());
                 if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
                     task.status = TaskStatus::Completed;
-                    task.completed_at = Some(chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string());
+                    task.completed_at = Some(
+                        chrono::Utc::now()
+                            .format("%Y-%m-%d %H:%M:%S UTC")
+                            .to_string(),
+                    );
                     task.result = result_text;
 
                     // Check if all tasks completed
@@ -449,17 +515,33 @@ impl Tool for PlanTool {
                     if all_done {
                         plan.status = PlanStatus::Completed;
                     }
-                    plan.updated_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+                    plan.updated_at = chrono::Utc::now()
+                        .format("%Y-%m-%d %H:%M:%S UTC")
+                        .to_string();
 
                     let msg = if all_done {
-                        format!("✅ Task #{} completed! 🎉 All tasks done — plan completed!", task_id)
+                        format!(
+                            "✅ Task #{} completed! 🎉 All tasks done — plan completed!",
+                            task_id
+                        )
                     } else {
                         let (done, total) = plan.progress();
-                        format!("✅ Task #{} completed! Progress: {}/{}", task_id, done, total)
+                        format!(
+                            "✅ Task #{} completed! Progress: {}/{}",
+                            task_id, done, total
+                        )
                     };
-                    Ok(ToolResult { tool_call_id: String::new(), output: msg, success: true })
+                    Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: msg,
+                        success: true,
+                    })
                 } else {
-                    Ok(ToolResult { tool_call_id: String::new(), output: format!("Task #{} not found", task_id), success: false })
+                    Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: format!("Task #{} not found", task_id),
+                        success: false,
+                    })
                 }
             }
 
@@ -470,9 +552,17 @@ impl Tool for PlanTool {
                 if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
                     task.status = TaskStatus::Failed;
                     task.result = result_text;
-                    Ok(ToolResult { tool_call_id: String::new(), output: format!("❌ Task #{} failed: {}", task_id, task.title), success: true })
+                    Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: format!("❌ Task #{} failed: {}", task_id, task.title),
+                        success: true,
+                    })
                 } else {
-                    Ok(ToolResult { tool_call_id: String::new(), output: format!("Task #{} not found", task_id), success: false })
+                    Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: format!("Task #{} not found", task_id),
+                        success: false,
+                    })
                 }
             }
 
@@ -481,36 +571,65 @@ impl Tool for PlanTool {
                 let task_id = args["task_id"].as_u64().unwrap_or(0) as usize;
                 if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
                     task.status = TaskStatus::Skipped;
-                    Ok(ToolResult { tool_call_id: String::new(), output: format!("⏭ Task #{} skipped: {}", task_id, task.title), success: true })
+                    Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: format!("⏭ Task #{} skipped: {}", task_id, task.title),
+                        success: true,
+                    })
                 } else {
-                    Ok(ToolResult { tool_call_id: String::new(), output: format!("Task #{} not found", task_id), success: false })
+                    Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: format!("Task #{} not found", task_id),
+                        success: false,
+                    })
                 }
             }
 
             "list" => {
                 if store.is_empty() {
-                    return Ok(ToolResult { tool_call_id: String::new(), output: "No plans exist yet.".into(), success: true });
+                    return Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: "No plans exist yet.".into(),
+                        success: true,
+                    });
                 }
                 let mut out = format!("📋 {} plan(s):\n\n", store.len());
                 for plan in store.iter() {
                     let (done, total) = plan.progress();
-                    out.push_str(&format!("  [{}] {} — {} ({}/{} tasks)\n", plan.id, plan.title, plan.status, done, total));
+                    out.push_str(&format!(
+                        "  [{}] {} — {} ({}/{} tasks)\n",
+                        plan.id, plan.title, plan.status, done, total
+                    ));
                 }
-                Ok(ToolResult { tool_call_id: String::new(), output: out, success: true })
+                Ok(ToolResult {
+                    tool_call_id: String::new(),
+                    output: out,
+                    success: true,
+                })
             }
 
             "show" => {
                 let plan = find_plan(&store, &args)?;
-                Ok(ToolResult { tool_call_id: String::new(), output: plan.display(), success: true })
+                Ok(ToolResult {
+                    tool_call_id: String::new(),
+                    output: plan.display(),
+                    success: true,
+                })
             }
 
             "delete" => {
                 let plan_id = get_plan_id(&store, &args)?;
                 store.retain(|p| p.id != plan_id);
-                Ok(ToolResult { tool_call_id: String::new(), output: format!("🗑️ Plan {} deleted.", plan_id), success: true })
+                Ok(ToolResult {
+                    tool_call_id: String::new(),
+                    output: format!("🗑️ Plan {} deleted.", plan_id),
+                    success: true,
+                })
             }
 
-            _ => Err(bizclaw_core::error::BizClawError::Tool(format!("Unknown operation: {operation}"))),
+            _ => Err(bizclaw_core::error::BizClawError::Tool(format!(
+                "Unknown operation: {operation}"
+            ))),
         }
     }
 }
@@ -523,18 +642,24 @@ fn get_plan_id(store: &[Plan], args: &serde_json::Value) -> Result<String> {
     } else if let Some(last) = store.last() {
         Ok(last.id.clone())
     } else {
-        Err(bizclaw_core::error::BizClawError::Tool("No plan_id specified and no plans exist".into()))
+        Err(bizclaw_core::error::BizClawError::Tool(
+            "No plan_id specified and no plans exist".into(),
+        ))
     }
 }
 
 fn find_plan<'a>(store: &'a [Plan], args: &serde_json::Value) -> Result<&'a Plan> {
     let id = get_plan_id(store, args)?;
-    store.iter().find(|p| p.id == id)
+    store
+        .iter()
+        .find(|p| p.id == id)
         .ok_or_else(|| bizclaw_core::error::BizClawError::Tool(format!("Plan '{}' not found", id)))
 }
 
 fn find_plan_mut<'a>(store: &'a mut Vec<Plan>, args: &serde_json::Value) -> Result<&'a mut Plan> {
     let id = get_plan_id(store, args)?;
-    store.iter_mut().find(|p| p.id == id)
+    store
+        .iter_mut()
+        .find(|p| p.id == id)
         .ok_or_else(|| bizclaw_core::error::BizClawError::Tool(format!("Plan '{}' not found", id)))
 }

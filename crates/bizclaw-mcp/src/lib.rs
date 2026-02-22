@@ -11,11 +11,11 @@
 //!                     MCP Server (any language)
 //! ```
 
+pub mod bridge;
 pub mod client;
 pub mod transport;
 pub mod types;
-pub mod bridge;
 
-pub use client::McpClient;
 pub use bridge::McpToolBridge;
+pub use client::McpClient;
 pub use types::{McpServerConfig, McpToolInfo};

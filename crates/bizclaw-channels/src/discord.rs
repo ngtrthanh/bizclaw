@@ -23,7 +23,9 @@ pub struct DiscordConfig {
     pub intents: u64,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 fn default_intents() -> u64 {
     // GUILDS | GUILD_MESSAGES | DIRECT_MESSAGES | MESSAGE_CONTENT
     (1 << 0) | (1 << 9) | (1 << 12) | (1 << 15)
@@ -41,14 +43,21 @@ impl DiscordChannel {
         let client = reqwest::Client::builder()
             .default_headers({
                 let mut h = reqwest::header::HeaderMap::new();
-                h.insert("Authorization", format!("Bot {}", config.bot_token).parse().unwrap());
+                h.insert(
+                    "Authorization",
+                    format!("Bot {}", config.bot_token).parse().unwrap(),
+                );
                 h.insert("User-Agent", "BizClaw/0.1".parse().unwrap());
                 h
             })
             .build()
             .unwrap_or_default();
 
-        Self { config, client, connected: false }
+        Self {
+            config,
+            client,
+            connected: false,
+        }
     }
 
     /// Send a message to a channel.
@@ -56,7 +65,12 @@ impl DiscordChannel {
         let url = format!("https://discord.com/api/v10/channels/{channel_id}/messages");
         let body = serde_json::json!({ "content": content });
 
-        let response = self.client.post(&url).json(&body).send().await
+        let response = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Discord send failed: {e}")))?;
 
         if !response.status().is_success() {
@@ -76,25 +90,34 @@ impl DiscordChannel {
 
     /// Get current bot info.
     pub async fn get_me(&self) -> Result<DiscordUser> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://discord.com/api/v10/users/@me")
-            .send().await
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("getMe failed: {e}")))?;
-        response.json().await
+        response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid response: {e}")))
     }
 
     /// Get Gateway WebSocket URL.
     pub async fn get_gateway_url(&self) -> Result<String> {
-        let response = self.client
+        let response = self
+            .client
             .get("https://discord.com/api/v10/gateway/bot")
-            .send().await
+            .send()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Gateway request failed: {e}")))?;
 
-        let body: serde_json::Value = response.json().await
+        let body: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid gateway response: {e}")))?;
 
-        body["url"].as_str()
+        body["url"]
+            .as_str()
             .map(|s| format!("{s}/?v=10&encoding=json"))
             .ok_or_else(|| BizClawError::Channel("No gateway URL".into()))
     }
@@ -116,7 +139,9 @@ impl DiscordChannel {
                 let gateway_url = match channel.get_gateway_url().await {
                     Ok(url) => url,
                     Err(e) => {
-                        tracing::error!("Failed to get gateway URL: {e}, retrying in {backoff_secs}s...");
+                        tracing::error!(
+                            "Failed to get gateway URL: {e}, retrying in {backoff_secs}s..."
+                        );
                         tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
                         backoff_secs = (backoff_secs * 2).min(60);
                         continue;
@@ -128,7 +153,9 @@ impl DiscordChannel {
                 let (mut ws, _) = match ws_result {
                     Ok(conn) => conn,
                     Err(e) => {
-                        tracing::error!("Gateway WebSocket failed: {e}, retrying in {backoff_secs}s...");
+                        tracing::error!(
+                            "Gateway WebSocket failed: {e}, retrying in {backoff_secs}s..."
+                        );
                         tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
                         backoff_secs = (backoff_secs * 2).min(60);
                         continue;
@@ -292,7 +319,9 @@ impl Unpin for DiscordGatewayStream {}
 
 #[async_trait]
 impl Channel for DiscordChannel {
-    fn name(&self) -> &str { "discord" }
+    fn name(&self) -> &str {
+        "discord"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         let me = self.get_me().await?;
@@ -306,10 +335,13 @@ impl Channel for DiscordChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        self.send_message(&message.thread_id, &message.content).await
+        self.send_message(&message.thread_id, &message.content)
+            .await
     }
 
     async fn send_typing(&self, thread_id: &str) -> Result<()> {

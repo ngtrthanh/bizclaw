@@ -8,16 +8,22 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 pub struct ConfigManagerTool;
 
 impl ConfigManagerTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for ConfigManagerTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for ConfigManagerTool {
-    fn name(&self) -> &str { "config_manager" }
+    fn name(&self) -> &str {
+        "config_manager"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -49,7 +55,8 @@ impl Tool for ConfigManagerTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let action = args["action"].as_str()
+        let action = args["action"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'action'".into()))?;
 
         let config_path = bizclaw_core::config::BizClawConfig::default_path();
@@ -58,8 +65,9 @@ impl Tool for ConfigManagerTool {
             "read" => {
                 // Read and display full config
                 if config_path.exists() {
-                    let content = tokio::fs::read_to_string(&config_path).await
-                        .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Read failed: {e}")))?;
+                    let content = tokio::fs::read_to_string(&config_path).await.map_err(|e| {
+                        bizclaw_core::error::BizClawError::Tool(format!("Read failed: {e}"))
+                    })?;
 
                     // Mask sensitive fields
                     let masked = mask_secrets(&content);
@@ -78,14 +86,17 @@ impl Tool for ConfigManagerTool {
             }
 
             "get" => {
-                let key = args["key"].as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'key' for get action".into()))?;
+                let key = args["key"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'key' for get action".into())
+                })?;
 
-                let config = bizclaw_core::config::BizClawConfig::load()
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Load config: {e}")))?;
+                let config = bizclaw_core::config::BizClawConfig::load().map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Load config: {e}"))
+                })?;
 
-                let json = serde_json::to_value(&config)
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Serialize: {e}")))?;
+                let json = serde_json::to_value(&config).map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Serialize: {e}"))
+                })?;
 
                 // Navigate dot-separated key path
                 let value = get_nested_value(&json, key);
@@ -93,7 +104,10 @@ impl Tool for ConfigManagerTool {
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: match value {
-                        Some(v) => format!("{key} = {}", serde_json::to_string_pretty(&v).unwrap_or_default()),
+                        Some(v) => format!(
+                            "{key} = {}",
+                            serde_json::to_string_pretty(&v).unwrap_or_default()
+                        ),
                         None => format!("Key '{key}' not found in config"),
                     },
                     success: value.is_some(),
@@ -101,25 +115,32 @@ impl Tool for ConfigManagerTool {
             }
 
             "set" => {
-                let key = args["key"].as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'key' for set action".into()))?;
-                let value = args["value"].as_str()
-                    .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'value' for set action".into()))?;
+                let key = args["key"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'key' for set action".into())
+                })?;
+                let value = args["value"].as_str().ok_or_else(|| {
+                    bizclaw_core::error::BizClawError::Tool("Missing 'value' for set action".into())
+                })?;
 
                 // Safety: don't allow setting certain sensitive fields via tool
                 if key.contains("api_key") || key.contains("password") || key.contains("secret") {
                     return Ok(ToolResult {
                         tool_call_id: String::new(),
-                        output: format!("Cannot set sensitive field '{}' via config_manager tool. Use the Dashboard UI instead.", key),
+                        output: format!(
+                            "Cannot set sensitive field '{}' via config_manager tool. Use the Dashboard UI instead.",
+                            key
+                        ),
                         success: false,
                     });
                 }
 
-                let mut config = bizclaw_core::config::BizClawConfig::load()
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Load config: {e}")))?;
+                let mut config = bizclaw_core::config::BizClawConfig::load().map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Load config: {e}"))
+                })?;
 
-                let mut json = serde_json::to_value(&config)
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Serialize: {e}")))?;
+                let mut json = serde_json::to_value(&config).map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Serialize: {e}"))
+                })?;
 
                 // Parse the new value
                 let new_value = serde_json::from_str::<serde_json::Value>(value)
@@ -129,11 +150,13 @@ impl Tool for ConfigManagerTool {
                 set_nested_value(&mut json, key, new_value.clone());
 
                 // Deserialize back to config
-                config = serde_json::from_value(json)
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Invalid value: {e}")))?;
+                config = serde_json::from_value(json).map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Invalid value: {e}"))
+                })?;
 
-                config.save()
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Save failed: {e}")))?;
+                config.save().map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Save failed: {e}"))
+                })?;
 
                 Ok(ToolResult {
                     tool_call_id: String::new(),
@@ -143,11 +166,13 @@ impl Tool for ConfigManagerTool {
             }
 
             "list_keys" => {
-                let config = bizclaw_core::config::BizClawConfig::load()
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Load config: {e}")))?;
+                let config = bizclaw_core::config::BizClawConfig::load().map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Load config: {e}"))
+                })?;
 
-                let json = serde_json::to_value(&config)
-                    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Serialize: {e}")))?;
+                let json = serde_json::to_value(&config).map_err(|e| {
+                    bizclaw_core::error::BizClawError::Tool(format!("Serialize: {e}"))
+                })?;
 
                 let keys = collect_keys(&json, "");
                 Ok(ToolResult {
@@ -157,7 +182,9 @@ impl Tool for ConfigManagerTool {
                 })
             }
 
-            _ => Err(bizclaw_core::error::BizClawError::Tool(format!("Unknown action: {action}"))),
+            _ => Err(bizclaw_core::error::BizClawError::Tool(format!(
+                "Unknown action: {action}"
+            ))),
         }
     }
 }
@@ -182,12 +209,17 @@ fn set_nested_value(json: &mut serde_json::Value, key: &str, value: serde_json::
     // For nested paths, navigate to parent then set
     let parent_parts = &parts[..parts.len() - 1];
     let last_key = parts.last().unwrap();
-    
+
     let mut current = json;
     for part in parent_parts {
-        if !current.is_object() { return; }
+        if !current.is_object() {
+            return;
+        }
         if current.get(*part).is_none() {
-            current.as_object_mut().unwrap().insert(part.to_string(), serde_json::json!({}));
+            current
+                .as_object_mut()
+                .unwrap()
+                .insert(part.to_string(), serde_json::json!({}));
         }
         current = current.get_mut(*part).unwrap();
     }
@@ -218,7 +250,11 @@ fn collect_keys(json: &serde_json::Value, prefix: &str) -> Vec<String> {
 fn mask_secrets(content: &str) -> String {
     let mut masked = String::new();
     for line in content.lines() {
-        if line.contains("api_key") || line.contains("password") || line.contains("secret") || line.contains("token") {
+        if line.contains("api_key")
+            || line.contains("password")
+            || line.contains("secret")
+            || line.contains("token")
+        {
             if let Some(eq_pos) = line.find('=') {
                 masked.push_str(&line[..eq_pos + 1]);
                 masked.push_str(" \"••••••••\"");

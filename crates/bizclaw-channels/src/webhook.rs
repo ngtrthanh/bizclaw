@@ -21,7 +21,9 @@ pub struct WebhookConfig {
     pub enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// Webhook channel.
 pub struct WebhookChannel {
@@ -47,7 +49,8 @@ impl WebhookChannel {
 
     /// Inject an inbound message (called from HTTP handler).
     pub fn inject_message(&self, msg: IncomingMessage) -> Result<()> {
-        self.inbound_tx.send(msg)
+        self.inbound_tx
+            .send(msg)
             .map_err(|_| BizClawError::Channel("Webhook receiver closed".into()))
     }
 
@@ -55,7 +58,7 @@ impl WebhookChannel {
     pub fn parse_inbound(&self, payload: &str, signature: Option<&str>) -> Result<IncomingMessage> {
         // Verify signature if secret is configured
         if let (Some(secret), Some(sig)) = (&self.config.secret, signature) {
-            use sha2::{Sha256, Digest};
+            use sha2::{Digest, Sha256};
             let mut hasher = Sha256::new();
             hasher.update(format!("{secret}{payload}"));
             let expected = format!("{:x}", hasher.finalize());
@@ -82,7 +85,9 @@ impl WebhookChannel {
 
 #[async_trait]
 impl Channel for WebhookChannel {
-    fn name(&self) -> &str { "webhook" }
+    fn name(&self) -> &str {
+        "webhook"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         self.connected = true;
@@ -95,7 +100,9 @@ impl Channel for WebhookChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
         if let Some(url) = &self.config.outbound_url {
@@ -105,7 +112,8 @@ impl Channel for WebhookChannel {
                 "reply_to": message.reply_to,
             });
 
-            self.client.post(url)
+            self.client
+                .post(url)
                 .json(&body)
                 .send()
                 .await

@@ -18,12 +18,16 @@ impl CliChannel {
 }
 
 impl Default for CliChannel {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Channel for CliChannel {
-    fn name(&self) -> &str { "cli" }
+    fn name(&self) -> &str {
+        "cli"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         self.connected = true;
@@ -35,7 +39,9 @@ impl Channel for CliChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn listen(&self) -> Result<Box<dyn Stream<Item = IncomingMessage> + Send + Unpin>> {
         let stream = async_stream::stream! {

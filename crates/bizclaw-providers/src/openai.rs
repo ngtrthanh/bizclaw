@@ -25,8 +25,7 @@ impl OpenAiProvider {
         let api_url = if config.default_provider == "openrouter" {
             "https://openrouter.ai/api/v1".into()
         } else {
-            std::env::var("OPENAI_API_BASE")
-                .unwrap_or_else(|_| "https://api.openai.com/v1".into())
+            std::env::var("OPENAI_API_BASE").unwrap_or_else(|_| "https://api.openai.com/v1".into())
         };
 
         Ok(Self {
@@ -39,7 +38,9 @@ impl OpenAiProvider {
 
 #[async_trait]
 impl Provider for OpenAiProvider {
-    fn name(&self) -> &str { "openai" }
+    fn name(&self) -> &str {
+        "openai"
+    }
 
     async fn chat(
         &self,
@@ -59,20 +60,24 @@ impl Provider for OpenAiProvider {
         });
 
         if !tools.is_empty() {
-            let tool_defs: Vec<serde_json::Value> = tools.iter().map(|t| {
-                serde_json::json!({
-                    "type": "function",
-                    "function": {
-                        "name": t.name,
-                        "description": t.description,
-                        "parameters": t.parameters,
-                    }
+            let tool_defs: Vec<serde_json::Value> = tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "function": {
+                            "name": t.name,
+                            "description": t.description,
+                            "parameters": t.parameters,
+                        }
+                    })
                 })
-            }).collect();
+                .collect();
             body["tools"] = serde_json::Value::Array(tool_defs);
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(format!("{}/chat/completions", self.api_url))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -84,27 +89,34 @@ impl Provider for OpenAiProvider {
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(BizClawError::Provider(format!("OpenAI API error {status}: {text}")));
+            return Err(BizClawError::Provider(format!(
+                "OpenAI API error {status}: {text}"
+            )));
         }
 
-        let json: serde_json::Value = resp.json().await
+        let json: serde_json::Value = resp
+            .json()
+            .await
             .map_err(|e| BizClawError::Http(e.to_string()))?;
 
-        let choice = json["choices"].get(0)
+        let choice = json["choices"]
+            .get(0)
             .ok_or_else(|| BizClawError::Provider("No choices in response".into()))?;
 
         let content = choice["message"]["content"].as_str().map(String::from);
         let tool_calls = if let Some(tc) = choice["message"]["tool_calls"].as_array() {
-            tc.iter().filter_map(|t| {
-                Some(bizclaw_core::types::ToolCall {
-                    id: t["id"].as_str()?.to_string(),
-                    r#type: "function".to_string(),
-                    function: bizclaw_core::types::FunctionCall {
-                        name: t["function"]["name"].as_str()?.to_string(),
-                        arguments: t["function"]["arguments"].as_str()?.to_string(),
-                    },
+            tc.iter()
+                .filter_map(|t| {
+                    Some(bizclaw_core::types::ToolCall {
+                        id: t["id"].as_str()?.to_string(),
+                        r#type: "function".to_string(),
+                        function: bizclaw_core::types::FunctionCall {
+                            name: t["function"]["name"].as_str()?.to_string(),
+                            arguments: t["function"]["arguments"].as_str()?.to_string(),
+                        },
+                    })
                 })
-            }).collect()
+                .collect()
         } else {
             vec![]
         };
@@ -113,18 +125,32 @@ impl Provider for OpenAiProvider {
             content,
             tool_calls,
             finish_reason: choice["finish_reason"].as_str().map(String::from),
-            usage: json["usage"].as_object().map(|u| bizclaw_core::types::Usage {
-                prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
-                completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
-                total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
-            }),
+            usage: json["usage"]
+                .as_object()
+                .map(|u| bizclaw_core::types::Usage {
+                    prompt_tokens: u["prompt_tokens"].as_u64().unwrap_or(0) as u32,
+                    completion_tokens: u["completion_tokens"].as_u64().unwrap_or(0) as u32,
+                    total_tokens: u["total_tokens"].as_u64().unwrap_or(0) as u32,
+                }),
         })
     }
 
     async fn list_models(&self) -> Result<Vec<ModelInfo>> {
         Ok(vec![
-            ModelInfo { id: "gpt-4o".into(), name: "GPT-4o".into(), provider: "openai".into(), context_length: 128000, max_output_tokens: Some(4096) },
-            ModelInfo { id: "gpt-4o-mini".into(), name: "GPT-4o Mini".into(), provider: "openai".into(), context_length: 128000, max_output_tokens: Some(4096) },
+            ModelInfo {
+                id: "gpt-4o".into(),
+                name: "GPT-4o".into(),
+                provider: "openai".into(),
+                context_length: 128000,
+                max_output_tokens: Some(4096),
+            },
+            ModelInfo {
+                id: "gpt-4o-mini".into(),
+                name: "GPT-4o Mini".into(),
+                provider: "openai".into(),
+                context_length: 128000,
+                max_output_tokens: Some(4096),
+            },
         ])
     }
 

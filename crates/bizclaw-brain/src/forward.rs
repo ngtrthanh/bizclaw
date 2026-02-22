@@ -6,8 +6,8 @@
 //! Reads weights from mmap, dequantizes on-the-fly, computes the forward
 //! pass, and produces logits for the next token.
 
+use crate::{kv_cache::KvCache, mmap::MmapModel, model::ModelParams, quant, rope, tensor};
 use bizclaw_core::error::{BizClawError, Result};
-use crate::{mmap::MmapModel, model::ModelParams, kv_cache::KvCache, quant, tensor, rope};
 
 /// Transformer weights — indices into the GGUF tensor list.
 pub struct TransformerWeights {
@@ -29,9 +29,9 @@ pub struct LayerWeights {
     pub attn_v: Option<usize>,
     pub attn_output: Option<usize>,
     pub ffn_norm: Option<usize>,
-    pub ffn_gate: Option<usize>,   // gate_proj (SiLU activation)
-    pub ffn_up: Option<usize>,     // up_proj
-    pub ffn_down: Option<usize>,   // down_proj
+    pub ffn_gate: Option<usize>, // gate_proj (SiLU activation)
+    pub ffn_up: Option<usize>,   // up_proj
+    pub ffn_down: Option<usize>, // down_proj
 }
 
 impl TransformerWeights {
@@ -44,22 +44,22 @@ impl TransformerWeights {
         let mut layers = Vec::new();
         for l in 0..params.n_layers {
             layers.push(LayerWeights {
-                attn_norm:   find(&format!("blk.{l}.attn_norm.weight")),
-                attn_q:      find(&format!("blk.{l}.attn_q.weight")),
-                attn_k:      find(&format!("blk.{l}.attn_k.weight")),
-                attn_v:      find(&format!("blk.{l}.attn_v.weight")),
+                attn_norm: find(&format!("blk.{l}.attn_norm.weight")),
+                attn_q: find(&format!("blk.{l}.attn_q.weight")),
+                attn_k: find(&format!("blk.{l}.attn_k.weight")),
+                attn_v: find(&format!("blk.{l}.attn_v.weight")),
                 attn_output: find(&format!("blk.{l}.attn_output.weight")),
-                ffn_norm:    find(&format!("blk.{l}.ffn_norm.weight")),
-                ffn_gate:    find(&format!("blk.{l}.ffn_gate.weight")),
-                ffn_up:      find(&format!("blk.{l}.ffn_up.weight")),
-                ffn_down:    find(&format!("blk.{l}.ffn_down.weight")),
+                ffn_norm: find(&format!("blk.{l}.ffn_norm.weight")),
+                ffn_gate: find(&format!("blk.{l}.ffn_gate.weight")),
+                ffn_up: find(&format!("blk.{l}.ffn_up.weight")),
+                ffn_down: find(&format!("blk.{l}.ffn_down.weight")),
             });
         }
 
         Self {
-            token_embd:  find("token_embd.weight"),
+            token_embd: find("token_embd.weight"),
             output_norm: find("output_norm.weight"),
-            output:      find("output.weight"),
+            output: find("output.weight"),
             layers,
         }
     }
@@ -91,7 +91,8 @@ pub fn forward(
         let embd_tensor = &model.gguf.tensors[embd_idx];
         let embd_data = model.tensor_data(embd_idx)?;
         let offset = token as usize * dim;
-        let row_bytes = dim * embd_tensor.ggml_type.type_size() / embd_tensor.ggml_type.block_size();
+        let row_bytes =
+            dim * embd_tensor.ggml_type.type_size() / embd_tensor.ggml_type.block_size();
 
         // If embedding is F32, direct copy. Otherwise dequantize.
         if embd_tensor.ggml_type == crate::gguf::GgmlType::F32 {
@@ -99,7 +100,12 @@ pub fn forward(
             for i in 0..dim {
                 let o = byte_offset + i * 4;
                 if o + 4 <= embd_data.len() {
-                    x[i] = f32::from_le_bytes([embd_data[o], embd_data[o+1], embd_data[o+2], embd_data[o+3]]);
+                    x[i] = f32::from_le_bytes([
+                        embd_data[o],
+                        embd_data[o + 1],
+                        embd_data[o + 2],
+                        embd_data[o + 3],
+                    ]);
                 }
             }
         } else {
@@ -118,12 +124,12 @@ pub fn forward(
     }
 
     // Scratch buffers
-    let mut xb = vec![0.0f32; dim];       // after RMSNorm
-    let mut xb2 = vec![0.0f32; dim];      // second residual
-    let mut q = vec![0.0f32; dim];         // query
-    let mut k = vec![0.0f32; kv_dim];      // key
-    let mut v = vec![0.0f32; kv_dim];      // value
-    let mut att_out = vec![0.0f32; dim];   // attention output
+    let mut xb = vec![0.0f32; dim]; // after RMSNorm
+    let mut xb2 = vec![0.0f32; dim]; // second residual
+    let mut q = vec![0.0f32; dim]; // query
+    let mut k = vec![0.0f32; kv_dim]; // key
+    let mut v = vec![0.0f32; kv_dim]; // value
+    let mut att_out = vec![0.0f32; dim]; // attention output
     let mut hb = vec![0.0f32; hidden_dim]; // FFN hidden
     let mut hb2 = vec![0.0f32; hidden_dim]; // FFN gate
 

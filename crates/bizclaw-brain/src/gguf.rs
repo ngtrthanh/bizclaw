@@ -10,9 +10,9 @@
 //! - Padding to alignment boundary
 //! - Tensor data
 
+use bizclaw_core::error::{BizClawError, Result};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
-use bizclaw_core::error::{BizClawError, Result};
 
 /// GGUF magic number.
 const GGUF_MAGIC: u32 = 0x46554747; // "GGUF" in little-endian
@@ -136,8 +136,12 @@ impl GgmlType {
             GgmlType::Q4_0 | GgmlType::Q4_1 => 32,
             GgmlType::Q5_0 | GgmlType::Q5_1 => 32,
             GgmlType::Q8_0 | GgmlType::Q8_1 => 32,
-            GgmlType::Q2K | GgmlType::Q3K | GgmlType::Q4K
-            | GgmlType::Q5K | GgmlType::Q6K | GgmlType::Q8K => 256,
+            GgmlType::Q2K
+            | GgmlType::Q3K
+            | GgmlType::Q4K
+            | GgmlType::Q5K
+            | GgmlType::Q6K
+            | GgmlType::Q8K => 256,
             _ => 32,
         }
     }
@@ -147,12 +151,12 @@ impl GgmlType {
         match self {
             GgmlType::F32 => 4,
             GgmlType::F16 => 2,
-            GgmlType::Q4_0 => 18,   // 2 + 32/2
-            GgmlType::Q4_1 => 20,   // 2 + 2 + 32/2
-            GgmlType::Q5_0 => 22,   // 2 + 4 + 32/2
-            GgmlType::Q5_1 => 24,   // 2 + 2 + 4 + 32/2
-            GgmlType::Q8_0 => 34,   // 2 + 32
-            GgmlType::Q8_1 => 40,   // 4 + 4 + 32
+            GgmlType::Q4_0 => 18, // 2 + 32/2
+            GgmlType::Q4_1 => 20, // 2 + 2 + 32/2
+            GgmlType::Q5_0 => 22, // 2 + 4 + 32/2
+            GgmlType::Q5_1 => 24, // 2 + 2 + 4 + 32/2
+            GgmlType::Q8_0 => 34, // 2 + 32
+            GgmlType::Q8_1 => 40, // 4 + 4 + 32
             GgmlType::Q2K => 84,
             GgmlType::Q3K => 110,
             GgmlType::Q4K => 144,
@@ -185,7 +189,7 @@ impl TensorInfo {
         let n = self.n_elements() as usize;
         let bs = self.ggml_type.block_size();
         let ts = self.ggml_type.type_size();
-        ((n + bs - 1) / bs * ts) as u64
+        (n.div_ceil(bs) * ts) as u64
     }
 }
 
@@ -232,7 +236,8 @@ impl GgufFile {
         }
 
         // Get alignment (default 32)
-        let alignment = metadata.get("general.alignment")
+        let alignment = metadata
+            .get("general.alignment")
             .and_then(|v| v.as_u64())
             .unwrap_or(32);
 
@@ -249,13 +254,20 @@ impl GgufFile {
             let ggml_type = GgmlType::from_u32(type_id)?;
             let offset = read_u64(reader)?;
 
-            tensors.push(TensorInfo { name, n_dims, dims, ggml_type, offset });
+            tensors.push(TensorInfo {
+                name,
+                n_dims,
+                dims,
+                ggml_type,
+                offset,
+            });
         }
 
         // Calculate data offset (aligned to alignment)
-        let current_pos = reader.stream_position()
+        let current_pos = reader
+            .stream_position()
             .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
-        let data_offset = (current_pos + alignment - 1) / alignment * alignment;
+        let data_offset = current_pos.div_ceil(alignment) * alignment;
 
         Ok(GgufFile {
             version,
@@ -291,53 +303,62 @@ impl GgufFile {
 
 fn read_u8<R: Read>(r: &mut R) -> Result<u8> {
     let mut buf = [0u8; 1];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(buf[0])
 }
 
 fn read_u32<R: Read>(r: &mut R) -> Result<u32> {
     let mut buf = [0u8; 4];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(u32::from_le_bytes(buf))
 }
 
 fn read_i32<R: Read>(r: &mut R) -> Result<i32> {
     let mut buf = [0u8; 4];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(i32::from_le_bytes(buf))
 }
 
 fn read_u64<R: Read>(r: &mut R) -> Result<u64> {
     let mut buf = [0u8; 8];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(u64::from_le_bytes(buf))
 }
 
 fn read_i64<R: Read>(r: &mut R) -> Result<i64> {
     let mut buf = [0u8; 8];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(i64::from_le_bytes(buf))
 }
 
 fn read_f32<R: Read>(r: &mut R) -> Result<f32> {
     let mut buf = [0u8; 4];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(f32::from_le_bytes(buf))
 }
 
 fn read_f64<R: Read>(r: &mut R) -> Result<f64> {
     let mut buf = [0u8; 8];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     Ok(f64::from_le_bytes(buf))
 }
 
 fn read_string<R: Read>(r: &mut R) -> Result<String> {
     let len = read_u64(r)? as usize;
-    if len > 1024 * 1024 { // 1MB max string
+    if len > 1024 * 1024 {
+        // 1MB max string
         return Err(BizClawError::GgufParse(format!("String too long: {len}")));
     }
     let mut buf = vec![0u8; len];
-    r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+    r.read_exact(&mut buf)
+        .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
     String::from_utf8(buf).map_err(|e| BizClawError::GgufParse(e.to_string()))
 }
 
@@ -348,14 +369,16 @@ fn read_value<R: Read>(r: &mut R) -> Result<GgufValue> {
         1 => Ok(GgufValue::I8(read_u8(r)? as i8)),
         2 => {
             let mut buf = [0u8; 2];
-            r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+            r.read_exact(&mut buf)
+                .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
             Ok(GgufValue::U16(u16::from_le_bytes(buf)))
-        },
+        }
         3 => {
             let mut buf = [0u8; 2];
-            r.read_exact(&mut buf).map_err(|e| BizClawError::GgufParse(e.to_string()))?;
+            r.read_exact(&mut buf)
+                .map_err(|e| BizClawError::GgufParse(e.to_string()))?;
             Ok(GgufValue::I16(i16::from_le_bytes(buf)))
-        },
+        }
         4 => Ok(GgufValue::U32(read_u32(r)?)),
         5 => Ok(GgufValue::I32(read_i32(r)?)),
         6 => Ok(GgufValue::F32(read_f32(r)?)),
@@ -379,15 +402,21 @@ fn read_value<R: Read>(r: &mut R) -> Result<GgufValue> {
                     10 => GgufValue::U64(read_u64(r)?),
                     11 => GgufValue::I64(read_i64(r)?),
                     12 => GgufValue::F64(read_f64(r)?),
-                    _ => return Err(BizClawError::GgufParse(format!("Unknown array element type: {elem_type}"))),
+                    _ => {
+                        return Err(BizClawError::GgufParse(format!(
+                            "Unknown array element type: {elem_type}"
+                        )));
+                    }
                 };
                 arr.push(val);
             }
             Ok(GgufValue::Array(arr))
-        },
+        }
         10 => Ok(GgufValue::U64(read_u64(r)?)),
         11 => Ok(GgufValue::I64(read_i64(r)?)),
         12 => Ok(GgufValue::F64(read_f64(r)?)),
-        _ => Err(BizClawError::GgufParse(format!("Unknown value type: {type_id}"))),
+        _ => Err(BizClawError::GgufParse(format!(
+            "Unknown value type: {type_id}"
+        ))),
     }
 }

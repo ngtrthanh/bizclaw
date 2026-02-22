@@ -51,7 +51,10 @@ mod tests {
         let b: Vec<f32> = vec![1.0; 16];
         let result = dot_product_neon(&a, &b);
         let expected: f32 = (1..=16).map(|x| x as f32).sum();
-        assert!((result - expected).abs() < 1e-3, "got {result}, expected {expected}");
+        assert!(
+            (result - expected).abs() < 1e-3,
+            "got {result}, expected {expected}"
+        );
     }
 
     #[test]

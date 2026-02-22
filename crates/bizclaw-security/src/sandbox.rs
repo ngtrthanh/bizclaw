@@ -42,7 +42,9 @@ pub struct Sandbox {
 impl Sandbox {
     /// Create a new sandbox with default config.
     pub fn new() -> Self {
-        Self { config: SandboxConfig::default() }
+        Self {
+            config: SandboxConfig::default(),
+        }
     }
 
     /// Create a sandbox with custom config.
@@ -65,14 +67,15 @@ impl Sandbox {
         }
 
         // Execute with timeout
-        let output = tokio::time::timeout(
-            self.config.timeout,
-            cmd.output(),
-        ).await
-        .map_err(|_| bizclaw_core::error::BizClawError::Timeout(
-            format!("Command timed out after {:?}", self.config.timeout)
-        ))?
-        .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
+        let output = tokio::time::timeout(self.config.timeout, cmd.output())
+            .await
+            .map_err(|_| {
+                bizclaw_core::error::BizClawError::Timeout(format!(
+                    "Command timed out after {:?}",
+                    self.config.timeout
+                ))
+            })?
+            .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
         let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -97,7 +100,9 @@ impl Sandbox {
 }
 
 impl Default for Sandbox {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Result of a sandboxed execution.

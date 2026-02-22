@@ -33,7 +33,9 @@ impl BrainProvider {
 
         if model_path.exists() {
             match engine.load_model(&model_path) {
-                Ok(()) => tracing::info!("Brain provider: model loaded from {}", model_path.display()),
+                Ok(()) => {
+                    tracing::info!("Brain provider: model loaded from {}", model_path.display())
+                }
                 Err(e) => tracing::warn!("Brain provider: failed to load model: {e}"),
             }
         } else {
@@ -43,7 +45,9 @@ impl BrainProvider {
             );
         }
 
-        Ok(Self { engine: Mutex::new(engine) })
+        Ok(Self {
+            engine: Mutex::new(engine),
+        })
     }
 }
 
@@ -52,20 +56,25 @@ fn find_gguf_model(dir: &std::path::Path) -> Option<std::path::PathBuf> {
     if !dir.exists() {
         return None;
     }
-    std::fs::read_dir(dir).ok()?.filter_map(|entry| {
-        let entry = entry.ok()?;
-        let path = entry.path();
-        if path.extension()?.to_str()? == "gguf" {
-            Some(path)
-        } else {
-            None
-        }
-    }).next()
+    std::fs::read_dir(dir)
+        .ok()?
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+            if path.extension()?.to_str()? == "gguf" {
+                Some(path)
+            } else {
+                None
+            }
+        })
+        .next()
 }
 
 #[async_trait]
 impl Provider for BrainProvider {
-    fn name(&self) -> &str { "brain" }
+    fn name(&self) -> &str {
+        "brain"
+    }
 
     async fn chat(
         &self,
@@ -107,12 +116,13 @@ impl Provider for BrainProvider {
 
         // List available models in ~/.bizclaw/models/
         let model_dir = bizclaw_core::config::BizClawConfig::home_dir().join("models");
-        if model_dir.exists() {
-            if let Ok(entries) = std::fs::read_dir(&model_dir) {
+        if model_dir.exists()
+            && let Ok(entries) = std::fs::read_dir(&model_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if path.extension().and_then(|e| e.to_str()) == Some("gguf") {
-                        let name = path.file_name()
+                        let name = path
+                            .file_name()
                             .map(|f| f.to_string_lossy().to_string())
                             .unwrap_or_default();
                         let size_mb = std::fs::metadata(&path)
@@ -131,7 +141,6 @@ impl Provider for BrainProvider {
                     }
                 }
             }
-        }
 
         if models.is_empty() {
             models.push(ModelInfo {

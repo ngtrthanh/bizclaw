@@ -4,12 +4,12 @@
 //! Includes admin dashboard, tenant lifecycle management, pairing security,
 //! subdomain routing, resource monitoring, and audit logging.
 
+pub mod admin;
+pub mod auth;
+pub mod config;
 pub mod db;
 pub mod tenant;
-pub mod auth;
-pub mod admin;
-pub mod config;
 
+pub use admin::AdminServer;
 pub use db::PlatformDb;
 pub use tenant::TenantManager;
-pub use admin::AdminServer;

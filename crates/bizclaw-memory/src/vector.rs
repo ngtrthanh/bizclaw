@@ -22,7 +22,8 @@ impl VectorStore {
 
     /// Search by cosine similarity against a query embedding.
     pub fn search(&self, query_embedding: &[f32], limit: usize) -> Vec<MemorySearchResult> {
-        let mut scored: Vec<(f32, &MemoryEntry)> = self.entries
+        let mut scored: Vec<(f32, &MemoryEntry)> = self
+            .entries
             .iter()
             .map(|(entry, emb)| {
                 let score = cosine_similarity(query_embedding, emb);
@@ -33,12 +34,13 @@ impl VectorStore {
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         scored.truncate(limit);
 
-        scored.into_iter().map(|(score, entry)| {
-            MemorySearchResult {
+        scored
+            .into_iter()
+            .map(|(score, entry)| MemorySearchResult {
                 entry: entry.clone(),
                 score,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Number of stored vectors.
@@ -58,7 +60,9 @@ impl VectorStore {
 }
 
 impl Default for VectorStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Compute cosine similarity between two vectors.
@@ -78,11 +82,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
 
     let denom = norm_a.sqrt() * norm_b.sqrt();
-    if denom == 0.0 {
-        0.0
-    } else {
-        dot / denom
-    }
+    if denom == 0.0 { 0.0 } else { dot / denom }
 }
 
 #[cfg(test)]

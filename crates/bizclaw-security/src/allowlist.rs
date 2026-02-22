@@ -3,8 +3,8 @@
 //! Controls which shell commands can be executed and which filesystem paths
 //! can be accessed by the agent.
 
-use std::collections::HashSet;
 use bizclaw_core::config::AutonomyConfig;
+use std::collections::HashSet;
 
 /// Manages command and path allowlists for security enforcement.
 pub struct Allowlist {
@@ -49,12 +49,11 @@ impl Allowlist {
         }
 
         // If workspace_only, restrict to workspace directory
-        if self.workspace_only {
-            if let Ok(cwd) = std::env::current_dir() {
+        if self.workspace_only
+            && let Ok(cwd) = std::env::current_dir() {
                 return canonical.starts_with(&cwd)
                     || expanded.starts_with(&cwd.to_string_lossy().to_string());
             }
-        }
 
         true
     }

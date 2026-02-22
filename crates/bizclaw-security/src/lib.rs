@@ -1,8 +1,8 @@
 //! # BizClaw Security
 //! Security policies, sandboxing, and secrets encryption.
 
-pub mod sandbox;
 pub mod allowlist;
+pub mod sandbox;
 pub mod secrets;
 
 use async_trait::async_trait;

@@ -38,11 +38,21 @@ pub struct EmailConfig {
     pub smtp_enabled: bool,
 }
 
-fn default_imap_port() -> u16 { 993 }
-fn default_smtp_port() -> u16 { 587 }
-fn default_mailbox() -> String { "INBOX".into() }
-fn default_poll_interval() -> u64 { 30 }
-fn default_true() -> bool { true }
+fn default_imap_port() -> u16 {
+    993
+}
+fn default_smtp_port() -> u16 {
+    587
+}
+fn default_mailbox() -> String {
+    "INBOX".into()
+}
+fn default_poll_interval() -> u64 {
+    30
+}
+fn default_true() -> bool {
+    true
+}
 
 impl Default for EmailConfig {
     fn default() -> Self {
@@ -103,8 +113,14 @@ impl EmailChannel {
 
         tokio::task::spawn_blocking(move || {
             imap_fetch_sync(
-                &host, port, &email, &password, &mailbox,
-                unread_only, mark_as_read, &last_seen_uid,
+                &host,
+                port,
+                &email,
+                &password,
+                &mailbox,
+                unread_only,
+                mark_as_read,
+                &last_seen_uid,
             )
         })
         .await
@@ -120,10 +136,8 @@ impl EmailChannel {
         in_reply_to: Option<&str>,
     ) -> Result<()> {
         use lettre::{
-            message::header::ContentType,
-            transport::smtp::authentication::Credentials,
-            AsyncSmtpTransport, AsyncTransport, Message as LettreMessage,
-            message::Mailbox,
+            AsyncSmtpTransport, AsyncTransport, Message as LettreMessage, message::Mailbox,
+            message::header::ContentType, transport::smtp::authentication::Credentials,
         };
 
         let from_name = self.config.display_name.as_deref().unwrap_or("BizClaw AI");
@@ -131,7 +145,8 @@ impl EmailChannel {
             .parse()
             .map_err(|e| BizClawError::Channel(format!("Invalid from: {e}")))?;
 
-        let to_mailbox: Mailbox = to.parse()
+        let to_mailbox: Mailbox = to
+            .parse()
             .map_err(|e| BizClawError::Channel(format!("Invalid to: {e}")))?;
 
         let mut builder = LettreMessage::builder()
@@ -148,20 +163,18 @@ impl EmailChannel {
             .body(body.to_string())
             .map_err(|e| BizClawError::Channel(format!("Build email: {e}")))?;
 
-        let creds = Credentials::new(
-            self.config.email.clone(),
-            self.config.password.clone(),
-        );
+        let creds = Credentials::new(self.config.email.clone(), self.config.password.clone());
 
-        let mailer = AsyncSmtpTransport::<lettre::Tokio1Executor>::starttls_relay(
-            &self.config.smtp_host,
-        )
-        .map_err(|e| BizClawError::Channel(format!("SMTP relay: {e}")))?
-        .port(self.config.smtp_port)
-        .credentials(creds)
-        .build();
+        let mailer =
+            AsyncSmtpTransport::<lettre::Tokio1Executor>::starttls_relay(&self.config.smtp_host)
+                .map_err(|e| BizClawError::Channel(format!("SMTP relay: {e}")))?
+                .port(self.config.smtp_port)
+                .credentials(creds)
+                .build();
 
-        mailer.send(email).await
+        mailer
+            .send(email)
+            .await
             .map_err(|e| BizClawError::Channel(format!("SMTP send: {e}")))?;
 
         tracing::info!("📤 Email sent to: {to}");
@@ -194,12 +207,15 @@ impl EmailChannel {
                                 timestamp: chrono::Utc::now(),
                                 reply_to: em.message_id,
                             };
-                            if tx.send(incoming).is_err() { return; }
+                            if tx.send(incoming).is_err() {
+                                return;
+                            }
                         }
                     }
                     Err(e) => tracing::error!("IMAP poll: {e}"),
                 }
-                tokio::time::sleep(std::time::Duration::from_secs(ch.config.poll_interval_secs)).await;
+                tokio::time::sleep(std::time::Duration::from_secs(ch.config.poll_interval_secs))
+                    .await;
             }
         });
 
@@ -222,7 +238,9 @@ impl Unpin for EmailPollingStream {}
 
 #[async_trait]
 impl Channel for EmailChannel {
-    fn name(&self) -> &str { "email" }
+    fn name(&self) -> &str {
+        "email"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         let host = self.config.imap_host.clone();
@@ -231,12 +249,13 @@ impl Channel for EmailChannel {
         let password = self.config.password.clone();
 
         tokio::task::spawn_blocking(move || {
-            let tls = native_tls::TlsConnector::builder().build()
+            let tls = native_tls::TlsConnector::builder()
+                .build()
                 .map_err(|e| BizClawError::Channel(format!("TLS: {e}")))?;
-            let client = imap::connect(
-                (host.as_str(), port), &host, &tls,
-            ).map_err(|e| BizClawError::Channel(format!("IMAP connect: {e}")))?;
-            let mut session = client.login(&email, &password)
+            let client = imap::connect((host.as_str(), port), &host, &tls)
+                .map_err(|e| BizClawError::Channel(format!("IMAP connect: {e}")))?;
+            let mut session = client
+                .login(&email, &password)
                 .map_err(|e| BizClawError::AuthFailed(format!("IMAP auth: {}", e.0)))?;
             session.logout().ok();
             Ok::<(), BizClawError>(())
@@ -254,13 +273,23 @@ impl Channel for EmailChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        let subject = message.reply_to.as_deref()
+        let subject = message
+            .reply_to
+            .as_deref()
             .map(|r| format!("Re: {r}"))
             .unwrap_or_else(|| "From BizClaw AI".into());
-        self.send_email(&message.thread_id, &subject, &message.content, message.reply_to.as_deref()).await
+        self.send_email(
+            &message.thread_id,
+            &subject,
+            &message.content,
+            message.reply_to.as_deref(),
+        )
+        .await
     }
 
     async fn listen(&self) -> Result<Box<dyn Stream<Item = IncomingMessage> + Send + Unpin>> {
@@ -286,14 +315,17 @@ fn imap_fetch_sync(
     let client = imap::connect((host, port), host, &tls)
         .map_err(|e| BizClawError::Channel(format!("IMAP connect: {e}")))?;
 
-    let mut session = client.login(email, password)
+    let mut session = client
+        .login(email, password)
         .map_err(|e| BizClawError::Channel(format!("IMAP login: {}", e.0)))?;
 
-    session.select(mailbox)
+    session
+        .select(mailbox)
         .map_err(|e| BizClawError::Channel(format!("Select: {e}")))?;
 
     let search = if unread_only { "UNSEEN" } else { "ALL" };
-    let uids = session.uid_search(search)
+    let uids = session
+        .uid_search(search)
         .map_err(|e| BizClawError::Channel(format!("Search: {e}")))?;
 
     let last = *last_seen_uid.lock().unwrap();
@@ -304,8 +336,13 @@ fn imap_fetch_sync(
         return Ok(vec![]);
     }
 
-    let uid_set = new_uids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(",");
-    let messages = session.uid_fetch(&uid_set, "(UID RFC822)")
+    let uid_set = new_uids
+        .iter()
+        .map(|u| u.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let messages = session
+        .uid_fetch(&uid_set, "(UID RFC822)")
         .map_err(|e| BizClawError::Channel(format!("Fetch: {e}")))?;
 
     let mut emails = Vec::new();
@@ -313,12 +350,13 @@ fn imap_fetch_sync(
 
     for msg in messages.iter() {
         let uid = msg.uid.unwrap_or(0);
-        if uid > max_uid { max_uid = uid; }
-        if let Some(body) = msg.body() {
-            if let Some(parsed) = parse_email_bytes(body, uid) {
+        if uid > max_uid {
+            max_uid = uid;
+        }
+        if let Some(body) = msg.body()
+            && let Some(parsed) = parse_email_bytes(body, uid) {
                 emails.push(parsed);
             }
-        }
     }
 
     if mark_as_read && !new_uids.is_empty() {
@@ -336,22 +374,26 @@ fn parse_email_bytes(raw: &[u8], uid: u32) -> Option<ParsedEmail> {
     use mail_parser::MessageParser;
     let parsed = MessageParser::default().parse(raw)?;
 
-    let from = parsed.from()
+    let from = parsed
+        .from()
         .and_then(|a| a.first())
         .map(|a| a.address().unwrap_or_default().to_string())
         .unwrap_or_default();
 
-    let from_name = parsed.from()
+    let from_name = parsed
+        .from()
         .and_then(|a| a.first())
         .and_then(|a| a.name())
         .map(String::from);
 
     let subject = parsed.subject().unwrap_or("(no subject)").to_string();
 
-    let body_text = parsed.body_text(0)
+    let body_text = parsed
+        .body_text(0)
         .map(|s| s.to_string())
         .unwrap_or_else(|| {
-            parsed.body_html(0)
+            parsed
+                .body_html(0)
                 .map(|h| strip_html(&h))
                 .unwrap_or_default()
         });
@@ -359,7 +401,10 @@ fn parse_email_bytes(raw: &[u8], uid: u32) -> Option<ParsedEmail> {
     let message_id = parsed.message_id().map(String::from);
 
     Some(ParsedEmail {
-        uid, from, from_name, subject,
+        uid,
+        from,
+        from_name,
+        subject,
         body_text: body_text.chars().take(4000).collect(),
         message_id,
     })

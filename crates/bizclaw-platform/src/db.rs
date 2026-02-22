@@ -1,7 +1,7 @@
 //! Platform database — SQLite schema for multi-tenant management.
 
-use rusqlite::{Connection, params};
 use bizclaw_core::error::{BizClawError, Result};
+use rusqlite::{Connection, params};
 use std::path::Path;
 
 /// Platform database manager.
@@ -60,8 +60,8 @@ pub struct TenantChannel {
     pub tenant_id: String,
     pub channel_type: String, // telegram, zalo, discord, email, webhook, whatsapp
     pub enabled: bool,
-    pub config_json: String,  // JSON blob with channel-specific config
-    pub status: String,       // connected, disconnected, error
+    pub config_json: String, // JSON blob with channel-specific config
+    pub status: String,      // connected, disconnected, error
     pub status_message: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -79,7 +79,9 @@ impl PlatformDb {
 
     /// Run schema migrations.
     fn migrate(&self) -> Result<()> {
-        self.conn.execute_batch("
+        self.conn
+            .execute_batch(
+                "
             CREATE TABLE IF NOT EXISTS tenants (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -140,14 +142,24 @@ impl PlatformDb {
                 updated_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(tenant_id, channel_type)
             );
-        ").map_err(|e| BizClawError::Memory(format!("Migration error: {e}")))?;
+        ",
+            )
+            .map_err(|e| BizClawError::Memory(format!("Migration error: {e}")))?;
         Ok(())
     }
 
     // ── Tenant CRUD ────────────────────────────────────
 
     /// Create a new tenant.
-    pub fn create_tenant(&self, name: &str, slug: &str, port: u16, provider: &str, model: &str, plan: &str) -> Result<Tenant> {
+    pub fn create_tenant(
+        &self,
+        name: &str,
+        slug: &str,
+        port: u16,
+        provider: &str,
+        model: &str,
+        plan: &str,
+    ) -> Result<Tenant> {
         let id = uuid::Uuid::new_v4().to_string();
         let pairing_code = format!("{:06}", rand_code());
 
@@ -180,13 +192,29 @@ impl PlatformDb {
             "SELECT id,name,slug,status,port,plan,provider,model,max_messages_day,max_channels,max_members,pairing_code,pid,cpu_percent,memory_bytes,disk_bytes,created_at FROM tenants ORDER BY created_at DESC"
         ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
 
-        let tenants = stmt.query_map([], |row| Ok(Tenant {
-            id: row.get(0)?, name: row.get(1)?, slug: row.get(2)?, status: row.get(3)?,
-            port: row.get(4)?, plan: row.get(5)?, provider: row.get(6)?, model: row.get(7)?,
-            max_messages_day: row.get(8)?, max_channels: row.get(9)?, max_members: row.get(10)?,
-            pairing_code: row.get(11)?, pid: row.get(12)?, cpu_percent: row.get(13)?,
-            memory_bytes: row.get(14)?, disk_bytes: row.get(15)?, created_at: row.get(16)?,
-        })).map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
+        let tenants = stmt
+            .query_map([], |row| {
+                Ok(Tenant {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    slug: row.get(2)?,
+                    status: row.get(3)?,
+                    port: row.get(4)?,
+                    plan: row.get(5)?,
+                    provider: row.get(6)?,
+                    model: row.get(7)?,
+                    max_messages_day: row.get(8)?,
+                    max_channels: row.get(9)?,
+                    max_members: row.get(10)?,
+                    pairing_code: row.get(11)?,
+                    pid: row.get(12)?,
+                    cpu_percent: row.get(13)?,
+                    memory_bytes: row.get(14)?,
+                    disk_bytes: row.get(15)?,
+                    created_at: row.get(16)?,
+                })
+            })
+            .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
             .filter_map(|r| r.ok())
             .collect();
 
@@ -195,16 +223,19 @@ impl PlatformDb {
 
     /// Update tenant status.
     pub fn update_tenant_status(&self, id: &str, status: &str, pid: Option<u32>) -> Result<()> {
-        self.conn.execute(
-            "UPDATE tenants SET status=?1, pid=?2, updated_at=datetime('now') WHERE id=?3",
-            params![status, pid, id],
-        ).map_err(|e| BizClawError::Memory(format!("Update status: {e}")))?;
+        self.conn
+            .execute(
+                "UPDATE tenants SET status=?1, pid=?2, updated_at=datetime('now') WHERE id=?3",
+                params![status, pid, id],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Update status: {e}")))?;
         Ok(())
     }
 
     /// Delete a tenant.
     pub fn delete_tenant(&self, id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM tenants WHERE id=?1", params![id])
+        self.conn
+            .execute("DELETE FROM tenants WHERE id=?1", params![id])
             .map_err(|e| BizClawError::Memory(format!("Delete tenant: {e}")))?;
         Ok(())
     }
@@ -212,9 +243,12 @@ impl PlatformDb {
     /// Regenerate pairing code.
     pub fn reset_pairing_code(&self, id: &str) -> Result<String> {
         let code = format!("{:06}", rand_code());
-        self.conn.execute(
-            "UPDATE tenants SET pairing_code=?1 WHERE id=?2", params![code, id],
-        ).map_err(|e| BizClawError::Memory(format!("Reset pairing: {e}")))?;
+        self.conn
+            .execute(
+                "UPDATE tenants SET pairing_code=?1 WHERE id=?2",
+                params![code, id],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Reset pairing: {e}")))?;
         Ok(code)
     }
 
@@ -229,9 +263,12 @@ impl PlatformDb {
         match result {
             Ok(id) => {
                 // Consume the code (one-time use)
-                self.conn.execute(
-                    "UPDATE tenants SET pairing_code=NULL WHERE id=?1", params![id],
-                ).ok();
+                self.conn
+                    .execute(
+                        "UPDATE tenants SET pairing_code=NULL WHERE id=?1",
+                        params![id],
+                    )
+                    .ok();
                 self.get_tenant(&id).map(Some)
             }
             Err(_) => Ok(None),
@@ -243,18 +280,27 @@ impl PlatformDb {
     /// Create admin user.
     pub fn create_user(&self, email: &str, password_hash: &str, role: &str) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
-        self.conn.execute(
-            "INSERT INTO users (id, email, password_hash, role) VALUES (?1,?2,?3,?4)",
-            params![id, email, password_hash, role],
-        ).map_err(|e| BizClawError::Memory(format!("Create user: {e}")))?;
+        self.conn
+            .execute(
+                "INSERT INTO users (id, email, password_hash, role) VALUES (?1,?2,?3,?4)",
+                params![id, email, password_hash, role],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Create user: {e}")))?;
         Ok(id)
     }
 
     /// Authenticate user by email, return password_hash for verification.
     pub fn get_user_by_email(&self, email: &str) -> Result<Option<(String, String, String)>> {
         match self.conn.query_row(
-            "SELECT id, password_hash, role FROM users WHERE email=?1", params![email],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+            "SELECT id, password_hash, role FROM users WHERE email=?1",
+            params![email],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
         ) {
             Ok(r) => Ok(Some(r)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
@@ -268,10 +314,18 @@ impl PlatformDb {
             "SELECT id,email,role,tenant_id,last_login,created_at FROM users ORDER BY created_at DESC"
         ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
 
-        let users = stmt.query_map([], |row| Ok(User {
-            id: row.get(0)?, email: row.get(1)?, role: row.get(2)?,
-            tenant_id: row.get(3)?, last_login: row.get(4)?, created_at: row.get(5)?,
-        })).map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
+        let users = stmt
+            .query_map([], |row| {
+                Ok(User {
+                    id: row.get(0)?,
+                    email: row.get(1)?,
+                    role: row.get(2)?,
+                    tenant_id: row.get(3)?,
+                    last_login: row.get(4)?,
+                    created_at: row.get(5)?,
+                })
+            })
+            .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
             .filter_map(|r| r.ok())
             .collect();
         Ok(users)
@@ -280,7 +334,13 @@ impl PlatformDb {
     // ── Audit Log ────────────────────────────────────
 
     /// Log an audit event.
-    pub fn log_event(&self, event_type: &str, actor_type: &str, actor_id: &str, details: Option<&str>) -> Result<()> {
+    pub fn log_event(
+        &self,
+        event_type: &str,
+        actor_type: &str,
+        actor_id: &str,
+        details: Option<&str>,
+    ) -> Result<()> {
         self.conn.execute(
             "INSERT INTO audit_log (event_type, actor_type, actor_id, details) VALUES (?1,?2,?3,?4)",
             params![event_type, actor_type, actor_id, details],
@@ -294,10 +354,18 @@ impl PlatformDb {
             "SELECT id,event_type,actor_type,actor_id,details,created_at FROM audit_log ORDER BY id DESC LIMIT ?1"
         ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
 
-        let entries = stmt.query_map(params![limit as i64], |row| Ok(AuditEntry {
-            id: row.get(0)?, event_type: row.get(1)?, actor_type: row.get(2)?,
-            actor_id: row.get(3)?, details: row.get(4)?, created_at: row.get(5)?,
-        })).map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
+        let entries = stmt
+            .query_map(params![limit as i64], |row| {
+                Ok(AuditEntry {
+                    id: row.get(0)?,
+                    event_type: row.get(1)?,
+                    actor_type: row.get(2)?,
+                    actor_id: row.get(3)?,
+                    details: row.get(4)?,
+                    created_at: row.get(5)?,
+                })
+            })
+            .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
             .filter_map(|r| r.ok())
             .collect();
         Ok(entries)
@@ -305,23 +373,46 @@ impl PlatformDb {
 
     /// Count tenants by status.
     pub fn tenant_stats(&self) -> Result<(u32, u32, u32, u32)> {
-        let total: u32 = self.conn.query_row("SELECT COUNT(*) FROM tenants", [], |r| r.get(0))
+        let total: u32 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM tenants", [], |r| r.get(0))
             .unwrap_or(0);
-        let running: u32 = self.conn.query_row("SELECT COUNT(*) FROM tenants WHERE status='running'", [], |r| r.get(0))
+        let running: u32 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM tenants WHERE status='running'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(0);
-        let stopped: u32 = self.conn.query_row("SELECT COUNT(*) FROM tenants WHERE status='stopped'", [], |r| r.get(0))
+        let stopped: u32 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM tenants WHERE status='stopped'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(0);
-        let error: u32 = self.conn.query_row("SELECT COUNT(*) FROM tenants WHERE status='error'", [], |r| r.get(0))
+        let error: u32 = self
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM tenants WHERE status='error'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap_or(0);
         Ok((total, running, stopped, error))
     }
 
     /// Get all ports currently assigned to tenants.
     pub fn used_ports(&self) -> Result<Vec<u16>> {
-        let mut stmt = self.conn.prepare("SELECT port FROM tenants")
+        let mut stmt = self
+            .conn
+            .prepare("SELECT port FROM tenants")
             .map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
-        let ports = stmt.query_map([], |row| row.get::<_, u16>(0))
-            .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?  
+        let ports = stmt
+            .query_map([], |row| row.get::<_, u16>(0))
+            .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
             .filter_map(|r| r.ok())
             .collect();
         Ok(ports)
@@ -330,7 +421,13 @@ impl PlatformDb {
     // ── Tenant Channels ────────────────────────────────────
 
     /// Save or update a channel configuration for a tenant.
-    pub fn upsert_channel(&self, tenant_id: &str, channel_type: &str, enabled: bool, config_json: &str) -> Result<TenantChannel> {
+    pub fn upsert_channel(
+        &self,
+        tenant_id: &str,
+        channel_type: &str,
+        enabled: bool,
+        config_json: &str,
+    ) -> Result<TenantChannel> {
         let id = format!("{}-{}", tenant_id, channel_type);
         self.conn.execute(
             "INSERT INTO tenant_channels (id, tenant_id, channel_type, enabled, config_json, updated_at)
@@ -362,19 +459,33 @@ impl PlatformDb {
             "SELECT id, tenant_id, channel_type, enabled, config_json, status, status_message, created_at, updated_at FROM tenant_channels WHERE tenant_id=?1 ORDER BY channel_type"
         ).map_err(|e| BizClawError::Memory(format!("Prepare: {e}")))?;
 
-        let channels = stmt.query_map(params![tenant_id], |row| Ok(TenantChannel {
-            id: row.get(0)?, tenant_id: row.get(1)?, channel_type: row.get(2)?,
-            enabled: row.get::<_, i32>(3)? != 0,
-            config_json: row.get(4)?, status: row.get(5)?,
-            status_message: row.get(6)?, created_at: row.get(7)?, updated_at: row.get(8)?,
-        })).map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
+        let channels = stmt
+            .query_map(params![tenant_id], |row| {
+                Ok(TenantChannel {
+                    id: row.get(0)?,
+                    tenant_id: row.get(1)?,
+                    channel_type: row.get(2)?,
+                    enabled: row.get::<_, i32>(3)? != 0,
+                    config_json: row.get(4)?,
+                    status: row.get(5)?,
+                    status_message: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                })
+            })
+            .map_err(|e| BizClawError::Memory(format!("Query: {e}")))?
             .filter_map(|r| r.ok())
             .collect();
         Ok(channels)
     }
 
     /// Update channel connection status.
-    pub fn update_channel_status(&self, id: &str, status: &str, message: Option<&str>) -> Result<()> {
+    pub fn update_channel_status(
+        &self,
+        id: &str,
+        status: &str,
+        message: Option<&str>,
+    ) -> Result<()> {
         self.conn.execute(
             "UPDATE tenant_channels SET status=?1, status_message=?2, updated_at=datetime('now') WHERE id=?3",
             params![status, message, id],
@@ -384,7 +495,8 @@ impl PlatformDb {
 
     /// Delete a channel config.
     pub fn delete_channel(&self, id: &str) -> Result<()> {
-        self.conn.execute("DELETE FROM tenant_channels WHERE id=?1", params![id])
+        self.conn
+            .execute("DELETE FROM tenant_channels WHERE id=?1", params![id])
             .map_err(|e| BizClawError::Memory(format!("Delete channel: {e}")))?;
         Ok(())
     }
@@ -392,8 +504,10 @@ impl PlatformDb {
 
 fn rand_code() -> u32 {
     use std::time::SystemTime;
-    let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default().subsec_nanos();
+    let seed = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
     (seed % 900_000) + 100_000
 }
 
@@ -409,7 +523,9 @@ mod tests {
     #[test]
     fn test_create_and_list_tenants() {
         let db = temp_db();
-        let t = db.create_tenant("TestBot", "testbot", 10001, "openai", "gpt-4o-mini", "free").unwrap();
+        let t = db
+            .create_tenant("TestBot", "testbot", 10001, "openai", "gpt-4o-mini", "free")
+            .unwrap();
         assert_eq!(t.name, "TestBot");
         assert_eq!(t.slug, "testbot");
         assert_eq!(t.port, 10001);
@@ -421,10 +537,13 @@ mod tests {
     #[test]
     fn test_tenant_status_update() {
         let db = temp_db();
-        let t = db.create_tenant("Bot", "bot", 10002, "ollama", "llama3.2", "pro").unwrap();
+        let t = db
+            .create_tenant("Bot", "bot", 10002, "ollama", "llama3.2", "pro")
+            .unwrap();
         assert_eq!(t.status, "stopped");
 
-        db.update_tenant_status(&t.id, "running", Some(12345)).unwrap();
+        db.update_tenant_status(&t.id, "running", Some(12345))
+            .unwrap();
         let updated = db.get_tenant(&t.id).unwrap();
         assert_eq!(updated.status, "running");
     }
@@ -432,7 +551,9 @@ mod tests {
     #[test]
     fn test_pairing_code() {
         let db = temp_db();
-        let t = db.create_tenant("P", "pair", 10003, "brain", "local", "free").unwrap();
+        let t = db
+            .create_tenant("P", "pair", 10003, "brain", "local", "free")
+            .unwrap();
         let code = t.pairing_code.clone().unwrap();
 
         // Valid pairing
@@ -447,8 +568,10 @@ mod tests {
     #[test]
     fn test_audit_log() {
         let db = temp_db();
-        db.log_event("tenant_created", "user", "admin-1", Some("slug=test")).unwrap();
-        db.log_event("login_success", "user", "user-1", None).unwrap();
+        db.log_event("tenant_created", "user", "admin-1", Some("slug=test"))
+            .unwrap();
+        db.log_event("login_success", "user", "user-1", None)
+            .unwrap();
 
         let events = db.recent_events(10).unwrap();
         assert_eq!(events.len(), 2);
@@ -474,10 +597,15 @@ mod tests {
     #[test]
     fn test_tenant_stats() {
         let db = temp_db();
-        db.create_tenant("A", "a", 10001, "openai", "gpt-4o", "free").unwrap();
-        db.create_tenant("B", "b", 10002, "openai", "gpt-4o", "pro").unwrap();
-        let t = db.create_tenant("C", "c", 10003, "openai", "gpt-4o", "free").unwrap();
-        db.update_tenant_status(&t.id, "running", Some(100)).unwrap();
+        db.create_tenant("A", "a", 10001, "openai", "gpt-4o", "free")
+            .unwrap();
+        db.create_tenant("B", "b", 10002, "openai", "gpt-4o", "pro")
+            .unwrap();
+        let t = db
+            .create_tenant("C", "c", 10003, "openai", "gpt-4o", "free")
+            .unwrap();
+        db.update_tenant_status(&t.id, "running", Some(100))
+            .unwrap();
 
         let (total, running, stopped, _error) = db.tenant_stats().unwrap();
         assert_eq!(total, 3);

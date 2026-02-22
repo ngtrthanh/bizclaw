@@ -5,6 +5,7 @@ use tokio::sync::RwLock;
 
 /// Zalo session state.
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct ZaloSession {
     /// User ID
     pub uid: String,
@@ -20,18 +21,6 @@ pub struct ZaloSession {
     pub last_heartbeat: u64,
 }
 
-impl Default for ZaloSession {
-    fn default() -> Self {
-        Self {
-            uid: String::new(),
-            zpw_enk: None,
-            zpw_key: None,
-            ws_url: None,
-            active: false,
-            last_heartbeat: 0,
-        }
-    }
-}
 
 /// Thread-safe session manager.
 pub struct SessionManager {
@@ -85,7 +74,9 @@ impl SessionManager {
 }
 
 impl Default for SessionManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn current_timestamp() -> u64 {

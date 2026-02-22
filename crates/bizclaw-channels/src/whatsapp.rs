@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 /// WhatsApp Business channel configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct WhatsAppConfig {
     /// Facebook Graph API access token
     pub access_token: String,
@@ -25,16 +26,6 @@ pub struct WhatsAppConfig {
     pub business_id: String,
 }
 
-impl Default for WhatsAppConfig {
-    fn default() -> Self {
-        Self {
-            access_token: String::new(),
-            phone_number_id: String::new(),
-            webhook_verify_token: String::new(),
-            business_id: String::new(),
-        }
-    }
-}
 
 /// WhatsApp Business channel implementation.
 pub struct WhatsAppChannel {
@@ -70,9 +61,13 @@ impl WhatsAppChannel {
             }
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
@@ -83,11 +78,14 @@ impl WhatsAppChannel {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             return Err(BizClawError::Channel(format!(
-                "WhatsApp API error {}: {}", status, error_text
+                "WhatsApp API error {}: {}",
+                status, error_text
             )));
         }
 
-        let result: serde_json::Value = response.json().await
+        let result: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid WhatsApp response: {e}")))?;
 
         let msg_id = result["messages"][0]["id"]
@@ -114,7 +112,10 @@ impl WhatsAppChannel {
 
         self.client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .json(&body)
             .send()
             .await
@@ -126,17 +127,19 @@ impl WhatsAppChannel {
 
 #[async_trait]
 impl Channel for WhatsAppChannel {
-    fn name(&self) -> &str { "whatsapp" }
+    fn name(&self) -> &str {
+        "whatsapp"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         if self.config.access_token.is_empty() {
             return Err(BizClawError::Config(
-                "WhatsApp access_token not configured".into()
+                "WhatsApp access_token not configured".into(),
             ));
         }
         if self.config.phone_number_id.is_empty() {
             return Err(BizClawError::Config(
-                "WhatsApp phone_number_id not configured".into()
+                "WhatsApp phone_number_id not configured".into(),
             ));
         }
 
@@ -146,20 +149,28 @@ impl Channel for WhatsAppChannel {
             self.config.phone_number_id
         );
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.config.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", self.config.access_token),
+            )
             .send()
             .await
             .map_err(|e| BizClawError::Channel(format!("WhatsApp verification failed: {e}")))?;
 
         if response.status().is_success() {
             self.connected = true;
-            tracing::info!("WhatsApp Business: connected (phone_id={})", self.config.phone_number_id);
+            tracing::info!(
+                "WhatsApp Business: connected (phone_id={})",
+                self.config.phone_number_id
+            );
         } else {
             let text = response.text().await.unwrap_or_default();
             return Err(BizClawError::AuthFailed(format!(
-                "WhatsApp token verification failed: {}", text
+                "WhatsApp token verification failed: {}",
+                text
             )));
         }
 
@@ -172,7 +183,9 @@ impl Channel for WhatsAppChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn listen(&self) -> Result<Box<dyn Stream<Item = IncomingMessage> + Send + Unpin>> {
         // WhatsApp incoming messages arrive via webhook (HTTP POST).
@@ -182,7 +195,8 @@ impl Channel for WhatsAppChannel {
     }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        self.send_text_message(&message.thread_id, &message.content).await?;
+        self.send_text_message(&message.thread_id, &message.content)
+            .await?;
         Ok(())
     }
 

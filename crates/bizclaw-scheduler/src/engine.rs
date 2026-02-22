@@ -46,7 +46,9 @@ impl SchedulerEngine {
 
     /// Set the trigger callback.
     pub fn set_on_trigger<F>(&mut self, f: F)
-    where F: Fn(&Task) -> String + Send + Sync + 'static {
+    where
+        F: Fn(&Task) -> String + Send + Sync + 'static,
+    {
         self.on_trigger = Some(Arc::new(f));
     }
 
@@ -79,7 +81,11 @@ impl SchedulerEngine {
     pub fn set_enabled(&mut self, id: &str, enabled: bool) {
         if let Some(task) = self.tasks.iter_mut().find(|t| t.id == id) {
             task.enabled = enabled;
-            task.status = if enabled { TaskStatus::Pending } else { TaskStatus::Disabled };
+            task.status = if enabled {
+                TaskStatus::Pending
+            } else {
+                TaskStatus::Disabled
+            };
             self.save();
         }
     }
@@ -112,12 +118,8 @@ impl SchedulerEngine {
             };
 
             // Record notification
-            let notification = NotifyRouter::create(
-                &task.name,
-                &body,
-                "scheduler",
-                NotifyPriority::Normal,
-            );
+            let notification =
+                NotifyRouter::create(&task.name, &body, "scheduler", NotifyPriority::Normal);
             self.router.record(notification);
 
             triggered.push((task.name.clone(), body));
@@ -152,11 +154,10 @@ impl SchedulerEngine {
     fn recompute_cron_times(&mut self) {
         let now = Utc::now();
         for task in self.tasks.iter_mut() {
-            if let TaskType::Cron { expression } = &task.task_type {
-                if task.next_run.is_none() || task.next_run.map_or(false, |nr| nr < now) {
+            if let TaskType::Cron { expression } = &task.task_type
+                && (task.next_run.is_none() || task.next_run.is_some_and(|nr| nr < now)) {
                     task.next_run = cron::next_run_from_cron(expression, now);
                 }
-            }
         }
     }
 
@@ -180,15 +181,13 @@ impl SchedulerEngine {
 
 /// Spawn the scheduler loop as a background tokio task.
 /// Checks every 30 seconds (configurable). Extremely lightweight.
-pub async fn spawn_scheduler(
-    engine: Arc<Mutex<SchedulerEngine>>,
-    check_interval_secs: u64,
-) {
-    tracing::info!("⏰ Scheduler started (check every {}s)", check_interval_secs);
-
-    let mut interval = tokio::time::interval(
-        std::time::Duration::from_secs(check_interval_secs),
+pub async fn spawn_scheduler(engine: Arc<Mutex<SchedulerEngine>>, check_interval_secs: u64) {
+    tracing::info!(
+        "⏰ Scheduler started (check every {}s)",
+        check_interval_secs
     );
+
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(check_interval_secs));
 
     loop {
         interval.tick().await;

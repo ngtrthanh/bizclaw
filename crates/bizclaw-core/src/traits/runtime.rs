@@ -1,7 +1,7 @@
 //! Runtime adapter trait.
 
-use async_trait::async_trait;
 use crate::error::Result;
+use async_trait::async_trait;
 
 /// Runtime adapter for command execution environments.
 #[async_trait]

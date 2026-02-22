@@ -8,16 +8,22 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 pub struct HttpRequestTool;
 
 impl HttpRequestTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for HttpRequestTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for HttpRequestTool {
-    fn name(&self) -> &str { "http_request" }
+    fn name(&self) -> &str {
+        "http_request"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -57,7 +63,8 @@ impl Tool for HttpRequestTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let url = args["url"].as_str()
+        let url = args["url"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'url'".into()))?;
         let method = args["method"].as_str().unwrap_or("GET").to_uppercase();
         let timeout = args["timeout_secs"].as_u64().unwrap_or(15);
@@ -85,19 +92,21 @@ impl Tool for HttpRequestTool {
             "DELETE" => client.delete(url),
             "PATCH" => client.patch(url),
             "HEAD" => client.head(url),
-            _ => return Err(bizclaw_core::error::BizClawError::Tool(format!("Unsupported method: {method}"))),
+            _ => {
+                return Err(bizclaw_core::error::BizClawError::Tool(format!(
+                    "Unsupported method: {method}"
+                )));
+            }
         };
 
         // Add custom headers
         if let Some(headers) = args["headers"].as_object() {
             for (key, value) in headers {
-                if let Some(val_str) = value.as_str() {
-                    if let Ok(header_name) = reqwest::header::HeaderName::from_bytes(key.as_bytes()) {
-                        if let Ok(header_val) = reqwest::header::HeaderValue::from_str(val_str) {
+                if let Some(val_str) = value.as_str()
+                    && let Ok(header_name) = reqwest::header::HeaderName::from_bytes(key.as_bytes())
+                        && let Ok(header_val) = reqwest::header::HeaderValue::from_str(val_str) {
                             request = request.header(header_name, header_val);
                         }
-                    }
-                }
             }
         }
 
@@ -105,38 +114,54 @@ impl Tool for HttpRequestTool {
         if let Some(body) = args["body"].as_str() {
             request = request.body(body.to_string());
             // Auto-detect content type if not set
-            if args["headers"].as_object().map(|h| !h.contains_key("content-type")).unwrap_or(true) {
-                if body.starts_with('{') || body.starts_with('[') {
+            if args["headers"]
+                .as_object()
+                .map(|h| !h.contains_key("content-type"))
+                .unwrap_or(true)
+                && (body.starts_with('{') || body.starts_with('[')) {
                     request = request.header("Content-Type", "application/json");
                 }
-            }
         }
 
         let start = std::time::Instant::now();
-        let response = request.send().await
+        let response = request
+            .send()
+            .await
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Request failed: {e}")))?;
 
         let elapsed = start.elapsed();
         let status = response.status();
-        let headers: String = response.headers().iter()
+        let headers: String = response
+            .headers()
+            .iter()
             .take(10) // limit header output
             .map(|(k, v)| format!("{}: {}", k.as_str(), v.to_str().unwrap_or("?")))
             .collect::<Vec<_>>()
             .join("\n");
 
-        let body_text = response.text().await
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Read body failed: {e}")))?;
+        let body_text = response.text().await.map_err(|e| {
+            bizclaw_core::error::BizClawError::Tool(format!("Read body failed: {e}"))
+        })?;
 
         // Truncate very large responses
         let body_display = if body_text.len() > 8000 {
-            format!("{}...\n\n[truncated, {} total bytes]", &body_text[..8000], body_text.len())
+            format!(
+                "{}...\n\n[truncated, {} total bytes]",
+                &body_text[..8000],
+                body_text.len()
+            )
         } else {
             body_text
         };
 
         let output = format!(
             "HTTP {} {} → {} ({:.0}ms)\n\nHeaders:\n{}\n\nBody:\n{}",
-            method, url, status, elapsed.as_millis(), headers, body_display
+            method,
+            url,
+            status,
+            elapsed.as_millis(),
+            headers,
+            body_display
         );
 
         Ok(ToolResult {

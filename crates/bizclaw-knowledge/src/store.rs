@@ -17,11 +17,11 @@ impl KnowledgeStore {
     /// Open or create a knowledge base at the given path.
     pub fn open(path: &Path) -> Result<Self, String> {
         std::fs::create_dir_all(path.parent().unwrap_or(Path::new("."))).ok();
-        let conn = Connection::open(path)
-            .map_err(|e| format!("DB error: {e}"))?;
+        let conn = Connection::open(path).map_err(|e| format!("DB error: {e}"))?;
 
         // Create tables
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -43,7 +43,9 @@ impl KnowledgeStore {
                 key TEXT PRIMARY KEY,
                 value TEXT
             );
-        ").map_err(|e| format!("Schema error: {e}"))?;
+        ",
+        )
+        .map_err(|e| format!("Schema error: {e}"))?;
 
         tracing::debug!("📚 Knowledge store opened: {}", path.display());
         Ok(Self { conn })
@@ -66,19 +68,23 @@ impl KnowledgeStore {
         let chunk_count = chunks.len();
 
         // Insert document record
-        self.conn.execute(
-            "INSERT INTO documents (name, source, chunk_count) VALUES (?1, ?2, ?3)",
-            params![name, source, chunk_count as i64],
-        ).map_err(|e| format!("Insert doc error: {e}"))?;
+        self.conn
+            .execute(
+                "INSERT INTO documents (name, source, chunk_count) VALUES (?1, ?2, ?3)",
+                params![name, source, chunk_count as i64],
+            )
+            .map_err(|e| format!("Insert doc error: {e}"))?;
 
         let doc_id = self.conn.last_insert_rowid();
 
         // Index chunks
         for (idx, chunk) in chunks.iter().enumerate() {
-            self.conn.execute(
-                "INSERT INTO chunks (doc_id, chunk_idx, content) VALUES (?1, ?2, ?3)",
-                params![doc_id.to_string(), idx.to_string(), chunk],
-            ).map_err(|e| format!("Insert chunk error: {e}"))?;
+            self.conn
+                .execute(
+                    "INSERT INTO chunks (doc_id, chunk_idx, content) VALUES (?1, ?2, ?3)",
+                    params![doc_id.to_string(), idx.to_string(), chunk],
+                )
+                .map_err(|e| format!("Insert chunk error: {e}"))?;
         }
 
         tracing::info!("📄 Added '{}' → {} chunks indexed", name, chunk_count);
@@ -106,7 +112,7 @@ impl KnowledgeStore {
              JOIN documents d ON d.id = CAST(c.doc_id AS INTEGER)
              WHERE chunks MATCH ?1
              ORDER BY score
-             LIMIT ?2"
+             LIMIT ?2",
         ) {
             Ok(s) => s,
             Err(e) => {
@@ -135,17 +141,13 @@ impl KnowledgeStore {
 
     /// List all documents.
     pub fn list_documents(&self) -> Vec<(i64, String, String, i64)> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, name, source, chunk_count FROM documents ORDER BY id DESC"
-        ).unwrap();
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, name, source, chunk_count FROM documents ORDER BY id DESC")
+            .unwrap();
 
         stmt.query_map([], |row| {
-            Ok((
-                row.get(0)?,
-                row.get(1)?,
-                row.get(2)?,
-                row.get(3)?,
-            ))
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
         })
         .map(|rows| rows.filter_map(|r| r.ok()).collect())
         .unwrap_or_default()
@@ -153,25 +155,28 @@ impl KnowledgeStore {
 
     /// Remove a document and its chunks.
     pub fn remove_document(&self, doc_id: i64) -> Result<(), String> {
-        self.conn.execute(
-            "DELETE FROM chunks WHERE CAST(doc_id AS INTEGER) = ?1",
-            params![doc_id],
-        ).map_err(|e| format!("Delete chunks error: {e}"))?;
+        self.conn
+            .execute(
+                "DELETE FROM chunks WHERE CAST(doc_id AS INTEGER) = ?1",
+                params![doc_id],
+            )
+            .map_err(|e| format!("Delete chunks error: {e}"))?;
 
-        self.conn.execute(
-            "DELETE FROM documents WHERE id = ?1",
-            params![doc_id],
-        ).map_err(|e| format!("Delete doc error: {e}"))?;
+        self.conn
+            .execute("DELETE FROM documents WHERE id = ?1", params![doc_id])
+            .map_err(|e| format!("Delete doc error: {e}"))?;
 
         Ok(())
     }
 
     /// Get total stats.
     pub fn stats(&self) -> (usize, usize) {
-        let doc_count: i64 = self.conn
+        let doc_count: i64 = self
+            .conn
             .query_row("SELECT COUNT(*) FROM documents", [], |r| r.get(0))
             .unwrap_or(0);
-        let chunk_count: i64 = self.conn
+        let chunk_count: i64 = self
+            .conn
             .query_row("SELECT COUNT(*) FROM chunks", [], |r| r.get(0))
             .unwrap_or(0);
         (doc_count as usize, chunk_count as usize)

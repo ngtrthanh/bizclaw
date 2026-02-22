@@ -25,9 +25,9 @@ pub fn dot_product_avx2(a: &[f32], b: &[f32]) -> f32 {
 
         // Horizontal sum of 8 lanes
         // [a, b, c, d | e, f, g, h]
-        let hi128 = _mm256_extractf128_ps(sum_vec, 1);   // [e, f, g, h]
-        let lo128 = _mm256_castps256_ps128(sum_vec);       // [a, b, c, d]
-        let sum128 = _mm_add_ps(lo128, hi128);             // [a+e, b+f, c+g, d+h]
+        let hi128 = _mm256_extractf128_ps(sum_vec, 1); // [e, f, g, h]
+        let lo128 = _mm256_castps256_ps128(sum_vec); // [a, b, c, d]
+        let sum128 = _mm_add_ps(lo128, hi128); // [a+e, b+f, c+g, d+h]
         let hi64 = _mm_movehl_ps(sum128, sum128);
         let sum64 = _mm_add_ps(sum128, hi64);
         let hi32 = _mm_shuffle_ps(sum64, sum64, 1);

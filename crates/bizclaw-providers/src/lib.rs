@@ -2,19 +2,19 @@
 //!
 //! LLM provider implementations: OpenAI, Anthropic, Ollama, LlamaCpp, Brain, Gemini, DeepSeek, Groq.
 
-pub mod openai;
 pub mod anthropic;
-pub mod ollama;
-pub mod llamacpp;
 pub mod brain;
 pub mod custom;
-pub mod gemini;
 pub mod deepseek;
+pub mod gemini;
 pub mod groq;
+pub mod llamacpp;
+pub mod ollama;
+pub mod openai;
 
 use bizclaw_core::config::BizClawConfig;
-use bizclaw_core::traits::Provider;
 use bizclaw_core::error::Result;
+use bizclaw_core::traits::Provider;
 
 /// Create a provider from configuration.
 pub fn create_provider(config: &BizClawConfig) -> Result<Box<dyn Provider>> {
@@ -30,11 +30,24 @@ pub fn create_provider(config: &BizClawConfig) -> Result<Box<dyn Provider>> {
         other if other.starts_with("custom:") => {
             Ok(Box::new(custom::CustomProvider::new(config, other)?))
         }
-        other => Err(bizclaw_core::error::BizClawError::ProviderNotFound(other.into())),
+        other => Err(bizclaw_core::error::BizClawError::ProviderNotFound(
+            other.into(),
+        )),
     }
 }
 
 /// List all available provider names.
 pub fn available_providers() -> Vec<&'static str> {
-    vec!["openai", "anthropic", "ollama", "llamacpp", "brain", "gemini", "deepseek", "groq", "openrouter", "custom"]
+    vec![
+        "openai",
+        "anthropic",
+        "ollama",
+        "llamacpp",
+        "brain",
+        "gemini",
+        "deepseek",
+        "groq",
+        "openrouter",
+        "custom",
+    ]
 }

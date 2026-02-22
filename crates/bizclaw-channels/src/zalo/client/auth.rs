@@ -1,8 +1,8 @@
 //! Zalo authentication — Cookie login, QR login, multi-account.
 //! Based on zca-js (https://github.com/RFS-ADRENO/zca-js) protocol.
 
-use serde::{Deserialize, Serialize};
 use bizclaw_core::error::{BizClawError, Result};
+use serde::{Deserialize, Serialize};
 
 /// Authentication credentials for Zalo.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +23,9 @@ impl Default for ZaloCredentials {
             imei: generate_imei(),
             cookie: None,
             phone: None,
-            user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0".into(),
+            user_agent:
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0"
+                    .into(),
         }
     }
 }
@@ -59,7 +61,10 @@ pub enum QrLoginStatus {
     /// QR generated, waiting for scan
     Pending { code: String, image: String },
     /// User scanned, waiting for confirm
-    Scanned { avatar: String, display_name: String },
+    Scanned {
+        avatar: String,
+        display_name: String,
+    },
     /// User confirmed, login complete
     Confirmed,
     /// QR expired
@@ -72,16 +77,25 @@ pub enum QrLoginStatus {
 fn zalo_headers(user_agent: &str) -> Vec<(&'static str, String)> {
     vec![
         ("accept", "*/*".into()),
-        ("accept-language", "vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5".into()),
+        (
+            "accept-language",
+            "vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5".into(),
+        ),
         ("content-type", "application/x-www-form-urlencoded".into()),
         ("priority", "u=1, i".into()),
-        ("sec-ch-ua", "\"Chromium\";v=\"130\", \"Google Chrome\";v=\"130\", \"Not?A_Brand\";v=\"99\"".into()),
+        (
+            "sec-ch-ua",
+            "\"Chromium\";v=\"130\", \"Google Chrome\";v=\"130\", \"Not?A_Brand\";v=\"99\"".into(),
+        ),
         ("sec-ch-ua-mobile", "?0".into()),
         ("sec-ch-ua-platform", "\"Windows\"".into()),
         ("sec-fetch-dest", "empty".into()),
         ("sec-fetch-mode", "cors".into()),
         ("sec-fetch-site", "same-origin".into()),
-        ("referer", "https://id.zalo.me/account?continue=https%3A%2F%2Fzalo.me%2Fpc".into()),
+        (
+            "referer",
+            "https://id.zalo.me/account?continue=https%3A%2F%2Fzalo.me%2Fpc".into(),
+        ),
         ("referrer-policy", "strict-origin-when-cross-origin".into()),
         ("user-agent", user_agent.into()),
     ]
@@ -114,12 +128,13 @@ impl ZaloAuth {
         // Validate cookie format
         if !cookie.contains("zpw_sek") {
             return Err(BizClawError::AuthFailed(
-                "Invalid Zalo cookie: must contain zpw_sek".into()
+                "Invalid Zalo cookie: must contain zpw_sek".into(),
             ));
         }
 
         // Send login request to Zalo Web API
-        let response = self.client
+        let response = self
+            .client
             .get("https://tt-chat-wpa.chat.zalo.me/api/login/getServerInfo")
             .header("cookie", cookie)
             .header("user-agent", &self.credentials.user_agent)
@@ -127,7 +142,9 @@ impl ZaloAuth {
             .await
             .map_err(|e| BizClawError::AuthFailed(format!("Login request failed: {e}")))?;
 
-        let body: serde_json::Value = response.json().await
+        let body: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::AuthFailed(format!("Invalid login response: {e}")))?;
 
         let error_code = body["error_code"].as_i64().unwrap_or(-1);
@@ -143,7 +160,9 @@ impl ZaloAuth {
             uid: body["data"]["uid"].as_str().unwrap_or("").into(),
             zpw_enk: body["data"]["zpw_enk"].as_str().map(String::from),
             zpw_key: body["data"]["zpw_key"].as_str().map(String::from),
-            zpw_service_map: body["data"]["zpw_service_map"].as_object().map(|m| serde_json::to_value(m).unwrap_or_default()),
+            zpw_service_map: body["data"]["zpw_service_map"]
+                .as_object()
+                .map(|m| serde_json::to_value(m).unwrap_or_default()),
         })
     }
 
@@ -153,9 +172,13 @@ impl ZaloAuth {
     async fn load_login_page(&mut self) -> Result<String> {
         tracing::info!("Zalo QR: loading login page...");
 
-        let response = self.client
+        let response = self
+            .client
             .get("https://id.zalo.me/account?continue=https%3A%2F%2Fchat.zalo.me%2F")
-            .header("accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header(
+                "accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            )
             .header("accept-language", "vi-VN,vi;q=0.9,en-US;q=0.6,en;q=0.5")
             .header("user-agent", &self.credentials.user_agent)
             .header("referer", "https://chat.zalo.me/")
@@ -167,19 +190,24 @@ impl ZaloAuth {
             .await
             .map_err(|e| BizClawError::AuthFailed(format!("Failed to load login page: {e}")))?;
 
-        let html = response.text().await
+        let html = response
+            .text()
+            .await
             .map_err(|e| BizClawError::AuthFailed(format!("Failed to read login page: {e}")))?;
 
         // Extract version: https://stc-zlogin.zdn.vn/main-X.Y.Z.js
         let re = regex::Regex::new(r"https://stc-zlogin\.zdn\.vn/main-([\d.]+)\.js")
             .map_err(|e| BizClawError::AuthFailed(format!("Regex error: {e}")))?;
 
-        let version = re.captures(&html)
+        let version = re
+            .captures(&html)
             .and_then(|c| c.get(1))
             .map(|m| m.as_str().to_string())
-            .ok_or_else(|| BizClawError::AuthFailed(
-                "Cannot get Zalo login version from page. API may have changed.".into()
-            ))?;
+            .ok_or_else(|| {
+                BizClawError::AuthFailed(
+                    "Cannot get Zalo login version from page. API may have changed.".into(),
+                )
+            })?;
 
         tracing::info!("Zalo QR: got login version: {}", version);
         self.login_version = Some(version.clone());
@@ -190,7 +218,8 @@ impl ZaloAuth {
     async fn get_login_info(&self, version: &str) -> Result<()> {
         let form = format!("continue=https%3A%2F%2Fzalo.me%2Fpc&v={}", version);
 
-        let mut req = self.client
+        let mut req = self
+            .client
             .post("https://id.zalo.me/account/logininfo")
             .body(form);
 
@@ -198,7 +227,8 @@ impl ZaloAuth {
             req = req.header(k, v);
         }
 
-        req.send().await
+        req.send()
+            .await
             .map_err(|e| BizClawError::AuthFailed(format!("logininfo failed: {e}")))?;
 
         Ok(())
@@ -206,9 +236,13 @@ impl ZaloAuth {
 
     /// Step 3: Verify client (device verification).
     async fn verify_client(&self, version: &str) -> Result<()> {
-        let form = format!("type=device&continue=https%3A%2F%2Fzalo.me%2Fpc&v={}", version);
+        let form = format!(
+            "type=device&continue=https%3A%2F%2Fzalo.me%2Fpc&v={}",
+            version
+        );
 
-        let mut req = self.client
+        let mut req = self
+            .client
             .post("https://id.zalo.me/account/verify-client")
             .body(form);
 
@@ -216,7 +250,8 @@ impl ZaloAuth {
             req = req.header(k, v);
         }
 
-        req.send().await
+        req.send()
+            .await
             .map_err(|e| BizClawError::AuthFailed(format!("verify-client failed: {e}")))?;
 
         Ok(())
@@ -226,7 +261,8 @@ impl ZaloAuth {
     async fn generate_qr(&self, version: &str) -> Result<QrCodeResult> {
         let form = format!("continue=https%3A%2F%2Fzalo.me%2Fpc&v={}", version);
 
-        let mut req = self.client
+        let mut req = self
+            .client
             .post("https://id.zalo.me/account/authen/qr/generate")
             .body(form);
 
@@ -234,17 +270,22 @@ impl ZaloAuth {
             req = req.header(k, v);
         }
 
-        let response = req.send().await
+        let response = req
+            .send()
+            .await
             .map_err(|e| BizClawError::AuthFailed(format!("QR generate failed: {e}")))?;
 
-        let text = response.text().await
+        let text = response
+            .text()
+            .await
             .map_err(|e| BizClawError::AuthFailed(format!("QR generate read error: {e}")))?;
 
-        let data: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|_| BizClawError::AuthFailed(format!(
+        let data: serde_json::Value = serde_json::from_str(&text).map_err(|_| {
+            BizClawError::AuthFailed(format!(
                 "QR generate returned non-JSON. First 200 chars: {}",
                 text.chars().take(200).collect::<String>()
-            )))?;
+            ))
+        })?;
 
         let error_code = data["error_code"].as_i64().unwrap_or(-1);
         if error_code != 0 {
@@ -255,9 +296,11 @@ impl ZaloAuth {
             )));
         }
 
-        let code = data["data"]["code"].as_str()
+        let code = data["data"]["code"]
+            .as_str()
             .ok_or_else(|| BizClawError::AuthFailed("No 'code' in QR response".into()))?;
-        let image = data["data"]["image"].as_str()
+        let image = data["data"]["image"]
+            .as_str()
             .ok_or_else(|| BizClawError::AuthFailed("No 'image' in QR response".into()))?;
 
         Ok(QrCodeResult {
@@ -297,7 +340,8 @@ impl ZaloAuth {
                 code, version
             );
 
-            let mut req = self.client
+            let mut req = self
+                .client
                 .post("https://id.zalo.me/account/authen/qr/waiting-scan")
                 .body(form);
 
@@ -305,10 +349,14 @@ impl ZaloAuth {
                 req = req.header(k, v);
             }
 
-            let response = req.send().await
+            let response = req
+                .send()
+                .await
                 .map_err(|e| BizClawError::AuthFailed(format!("waiting-scan failed: {e}")))?;
 
-            let data: serde_json::Value = response.json().await
+            let data: serde_json::Value = response
+                .json()
+                .await
                 .map_err(|e| BizClawError::AuthFailed(format!("waiting-scan parse error: {e}")))?;
 
             let error_code = data["error_code"].as_i64().unwrap_or(-1);
@@ -317,15 +365,20 @@ impl ZaloAuth {
                 8 => continue, // Still waiting, retry
                 0 => {
                     let avatar = data["data"]["avatar"].as_str().unwrap_or("").to_string();
-                    let name = data["data"]["display_name"].as_str().unwrap_or("").to_string();
+                    let name = data["data"]["display_name"]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string();
                     return Ok((avatar, name));
                 }
                 -13 => return Err(BizClawError::AuthFailed("QR code expired".into())),
-                _ => return Err(BizClawError::AuthFailed(format!(
-                    "waiting-scan error {}: {}",
-                    error_code,
-                    data["error_message"].as_str().unwrap_or("unknown")
-                ))),
+                _ => {
+                    return Err(BizClawError::AuthFailed(format!(
+                        "waiting-scan error {}: {}",
+                        error_code,
+                        data["error_message"].as_str().unwrap_or("unknown")
+                    )));
+                }
             }
         }
     }
@@ -340,7 +393,8 @@ impl ZaloAuth {
                 code, version
             );
 
-            let mut req = self.client
+            let mut req = self
+                .client
                 .post("https://id.zalo.me/account/authen/qr/waiting-confirm")
                 .body(form);
 
@@ -348,11 +402,14 @@ impl ZaloAuth {
                 req = req.header(k, v);
             }
 
-            let response = req.send().await
+            let response = req
+                .send()
+                .await
                 .map_err(|e| BizClawError::AuthFailed(format!("waiting-confirm failed: {e}")))?;
 
-            let data: serde_json::Value = response.json().await
-                .map_err(|e| BizClawError::AuthFailed(format!("waiting-confirm parse error: {e}")))?;
+            let data: serde_json::Value = response.json().await.map_err(|e| {
+                BizClawError::AuthFailed(format!("waiting-confirm parse error: {e}"))
+            })?;
 
             let error_code = data["error_code"].as_i64().unwrap_or(-1);
 
@@ -360,11 +417,13 @@ impl ZaloAuth {
                 8 => continue,
                 0 => return Ok(()),
                 -13 => return Err(BizClawError::AuthFailed("User declined QR login".into())),
-                _ => return Err(BizClawError::AuthFailed(format!(
-                    "waiting-confirm error {}: {}",
-                    error_code,
-                    data["error_message"].as_str().unwrap_or("unknown")
-                ))),
+                _ => {
+                    return Err(BizClawError::AuthFailed(format!(
+                        "waiting-confirm error {}: {}",
+                        error_code,
+                        data["error_message"].as_str().unwrap_or("unknown")
+                    )));
+                }
             }
         }
     }

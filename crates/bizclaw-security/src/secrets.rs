@@ -5,10 +5,10 @@
 //! with a machine-specific key derived from hostname + username.
 
 use aes::Aes256;
-use aes::cipher::{BlockEncrypt, BlockDecrypt, KeyInit, generic_array::GenericArray};
+use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use bizclaw_core::error::{BizClawError, Result};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -42,11 +42,13 @@ impl SecretStore {
 
         let json_str = if self.encrypt {
             // Decrypt from base64 → AES-256 → JSON
-            let encrypted = BASE64.decode(content.trim())
+            let encrypted = BASE64
+                .decode(content.trim())
                 .map_err(|e| BizClawError::Security(format!("Base64 decode failed: {e}")))?;
             let decrypted = decrypt_aes256(&encrypted, &self.key);
-            String::from_utf8(decrypted)
-                .map_err(|e| BizClawError::Security(format!("Decryption produced invalid UTF-8: {e}")))?
+            String::from_utf8(decrypted).map_err(|e| {
+                BizClawError::Security(format!("Decryption produced invalid UTF-8: {e}"))
+            })?
         } else {
             content
         };
@@ -54,7 +56,11 @@ impl SecretStore {
         self.secrets = serde_json::from_str(&json_str)
             .map_err(|e| BizClawError::Security(format!("Failed to parse secrets: {e}")))?;
 
-        tracing::debug!("Loaded {} secrets from {}", self.secrets.len(), self.secrets_path.display());
+        tracing::debug!(
+            "Loaded {} secrets from {}",
+            self.secrets.len(),
+            self.secrets_path.display()
+        );
         Ok(())
     }
 
@@ -77,10 +83,13 @@ impl SecretStore {
         // Set restrictive permissions on Unix (0600)
         #[cfg(unix)]
         {
-            use std::os::unix::fs::OpenOptionsExt;
             use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
             let mut file = std::fs::OpenOptions::new()
-                .write(true).create(true).truncate(true).mode(0o600)
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .mode(0o600)
                 .open(&self.secrets_path)?;
             file.write_all(content.as_bytes())?;
             return Ok(());
@@ -151,7 +160,7 @@ fn encrypt_aes256(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
     // PKCS7 padding
     let padding_len = block_size - (data.len() % block_size);
     let mut padded = data.to_vec();
-    padded.extend(std::iter::repeat(padding_len as u8).take(padding_len));
+    padded.extend(std::iter::repeat_n(padding_len as u8, padding_len));
 
     let mut encrypted = Vec::with_capacity(padded.len());
     for chunk in padded.chunks(block_size) {

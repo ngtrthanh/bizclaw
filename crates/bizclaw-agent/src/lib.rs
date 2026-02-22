@@ -1,6 +1,6 @@
 //! # BizClaw Agent
 //! The core agent engine — orchestrates providers, channels, memory, and tools.
-//! 
+//!
 //! ## Features (BizClaw agent features):
 //! - **Multi-round tool calling**: Up to 3 rounds of tool → LLM → tool loops
 //! - **Memory retrieval (RAG)**: FTS5-powered search of past conversations
@@ -9,8 +9,8 @@
 //! - **Session management**: Thread isolation via session_id
 //! - **Context tracking**: Monitor conversation length and estimate token usage
 
-pub mod engine;
 pub mod context;
+pub mod engine;
 pub mod orchestrator;
 
 use bizclaw_core::config::BizClawConfig;
@@ -48,7 +48,10 @@ impl PromptCache {
     }
 
     /// Get cached tool definitions (refresh every 5 minutes).
-    fn tool_defs(&mut self, tools: &bizclaw_tools::ToolRegistry) -> &[bizclaw_core::types::ToolDefinition] {
+    fn tool_defs(
+        &mut self,
+        tools: &bizclaw_tools::ToolRegistry,
+    ) -> &[bizclaw_core::types::ToolDefinition] {
         if self.last_refresh.elapsed() > std::time::Duration::from_secs(300) {
             self.cached_tool_defs = tools.list();
             self.last_refresh = std::time::Instant::now();
@@ -88,7 +91,8 @@ pub struct Agent {
     /// Current session ID for memory isolation
     session_id: String,
     /// Knowledge base for RAG (optional, shared with gateway)
-    knowledge: Option<std::sync::Arc<tokio::sync::Mutex<Option<bizclaw_knowledge::KnowledgeStore>>>>,
+    knowledge:
+        Option<std::sync::Arc<tokio::sync::Mutex<Option<bizclaw_knowledge::KnowledgeStore>>>>,
     /// Context statistics from last process() call
     last_stats: ContextStats,
     /// 3-Tier Memory: daily log manager for persisting compaction summaries
@@ -153,16 +157,21 @@ impl Agent {
 
         // Connect MCP servers and register their tools
         if !config.mcp_servers.is_empty() {
-            tracing::info!("🔗 Connecting {} MCP server(s)...", config.mcp_servers.len());
-            let mcp_configs: Vec<bizclaw_mcp::McpServerConfig> = config.mcp_servers.iter().map(|e| {
-                bizclaw_mcp::McpServerConfig {
+            tracing::info!(
+                "🔗 Connecting {} MCP server(s)...",
+                config.mcp_servers.len()
+            );
+            let mcp_configs: Vec<bizclaw_mcp::McpServerConfig> = config
+                .mcp_servers
+                .iter()
+                .map(|e| bizclaw_mcp::McpServerConfig {
                     name: e.name.clone(),
                     command: e.command.clone(),
                     args: e.args.clone(),
                     env: e.env.clone(),
                     enabled: e.enabled,
-                }
-            }).collect();
+                })
+                .collect();
 
             let results = bizclaw_mcp::bridge::connect_mcp_servers(&mcp_configs).await;
             let mut total_mcp_tools = 0;
@@ -216,7 +225,10 @@ impl Agent {
     }
 
     /// Attach a knowledge base for RAG-enhanced responses.
-    pub fn set_knowledge(&mut self, kb: std::sync::Arc<tokio::sync::Mutex<Option<bizclaw_knowledge::KnowledgeStore>>>) {
+    pub fn set_knowledge(
+        &mut self,
+        kb: std::sync::Arc<tokio::sync::Mutex<Option<bizclaw_knowledge::KnowledgeStore>>>,
+    ) {
         self.knowledge = Some(kb);
     }
 
@@ -241,10 +253,17 @@ impl Agent {
         // ═══════════════════════════════════════
         let estimated_tokens = self.estimate_tokens();
         let max_context = self.config.brain.context_length as usize;
-        let utilization = if max_context > 0 { estimated_tokens as f32 / max_context as f32 } else { 0.0 };
+        let utilization = if max_context > 0 {
+            estimated_tokens as f32 / max_context as f32
+        } else {
+            0.0
+        };
 
         if utilization > 0.70 && self.conversation.len() > 10 {
-            tracing::info!("📦 Auto-compaction triggered ({}% context used)", (utilization * 100.0) as u32);
+            tracing::info!(
+                "📦 Auto-compaction triggered ({}% context used)",
+                (utilization * 100.0) as u32
+            );
             self.compact_conversation().await;
             compacted = true;
         }
@@ -253,7 +272,7 @@ impl Agent {
         // Phase 1: Knowledge Base RAG
         // ═══════════════════════════════════════
         if let Some(kb_context) = self.search_knowledge(user_message).await {
-            self.conversation.push(Message::system(&format!(
+            self.conversation.push(Message::system(format!(
                 "[Knowledge Base — relevant documents]\n{kb_context}\n[End of knowledge context]"
             )));
         }
@@ -262,7 +281,7 @@ impl Agent {
         // Phase 2: Memory Retrieval
         // ═══════════════════════════════════════
         if let Some(memory_ctx) = self.retrieve_memory(user_message).await {
-            self.conversation.push(Message::system(&format!(
+            self.conversation.push(Message::system(format!(
                 "[Past conversations]\n{memory_ctx}\n[End of past conversations]"
             )));
         }
@@ -299,63 +318,79 @@ impl Agent {
         let mut tool_rounds_used = 0;
 
         for round in 0..=MAX_TOOL_ROUNDS {
-            let current_tools = if round < MAX_TOOL_ROUNDS { &tool_defs } else { &vec![] };
-            let response = self.provider.chat(&self.conversation, current_tools, &params).await?;
+            let current_tools = if round < MAX_TOOL_ROUNDS {
+                &tool_defs
+            } else {
+                &vec![]
+            };
+            let response = self
+                .provider
+                .chat(&self.conversation, current_tools, &params)
+                .await?;
 
             // No tool calls → this is the final text response
             if response.tool_calls.is_empty() {
-                final_content = response.content.unwrap_or_else(|| "I'm not sure how to respond.".into());
+                final_content = response
+                    .content
+                    .unwrap_or_else(|| "I'm not sure how to respond.".into());
                 self.conversation.push(Message::assistant(&final_content));
                 break;
             }
 
             // Has tool calls → execute them
             tool_rounds_used = round + 1;
-            tracing::info!("Tool round {}/{}: {} tool call(s)",
-                round + 1, MAX_TOOL_ROUNDS, response.tool_calls.len());
+            tracing::info!(
+                "Tool round {}/{}: {} tool call(s)",
+                round + 1,
+                MAX_TOOL_ROUNDS,
+                response.tool_calls.len()
+            );
 
             let mut tool_results = Vec::new();
 
             for tc in &response.tool_calls {
-                tracing::info!("  → {} ({})", tc.function.name,
-                    &tc.function.arguments[..tc.function.arguments.len().min(100)]);
+                tracing::info!(
+                    "  → {} ({})",
+                    tc.function.name,
+                    &tc.function.arguments[..tc.function.arguments.len().min(100)]
+                );
 
                 // Security check for shell commands
-                if tc.function.name == "shell" {
-                    if let Ok(args) = serde_json::from_str::<serde_json::Value>(&tc.function.arguments) {
-                        if let Some(cmd) = args["command"].as_str() {
-                            if !self.security.check_command(cmd).await? {
+                if tc.function.name == "shell"
+                    && let Ok(args) =
+                        serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
+                        && let Some(cmd) = args["command"].as_str()
+                            && !self.security.check_command(cmd).await? {
                                 tool_results.push(Message::tool(
                                     format!("Permission denied: command '{}' not allowed", cmd),
                                     &tc.id,
                                 ));
                                 continue;
                             }
-                        }
-                    }
-                }
 
                 // Execute tool
                 if let Some(tool) = self.tools.get(&tc.function.name) {
                     match tool.execute(&tc.function.arguments).await {
                         Ok(result) => {
                             let output = if result.output.len() > 4000 {
-                                format!("{}...\n[truncated, {} total chars]",
-                                    &result.output[..4000], result.output.len())
+                                format!(
+                                    "{}...\n[truncated, {} total chars]",
+                                    &result.output[..4000],
+                                    result.output.len()
+                                )
                             } else {
                                 result.output
                             };
                             tool_results.push(Message::tool(&output, &tc.id));
                         }
                         Err(e) => {
-                            tool_results.push(Message::tool(
-                                format!("Tool error: {e}"), &tc.id,
-                            ));
+                            tool_results.push(Message::tool(format!("Tool error: {e}"), &tc.id));
                         }
                     }
                 } else {
                     tool_results.push(Message::tool(
-                        format!("Tool not found: {}", tc.function.name), &tc.id,
+                        format!("Tool not found: {}", tc.function.name),
+                        &tc.id,
                     ));
                 }
             }
@@ -421,7 +456,11 @@ impl Agent {
             context.push_str(&entry);
         }
 
-        tracing::debug!("Knowledge RAG: {} results, {} chars", results.len(), context.len());
+        tracing::debug!(
+            "Knowledge RAG: {} results, {} chars",
+            results.len(),
+            context.len()
+        );
         Some(context)
     }
 
@@ -433,16 +472,17 @@ impl Agent {
 
         // Extract meaningful keywords (skip common words)
         let stop_words: std::collections::HashSet<&str> = [
-            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-            "have", "has", "had", "do", "does", "did", "will", "would", "could",
-            "should", "may", "might", "shall", "can", "need", "dare", "ought",
-            "i", "me", "my", "you", "your", "he", "she", "it", "we", "they",
-            "this", "that", "these", "those", "what", "which", "who", "how",
-            "and", "but", "or", "not", "no", "of", "in", "on", "at", "to",
-            "for", "with", "from", "by", "as", "if", "then", "so", "than",
-            "tôi", "bạn", "là", "có", "và", "của", "với", "cho", "để",
-            "không", "được", "này", "đó", "một", "các", "những",
-        ].iter().copied().collect();
+            "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "have", "has",
+            "had", "do", "does", "did", "will", "would", "could", "should", "may", "might",
+            "shall", "can", "need", "dare", "ought", "i", "me", "my", "you", "your", "he", "she",
+            "it", "we", "they", "this", "that", "these", "those", "what", "which", "who", "how",
+            "and", "but", "or", "not", "no", "of", "in", "on", "at", "to", "for", "with", "from",
+            "by", "as", "if", "then", "so", "than", "tôi", "bạn", "là", "có", "và", "của", "với",
+            "cho", "để", "không", "được", "này", "đó", "một", "các", "những",
+        ]
+        .iter()
+        .copied()
+        .collect();
 
         let keywords: Vec<&str> = user_message
             .split(|c: char| !c.is_alphanumeric() && c != '_')
@@ -487,7 +527,11 @@ impl Agent {
             total_len += entry.len();
         }
 
-        tracing::debug!("Memory RAG: {} results, {} chars", relevant.len(), total_len);
+        tracing::debug!(
+            "Memory RAG: {} results, {} chars",
+            relevant.len(),
+            total_len
+        );
         Some(context)
     }
 
@@ -523,7 +567,7 @@ impl Agent {
         }
 
         let system = self.conversation[0].clone();
-        
+
         // Summarize old messages (keep last 10)
         let old_count = self.conversation.len() - 10;
         let old_messages: Vec<_> = self.conversation[1..=old_count].to_vec();
@@ -559,7 +603,11 @@ impl Agent {
         self.conversation.push(Message::system(&summary));
         self.conversation.extend(recent);
 
-        tracing::info!("📦 Compacted {} → {} messages", old_count + 10, self.conversation.len());
+        tracing::info!(
+            "📦 Compacted {} → {} messages",
+            old_count + 10,
+            self.conversation.len()
+        );
 
         // 3-Tier Memory: persist compaction summary to daily log
         if let Err(e) = self.daily_log.save_compaction(&summary) {
@@ -569,7 +617,8 @@ impl Agent {
 
     /// Estimate token count (rough heuristic: 1 token ≈ 4 chars for English, 2 chars for CJK).
     fn estimate_tokens(&self) -> usize {
-        self.conversation.iter()
+        self.conversation
+            .iter()
             .map(|m| {
                 let chars = m.content.len();
                 // Rough estimate: mix of English and Vietnamese
@@ -579,7 +628,10 @@ impl Agent {
     }
 
     /// Process incoming message and create an outgoing response.
-    pub async fn handle_incoming(&mut self, msg: &bizclaw_core::types::IncomingMessage) -> Result<OutgoingMessage> {
+    pub async fn handle_incoming(
+        &mut self,
+        msg: &bizclaw_core::types::IncomingMessage,
+    ) -> Result<OutgoingMessage> {
         let response = self.process(&msg.content).await?;
         Ok(OutgoingMessage {
             thread_id: msg.thread_id.clone(),

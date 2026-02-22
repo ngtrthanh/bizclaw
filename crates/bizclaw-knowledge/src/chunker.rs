@@ -91,12 +91,16 @@ pub fn extract_text(content: &str, filename: &str) -> String {
 fn extract_json_strings(val: &serde_json::Value) -> String {
     match val {
         serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Array(arr) => {
-            arr.iter().map(extract_json_strings).collect::<Vec<_>>().join("\n")
-        }
-        serde_json::Value::Object(map) => {
-            map.values().map(extract_json_strings).collect::<Vec<_>>().join("\n")
-        }
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .map(extract_json_strings)
+            .collect::<Vec<_>>()
+            .join("\n"),
+        serde_json::Value::Object(map) => map
+            .values()
+            .map(extract_json_strings)
+            .collect::<Vec<_>>()
+            .join("\n"),
         other => other.to_string(),
     }
 }
@@ -116,17 +120,25 @@ mod tests {
     fn test_chunk_paragraphs() {
         let text = "Paragraph one line one.\nParagraph one line two.\n\nParagraph two line one.\nParagraph two line two.";
         let chunks = chunk_text(text, 100);
-        assert!(chunks.len() >= 1);
+        assert!(!chunks.is_empty());
     }
 
     #[test]
     fn test_chunk_long_text() {
         let text = "word ".repeat(200); // ~1000 chars
         let chunks = chunk_text(&text, 300);
-        assert!(chunks.len() >= 2, "Expected at least 2 chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "Expected at least 2 chunks, got {}",
+            chunks.len()
+        );
         // Each chunk should be <= 300 chars (approximately)
         for chunk in &chunks {
-            assert!(chunk.len() <= 1100, "Chunk too large: {} chars", chunk.len());
+            assert!(
+                chunk.len() <= 1100,
+                "Chunk too large: {} chars",
+                chunk.len()
+            );
         }
     }
 

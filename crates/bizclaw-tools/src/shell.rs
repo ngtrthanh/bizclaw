@@ -8,16 +8,22 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 pub struct ShellTool;
 
 impl ShellTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for ShellTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for ShellTool {
-    fn name(&self) -> &str { "shell" }
+    fn name(&self) -> &str {
+        "shell"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -44,7 +50,8 @@ impl Tool for ShellTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let command = args["command"].as_str()
+        let command = args["command"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'command'".into()))?;
 
         let workdir = args["workdir"].as_str();
@@ -66,7 +73,10 @@ impl Tool for ShellTool {
         let result = if output.status.success() {
             stdout
         } else {
-            format!("STDOUT:\n{stdout}\nSTDERR:\n{stderr}\nExit code: {}", output.status.code().unwrap_or(-1))
+            format!(
+                "STDOUT:\n{stdout}\nSTDERR:\n{stderr}\nExit code: {}",
+                output.status.code().unwrap_or(-1)
+            )
         };
 
         Ok(ToolResult {

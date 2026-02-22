@@ -1,10 +1,10 @@
 //! Tenant process manager — start/stop/restart BizClaw agent instances.
 
+use crate::db::{PlatformDb, Tenant};
+use bizclaw_core::error::{BizClawError, Result};
 use std::collections::HashMap;
 use std::process::Command;
 use std::time::Instant;
-use bizclaw_core::error::{BizClawError, Result};
-use crate::db::{PlatformDb, Tenant};
 
 /// A running tenant process.
 pub struct TenantProcess {
@@ -28,9 +28,17 @@ impl TenantManager {
     }
 
     /// Start a tenant as a child process.
-    pub fn start_tenant(&mut self, tenant: &Tenant, bizclaw_bin: &str, db: &crate::db::PlatformDb) -> Result<u32> {
+    pub fn start_tenant(
+        &mut self,
+        tenant: &Tenant,
+        bizclaw_bin: &str,
+        db: &crate::db::PlatformDb,
+    ) -> Result<u32> {
         if self.processes.contains_key(&tenant.id) {
-            return Err(BizClawError::provider(format!("Tenant {} already running", tenant.slug)));
+            return Err(BizClawError::provider(format!(
+                "Tenant {} already running",
+                tenant.slug
+            )));
         }
 
         let tenant_dir = self.data_dir.join(&tenant.slug);
@@ -59,7 +67,9 @@ port = {}
             // Load channel configs from database and inject into config.toml
             if let Ok(channels) = db.list_channels(&tenant.id) {
                 for ch in &channels {
-                    if !ch.enabled { continue; }
+                    if !ch.enabled {
+                        continue;
+                    }
                     if let Ok(cfg) = serde_json::from_str::<serde_json::Value>(&ch.config_json) {
                         match ch.channel_type.as_str() {
                             "telegram" => {
@@ -70,9 +80,16 @@ port = {}
                                         token
                                     ));
                                     if let Some(ids) = cfg["allowed_chat_ids"].as_str() {
-                                        let parsed: Vec<&str> = ids.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+                                        let parsed: Vec<&str> = ids
+                                            .split(',')
+                                            .map(|s| s.trim())
+                                            .filter(|s| !s.is_empty())
+                                            .collect();
                                         if !parsed.is_empty() {
-                                            config_content.push_str(&format!("allowed_chat_ids = [{}]\n", parsed.join(", ")));
+                                            config_content.push_str(&format!(
+                                                "allowed_chat_ids = [{}]\n",
+                                                parsed.join(", ")
+                                            ));
                                         }
                                     }
                                 }
@@ -149,13 +166,21 @@ port = {}
             .map_err(|e| BizClawError::provider(format!("Failed to start tenant: {e}")))?;
 
         let pid = child.id();
-        self.processes.insert(tenant.id.clone(), TenantProcess {
-            pid,
-            port: tenant.port,
-            started_at: Instant::now(),
-        });
+        self.processes.insert(
+            tenant.id.clone(),
+            TenantProcess {
+                pid,
+                port: tenant.port,
+                started_at: Instant::now(),
+            },
+        );
 
-        tracing::info!("🚀 Started tenant '{}' (pid={}, port={})", tenant.slug, pid, tenant.port);
+        tracing::info!(
+            "🚀 Started tenant '{}' (pid={}, port={})",
+            tenant.slug,
+            pid,
+            tenant.port
+        );
         Ok(pid)
     }
 
@@ -170,12 +195,19 @@ port = {}
     }
 
     /// Restart a tenant.
-    pub fn restart_tenant(&mut self, tenant: &Tenant, bizclaw_bin: &str, db: &PlatformDb) -> Result<u32> {
+    pub fn restart_tenant(
+        &mut self,
+        tenant: &Tenant,
+        bizclaw_bin: &str,
+        db: &PlatformDb,
+    ) -> Result<u32> {
         self.stop_tenant(&tenant.id)?;
         std::thread::sleep(std::time::Duration::from_millis(500));
         let pid = self.start_tenant(tenant, bizclaw_bin, db)?;
-        db.update_tenant_status(&tenant.id, "running", Some(pid)).ok();
-        db.log_event("tenant_restarted", "system", &tenant.id, None).ok();
+        db.update_tenant_status(&tenant.id, "running", Some(pid))
+            .ok();
+        db.log_event("tenant_restarted", "system", &tenant.id, None)
+            .ok();
         Ok(pid)
     }
 
@@ -214,9 +246,14 @@ mod tests {
         let mut mgr = TenantManager::new("/tmp/bizclaw-test");
         assert_eq!(mgr.next_port(10001), 10001);
 
-        mgr.processes.insert("t1".into(), TenantProcess {
-            pid: 1, port: 10001, started_at: Instant::now(),
-        });
+        mgr.processes.insert(
+            "t1".into(),
+            TenantProcess {
+                pid: 1,
+                port: 10001,
+                started_at: Instant::now(),
+            },
+        );
         assert_eq!(mgr.next_port(10001), 10002);
     }
 }

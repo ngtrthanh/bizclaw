@@ -3,9 +3,9 @@
 //! Reads vocabulary and merge rules from GGUF metadata and converts
 //! text to/from token IDs.
 
-use std::collections::HashMap;
-use bizclaw_core::error::{BizClawError, Result};
 use crate::gguf::GgufValue;
+use bizclaw_core::error::{BizClawError, Result};
+use std::collections::HashMap;
 
 /// BPE tokenizer for LLaMA-family models.
 pub struct BpeTokenizer {
@@ -25,23 +25,26 @@ impl BpeTokenizer {
     /// Create a tokenizer from GGUF metadata.
     pub fn from_gguf(metadata: &HashMap<String, GgufValue>) -> Result<Self> {
         // Extract vocabulary tokens
-        let tokens = metadata.get("tokenizer.ggml.tokens")
+        let tokens = metadata
+            .get("tokenizer.ggml.tokens")
             .and_then(|v| match v {
                 GgufValue::Array(arr) => Some(arr),
                 _ => None,
             })
             .ok_or_else(|| BizClawError::Brain("Missing tokenizer.ggml.tokens".into()))?;
 
-        let vocab: Vec<String> = tokens.iter().filter_map(|v| {
-            v.as_str().map(|s| s.to_string())
-        }).collect();
+        let vocab: Vec<String> = tokens
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
 
         if vocab.is_empty() {
             return Err(BizClawError::Brain("Empty vocabulary".into()));
         }
 
         // Extract scores
-        let scores: Vec<f32> = metadata.get("tokenizer.ggml.scores")
+        let scores: Vec<f32> = metadata
+            .get("tokenizer.ggml.scores")
             .and_then(|v| match v {
                 GgufValue::Array(arr) => Some(arr.iter().filter_map(|v| v.as_f32()).collect()),
                 _ => None,
@@ -49,25 +52,31 @@ impl BpeTokenizer {
             .unwrap_or_else(|| vec![0.0; vocab.len()]);
 
         // Build reverse mapping
-        let token_to_id: HashMap<String, u32> = vocab.iter()
+        let token_to_id: HashMap<String, u32> = vocab
+            .iter()
             .enumerate()
             .map(|(i, t)| (t.clone(), i as u32))
             .collect();
 
         // Extract special tokens
-        let bos_id = metadata.get("tokenizer.ggml.bos_token_id")
+        let bos_id = metadata
+            .get("tokenizer.ggml.bos_token_id")
             .and_then(|v| v.as_u32())
             .unwrap_or(1);
-        let eos_id = metadata.get("tokenizer.ggml.eos_token_id")
+        let eos_id = metadata
+            .get("tokenizer.ggml.eos_token_id")
             .and_then(|v| v.as_u32())
             .unwrap_or(2);
-        let pad_id = metadata.get("tokenizer.ggml.padding_token_id")
+        let pad_id = metadata
+            .get("tokenizer.ggml.padding_token_id")
             .and_then(|v| v.as_u32())
             .unwrap_or(0);
 
         tracing::info!(
             "Tokenizer loaded: vocab_size={}, bos={}, eos={}",
-            vocab.len(), bos_id, eos_id
+            vocab.len(),
+            bos_id,
+            eos_id
         );
 
         Ok(Self {
@@ -83,7 +92,8 @@ impl BpeTokenizer {
     /// Create a simple fallback tokenizer (for testing without a model).
     pub fn fallback() -> Self {
         let vocab: Vec<String> = vec!["<pad>".into(), "<bos>".into(), "<eos>".into(), " ".into()];
-        let token_to_id: HashMap<String, u32> = vocab.iter()
+        let token_to_id: HashMap<String, u32> = vocab
+            .iter()
             .enumerate()
             .map(|(i, t)| (t.clone(), i as u32))
             .collect();
@@ -134,7 +144,11 @@ impl BpeTokenizer {
             let mut best_id = 0u32;
 
             for i in 0..tokens.len() - 1 {
-                let merged = format!("{}{}", self.decode_token(tokens[i]), self.decode_token(tokens[i + 1]));
+                let merged = format!(
+                    "{}{}",
+                    self.decode_token(tokens[i]),
+                    self.decode_token(tokens[i + 1])
+                );
                 if let Some(&id) = self.token_to_id.get(&merged) {
                     let score = if (id as usize) < self.scores.len() {
                         self.scores[id as usize]
@@ -163,14 +177,16 @@ impl BpeTokenizer {
 
     /// Decode a single token ID to string.
     pub fn decode_token(&self, id: u32) -> &str {
-        self.vocab.get(id as usize)
+        self.vocab
+            .get(id as usize)
             .map(|s| s.as_str())
             .unwrap_or("<unk>")
     }
 
     /// Decode a sequence of token IDs to text.
     pub fn decode(&self, tokens: &[u32]) -> String {
-        tokens.iter()
+        tokens
+            .iter()
             .map(|&id| self.decode_token(id))
             .collect::<Vec<&str>>()
             .join("")

@@ -1,8 +1,8 @@
 //! Zalo messaging — send/receive text, images, stickers, files.
 //! Based on Zalo Web HTTP API endpoints.
 
-use serde::{Deserialize, Serialize};
 use bizclaw_core::error::{BizClawError, Result};
+use serde::{Deserialize, Serialize};
 
 /// Message types supported by Zalo.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +75,8 @@ impl ZaloMessaging {
             "clientId": generate_client_id(),
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&endpoint)
             .header("cookie", cookie)
             .form(&params)
@@ -83,7 +84,9 @@ impl ZaloMessaging {
             .await
             .map_err(|e| BizClawError::Channel(format!("Send message failed: {e}")))?;
 
-        let body: serde_json::Value = response.json().await
+        let body: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid send response: {e}")))?;
 
         let error_code = body["error_code"].as_i64().unwrap_or(-1);
@@ -119,7 +122,7 @@ impl ZaloMessaging {
         });
 
         self.client
-            .post(&format!("{}/message/reaction", self.base_url))
+            .post(format!("{}/message/reaction", self.base_url))
             .header("cookie", cookie)
             .form(&params)
             .send()
@@ -130,19 +133,14 @@ impl ZaloMessaging {
     }
 
     /// Undo (recall) a message.
-    pub async fn undo_message(
-        &self,
-        msg_id: &str,
-        thread_id: &str,
-        cookie: &str,
-    ) -> Result<()> {
+    pub async fn undo_message(&self, msg_id: &str, thread_id: &str, cookie: &str) -> Result<()> {
         let params = serde_json::json!({
             "msgId": msg_id,
             "toid": thread_id,
         });
 
         self.client
-            .post(&format!("{}/message/undo", self.base_url))
+            .post(format!("{}/message/undo", self.base_url))
             .header("cookie", cookie)
             .form(&params)
             .send()
@@ -154,7 +152,9 @@ impl ZaloMessaging {
 }
 
 impl Default for ZaloMessaging {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Generate a client-side message ID.
