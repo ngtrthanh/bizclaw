@@ -50,6 +50,7 @@ rsa = "0.9"
 sha2 = "0.10"
 hmac = "0.12"
 base64 = "0.22"
+openssl = { version = "0.10", features = ["vendored"] }
 # Database
 rusqlite = { version = "0.32", features = ["bundled"] }
 # Memory mapping
