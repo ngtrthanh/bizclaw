@@ -13,6 +13,8 @@ use crate::notify::{NotifyPriority, NotifyRouter};
 use crate::store::TaskStore;
 use crate::tasks::{Task, TaskAction, TaskStatus, TaskType};
 
+pub type TriggerCallback = dyn Fn(&Task) -> String + Send + Sync;
+
 /// The scheduler engine — manages tasks and triggers them.
 pub struct SchedulerEngine {
     tasks: Vec<Task>,
@@ -20,7 +22,7 @@ pub struct SchedulerEngine {
     pub router: NotifyRouter,
     /// Callback: triggered when a task fires. Returns the notification body.
     /// In practice, this sends a prompt to the Agent or fires a webhook.
-    on_trigger: Option<Arc<dyn Fn(&Task) -> String + Send + Sync>>,
+    on_trigger: Option<Arc<TriggerCallback>>,
 }
 
 impl SchedulerEngine {

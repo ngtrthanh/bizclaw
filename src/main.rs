@@ -757,10 +757,12 @@ async fn run_init_wizard() -> Result<()> {
     let enable_gateway = !input.trim().eq_ignore_ascii_case("n");
 
     // Build config
-    let mut config = bizclaw_core::BizClawConfig::default();
-    config.default_provider = provider.into();
-    config.default_model = default_model.into();
-    config.api_key = api_key;
+    let mut config = bizclaw_core::BizClawConfig {
+        default_provider: provider.into(),
+        default_model: default_model.into(),
+        api_key,
+        ..Default::default()
+    };
     config.identity.name = bot_name;
 
     // Save

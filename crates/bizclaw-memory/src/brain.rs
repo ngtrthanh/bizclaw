@@ -40,7 +40,7 @@ impl BrainWorkspace {
     }
 
     /// Create workspace with default BizClaw home dir.
-    pub fn default() -> Self {
+    pub fn with_default_home() -> Self {
         Self::new(bizclaw_core::config::BizClawConfig::home_dir())
     }
 
@@ -144,7 +144,7 @@ impl DailyLogManager {
         Self { memory_dir }
     }
 
-    pub fn default() -> Self {
+    pub fn with_default_home() -> Self {
         Self::new(bizclaw_core::config::BizClawConfig::home_dir())
     }
 

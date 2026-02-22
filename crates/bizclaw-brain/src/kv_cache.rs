@@ -353,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_fp16_roundtrip() {
-        let values = [0.0f32, 1.0, -1.0, 0.5, 3.14, -0.001, 65504.0];
+        let values = [0.0f32, 1.0, -1.0, 0.5, 3.141592, -0.001, 65504.0];
         for &v in &values {
             let fp16 = fp32_to_fp16(v);
             let back = fp16_to_fp32(fp16);

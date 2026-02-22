@@ -657,7 +657,7 @@ fn find_plan<'a>(store: &'a [Plan], args: &serde_json::Value) -> Result<&'a Plan
         .ok_or_else(|| bizclaw_core::error::BizClawError::Tool(format!("Plan '{}' not found", id)))
 }
 
-fn find_plan_mut<'a>(store: &'a mut Vec<Plan>, args: &serde_json::Value) -> Result<&'a mut Plan> {
+fn find_plan_mut<'a>(store: &'a mut [Plan], args: &serde_json::Value) -> Result<&'a mut Plan> {
     let id = get_plan_id(store, args)?;
     store
         .iter_mut()

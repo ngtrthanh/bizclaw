@@ -3,6 +3,13 @@
 //! Computes attention scores incrementally without materializing
 //! the full QK^T matrix, saving O(seq_len) memory.
 
+pub struct AttentionConfig {
+    pub n_heads: usize,
+    pub n_kv_heads: usize,
+    pub seq_len: usize,
+    pub head_dim: usize,
+}
+
 /// Compute single-head attention output for a single query position.
 /// Uses online softmax (flash attention) — no intermediate score buffer.
 ///
@@ -84,25 +91,22 @@ pub fn multi_head_attention(
     q: &[f32],
     key_cache: &[f32],
     value_cache: &[f32],
-    n_heads: usize,
-    n_kv_heads: usize,
-    seq_len: usize,
-    head_dim: usize,
+    cfg: &AttentionConfig,
 ) {
-    let gqa_ratio = n_heads / n_kv_heads;
+    let gqa_ratio = cfg.n_heads / cfg.n_kv_heads;
 
-    for h in 0..n_heads {
-        let q_offset = h * head_dim;
+    for h in 0..cfg.n_heads {
+        let q_offset = h * cfg.head_dim;
         let kv_head = h / gqa_ratio;
-        let kv_stride = n_kv_heads * head_dim;
+        let kv_stride = cfg.n_kv_heads * cfg.head_dim;
 
         // For GQA: multiple Q heads share the same KV head
-        let k_base = kv_head * head_dim;
-        let v_base = kv_head * head_dim;
+        let k_base = kv_head * cfg.head_dim;
+        let v_base = kv_head * cfg.head_dim;
 
         // Build per-head key/value views (strided)
-        let q_slice = &q[q_offset..q_offset + head_dim];
-        let out_slice = &mut output[q_offset..q_offset + head_dim];
+        let q_slice = &q[q_offset..q_offset + cfg.head_dim];
+        let out_slice = &mut output[q_offset..q_offset + cfg.head_dim];
 
         // Single-head attention with flash attention
         attention_strided(
@@ -110,13 +114,21 @@ pub fn multi_head_attention(
             q_slice,
             key_cache,
             value_cache,
-            seq_len,
-            head_dim,
+            cfg.seq_len,
+            cfg.head_dim,
             kv_stride,
             k_base,
             v_base,
         );
     }
+}
+
+struct AttentionStridedParams {
+    seq_len: usize,
+    head_dim: usize,
+    kv_stride: usize,
+    k_base: usize,
+    v_base: usize,
 }
 
 /// Strided attention — works with interleaved multi-head KV cache layout.
@@ -131,26 +143,34 @@ fn attention_strided(
     k_base: usize,
     v_base: usize,
 ) {
-    if seq_len == 0 {
+    let params = AttentionStridedParams {
+        seq_len,
+        head_dim,
+        kv_stride,
+        k_base,
+        v_base,
+    };
+
+    if params.seq_len == 0 {
         for v in output.iter_mut() {
             *v = 0.0;
         }
         return;
     }
 
-    let scale = 1.0 / (head_dim as f32).sqrt();
+    let scale = 1.0 / (params.head_dim as f32).sqrt();
     let mut running_max = f32::NEG_INFINITY;
     let mut running_sum = 0.0f32;
     for v in output.iter_mut() {
         *v = 0.0;
     }
 
-    for t in 0..seq_len {
-        let k_offset = t * kv_stride + k_base;
-        let v_offset = t * kv_stride + v_base;
+    for t in 0..params.seq_len {
+        let k_offset = t * params.kv_stride + params.k_base;
+        let v_offset = t * params.kv_stride + params.v_base;
 
         let mut dot = 0.0f32;
-        for i in 0..head_dim {
+        for i in 0..params.head_dim {
             dot += q[i] * key_cache[k_offset + i];
         }
         let score = dot * scale;
@@ -161,7 +181,7 @@ fn attention_strided(
 
         running_sum = running_sum * scale_old + exp_score;
 
-        for i in 0..head_dim {
+        for i in 0..params.head_dim {
             output[i] = output[i] * scale_old + exp_score * value_cache[v_offset + i];
         }
 

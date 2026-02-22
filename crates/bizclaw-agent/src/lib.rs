@@ -108,10 +108,10 @@ impl Agent {
         let security = bizclaw_security::DefaultSecurityPolicy::new(config.autonomy.clone());
 
         // 3-Tier Memory: assemble brain context from workspace files
-        let brain_ws = bizclaw_memory::brain::BrainWorkspace::default();
+        let brain_ws = bizclaw_memory::brain::BrainWorkspace::with_default_home();
         let _ = brain_ws.initialize(); // seed default files if missing
         let brain_context = brain_ws.assemble_brain();
-        let daily_log = bizclaw_memory::brain::DailyLogManager::default();
+        let daily_log = bizclaw_memory::brain::DailyLogManager::with_default_home();
 
         // Build system prompt: user config + brain workspace
         let system_prompt = if brain_context.trim().is_empty() {
@@ -185,10 +185,10 @@ impl Agent {
         }
 
         // 3-Tier Memory: assemble brain context from workspace files
-        let brain_ws = bizclaw_memory::brain::BrainWorkspace::default();
+        let brain_ws = bizclaw_memory::brain::BrainWorkspace::with_default_home();
         let _ = brain_ws.initialize();
         let brain_context = brain_ws.assemble_brain();
-        let daily_log = bizclaw_memory::brain::DailyLogManager::default();
+        let daily_log = bizclaw_memory::brain::DailyLogManager::with_default_home();
 
         let system_prompt = if brain_context.trim().is_empty() {
             config.identity.system_prompt.clone()
