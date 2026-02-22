@@ -1,0 +1,30 @@
+{
+  "name": "BizClaw Dev",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshCompletions": true
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "rust-analyzer.check.command": "clippy",
+        "rust-analyzer.check.extraArgs": ["--workspace", "--", "-D", "warnings"],
+        "editor.formatOnSave": true,
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        }
+      },
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "vadimcn.vscode-lldb",
+        "serayuzgur.crates"
+      ]
+    }
+  },
+  "postCreateCommand": "cargo build --workspace",
+  "remoteUser": "vscode"
+}

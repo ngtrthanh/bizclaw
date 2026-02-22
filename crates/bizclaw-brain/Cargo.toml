@@ -5,6 +5,11 @@ edition.workspace = true
 license.workspace = true
 description = "Local LLM inference engine - PicoLM rewrite in Rust"
 
+[features]
+default = ["rust-native-backend"]
+rust-native-backend = []
+llama-backend = ["dep:bindgen", "dep:cc"]
+
 [dependencies]
 bizclaw-core.workspace = true
 memmap2.workspace = true
@@ -17,3 +22,7 @@ thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
 rand.workspace = true
+
+[build-dependencies]
+bindgen = { version = "0.71", optional = true }
+cc = { version = "1", optional = true }

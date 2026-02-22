@@ -1,16 +1,27 @@
 //! Encrypted secrets management.
 //!
 //! Provides secure storage and retrieval of API keys, tokens, and
-//! other sensitive configuration values using AES-256-ECB encryption
-//! with a machine-specific key derived from hostname + username.
+//! other sensitive configuration values using AES-256-GCM encryption
+//! (authenticated encryption with nonce) with a machine-specific key
+//! derived from hostname + username.
+//!
+//! Migration: Automatically detects and upgrades legacy AES-256-ECB files.
 
 use aes::Aes256;
-use aes::cipher::{BlockEncrypt, BlockDecrypt, KeyInit, generic_array::GenericArray};
+use aes::cipher::{BlockDecrypt, KeyInit, generic_array::GenericArray};
+use aes_gcm::{Aes256Gcm, Nonce};
+use aes_gcm::aead::Aead;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
 use bizclaw_core::error::{BizClawError, Result};
 use sha2::{Sha256, Digest};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+
+/// GCM nonce size (12 bytes, standard for AES-GCM).
+const GCM_NONCE_SIZE: usize = 12;
+
+/// Magic prefix for GCM-encrypted data (to distinguish from legacy ECB).
+const GCM_MAGIC: &[u8; 4] = b"BCGM";
 
 /// Manages encrypted secrets stored on disk.
 pub struct SecretStore {
@@ -41,12 +52,34 @@ impl SecretStore {
         let content = std::fs::read_to_string(&self.secrets_path)?;
 
         let json_str = if self.encrypt {
-            // Decrypt from base64 → AES-256 → JSON
-            let encrypted = BASE64.decode(content.trim())
+            let raw = BASE64.decode(content.trim())
                 .map_err(|e| BizClawError::Security(format!("Base64 decode failed: {e}")))?;
-            let decrypted = decrypt_aes256(&encrypted, &self.key);
-            String::from_utf8(decrypted)
-                .map_err(|e| BizClawError::Security(format!("Decryption produced invalid UTF-8: {e}")))?
+
+            // Try GCM first (new format), fallback to ECB (legacy migration)
+            match decrypt_aes256_gcm(&raw, &self.key) {
+                Ok(decrypted) => {
+                    String::from_utf8(decrypted)
+                        .map_err(|e| BizClawError::Security(format!("Decryption produced invalid UTF-8: {e}")))?
+                }
+                Err(_) => {
+                    // Legacy ECB migration path
+                    tracing::warn!("Migrating secrets from legacy AES-256-ECB to AES-256-GCM");
+                    let decrypted = decrypt_aes256_ecb(&raw, &self.key);
+                    let json = String::from_utf8(decrypted)
+                        .map_err(|e| BizClawError::Security(format!("Legacy decryption produced invalid UTF-8: {e}")))?;
+
+                    // Parse to validate, then re-save will use GCM
+                    self.secrets = serde_json::from_str(&json)
+                        .map_err(|e| BizClawError::Security(format!("Failed to parse secrets: {e}")))?;
+
+                    // Re-encrypt with GCM immediately
+                    tracing::info!("Re-encrypting secrets with AES-256-GCM");
+                    self.save()?;
+
+                    tracing::info!("Loaded {} secrets (migrated to GCM)", self.secrets.len());
+                    return Ok(());
+                }
+            }
         } else {
             content
         };
@@ -54,7 +87,7 @@ impl SecretStore {
         self.secrets = serde_json::from_str(&json_str)
             .map_err(|e| BizClawError::Security(format!("Failed to parse secrets: {e}")))?;
 
-        tracing::debug!("Loaded {} secrets from {}", self.secrets.len(), self.secrets_path.display());
+        tracing::info!("Loaded {} secrets from {}", self.secrets.len(), self.secrets_path.display());
         Ok(())
     }
 
@@ -67,8 +100,7 @@ impl SecretStore {
         let json = serde_json::to_string_pretty(&self.secrets)?;
 
         let content = if self.encrypt {
-            // Encrypt: JSON → AES-256 → base64
-            let encrypted = encrypt_aes256(json.as_bytes(), &self.key);
+            let encrypted = encrypt_aes256_gcm(json.as_bytes(), &self.key)?;
             BASE64.encode(&encrypted)
         } else {
             json
@@ -143,28 +175,53 @@ fn derive_machine_key() -> [u8; 32] {
     key
 }
 
-/// AES-256-ECB encrypt with PKCS7 padding.
-fn encrypt_aes256(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
-    let cipher = Aes256::new(GenericArray::from_slice(key));
-    let block_size = 16;
+// ── AES-256-GCM (primary, authenticated) ──────────────────────
 
-    // PKCS7 padding
-    let padding_len = block_size - (data.len() % block_size);
-    let mut padded = data.to_vec();
-    padded.extend(std::iter::repeat(padding_len as u8).take(padding_len));
+/// AES-256-GCM encrypt: BCGM magic + 12-byte nonce + ciphertext.
+fn encrypt_aes256_gcm(data: &[u8], key: &[u8; 32]) -> Result<Vec<u8>> {
+    let cipher = Aes256Gcm::new(GenericArray::from_slice(key));
 
-    let mut encrypted = Vec::with_capacity(padded.len());
-    for chunk in padded.chunks(block_size) {
-        let mut block = GenericArray::clone_from_slice(chunk);
-        cipher.encrypt_block(&mut block);
-        encrypted.extend_from_slice(&block);
-    }
+    // Generate random 12-byte nonce
+    let mut nonce_bytes = [0u8; GCM_NONCE_SIZE];
+    use rand::RngCore;
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+    let nonce = Nonce::from_slice(&nonce_bytes);
 
-    encrypted
+    let ciphertext = cipher.encrypt(nonce, data)
+        .map_err(|e| BizClawError::Security(format!("AES-256-GCM encryption failed: {e}")))?;
+
+    // Format: BCGM (4) + nonce (12) + ciphertext
+    let mut result = Vec::with_capacity(4 + GCM_NONCE_SIZE + ciphertext.len());
+    result.extend_from_slice(GCM_MAGIC);
+    result.extend_from_slice(&nonce_bytes);
+    result.extend_from_slice(&ciphertext);
+    Ok(result)
 }
 
-/// AES-256-ECB decrypt with PKCS7 unpadding.
-fn decrypt_aes256(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
+/// AES-256-GCM decrypt: expects BCGM magic + 12-byte nonce + ciphertext.
+fn decrypt_aes256_gcm(data: &[u8], key: &[u8; 32]) -> std::result::Result<Vec<u8>, String> {
+    if data.len() < 4 + GCM_NONCE_SIZE {
+        return Err("Data too short for GCM".into());
+    }
+
+    // Check magic
+    if &data[0..4] != GCM_MAGIC {
+        return Err("Not a GCM-encrypted payload (missing BCGM magic)".into());
+    }
+
+    let nonce = Nonce::from_slice(&data[4..4 + GCM_NONCE_SIZE]);
+    let ciphertext = &data[4 + GCM_NONCE_SIZE..];
+
+    let cipher = Aes256Gcm::new(GenericArray::from_slice(key));
+    cipher.decrypt(nonce, ciphertext)
+        .map_err(|e| format!("AES-256-GCM decryption failed: {e}"))
+}
+
+// ── AES-256-ECB (legacy, kept for migration only) ─────────────
+
+/// Legacy AES-256-ECB decrypt with PKCS7 unpadding.
+/// Only used for migrating old secrets.enc files.
+fn decrypt_aes256_ecb(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
     let cipher = Aes256::new(GenericArray::from_slice(key));
     let block_size = 16;
 
@@ -198,12 +255,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_encrypt_decrypt_roundtrip() {
+    fn test_gcm_encrypt_decrypt_roundtrip() {
         let key = derive_machine_key();
         let data = b"Hello, BizClaw secrets!";
-        let encrypted = encrypt_aes256(data, &key);
-        let decrypted = decrypt_aes256(&encrypted, &key);
+        let encrypted = encrypt_aes256_gcm(data, &key).unwrap();
+        let decrypted = decrypt_aes256_gcm(&encrypted, &key).unwrap();
         assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn test_gcm_different_nonces() {
+        let key = derive_machine_key();
+        let data = b"same plaintext";
+        let enc1 = encrypt_aes256_gcm(data, &key).unwrap();
+        let enc2 = encrypt_aes256_gcm(data, &key).unwrap();
+        // Two encryptions of the same data should produce different ciphertexts
+        assert_ne!(enc1, enc2, "GCM should produce different ciphertexts due to random nonces");
+        // But both should decrypt to the same plaintext
+        assert_eq!(decrypt_aes256_gcm(&enc1, &key).unwrap(), data);
+        assert_eq!(decrypt_aes256_gcm(&enc2, &key).unwrap(), data);
+    }
+
+    #[test]
+    fn test_gcm_tamper_detection() {
+        let key = derive_machine_key();
+        let data = b"sensitive data";
+        let mut encrypted = encrypt_aes256_gcm(data, &key).unwrap();
+        // Tamper with the last byte of ciphertext
+        if let Some(last) = encrypted.last_mut() {
+            *last ^= 0xFF;
+        }
+        // Should fail to decrypt (authentication failure)
+        assert!(decrypt_aes256_gcm(&encrypted, &key).is_err());
+    }
+
+    #[test]
+    fn test_legacy_ecb_detection() {
+        // Data without BCGM magic should fail GCM and trigger ECB path
+        let fake_ecb_data = vec![0u8; 32]; // not starting with BCGM
+        assert!(decrypt_aes256_gcm(&fake_ecb_data, &[0u8; 32]).is_err());
     }
 
     #[test]

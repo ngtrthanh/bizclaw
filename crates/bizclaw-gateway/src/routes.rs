@@ -349,6 +349,7 @@ mod tests {
             config_path: std::path::PathBuf::from("/tmp/test_config.toml"),
             start_time: std::time::Instant::now(),
             pairing_code: None,
+            agent: Arc::new(tokio::sync::Mutex::new(None)),
         }))
     }
 

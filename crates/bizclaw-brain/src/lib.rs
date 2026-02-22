@@ -68,6 +68,8 @@ struct LoadedModel {
     kv_cache: kv_cache::KvCache,
     /// Sampler
     sampler: sampler::Sampler,
+    /// JSON grammar (initialized from vocab at load time)
+    json_grammar: grammar::JsonGrammar,
     /// Model file path
     path: PathBuf,
 }
@@ -98,6 +100,28 @@ impl BrainEngine {
             params.dim, params.n_layers, params.n_heads, params.n_kv_heads, params.vocab_size
         );
 
+        // ── Strict GGUF tensor validation ──
+        let unsupported = quant::validate_model_quants(&mmap_model.gguf.tensors);
+        if !unsupported.is_empty() {
+            let details: Vec<String> = unsupported.iter()
+                .take(5)
+                .map(|(name, ty)| format!("  {name}: {ty:?}"))
+                .collect();
+            let more = if unsupported.len() > 5 {
+                format!("  ... and {} more", unsupported.len() - 5)
+            } else {
+                String::new()
+            };
+            return Err(BizClawError::Brain(format!(
+                "Model contains {} tensor(s) with unsupported quantization types:\n{}{}\n\
+                 Supported types: F32, F16, Q4_0, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K",
+                unsupported.len(),
+                details.join("\n"),
+                more,
+            )));
+        }
+        tracing::info!("✅ All {} tensors use supported quantization types", mmap_model.gguf.tensors.len());
+
         // Build weight index
         let weights = forward::TransformerWeights::from_gguf(&mmap_model, &params);
         tracing::info!(
@@ -115,6 +139,13 @@ impl BrainEngine {
             });
 
         tracing::info!("Tokenizer loaded: vocab_size={}", tokenizer.vocab_size());
+
+        // Pre-compute JSON grammar token properties from vocabulary
+        let vocab_strings: Vec<String> = (0..tokenizer.vocab_size())
+            .map(|id| tokenizer.decode(&[id as u32]))
+            .collect();
+        let json_grammar = grammar::JsonGrammar::new(&vocab_strings);
+        tracing::info!("JSON grammar: analyzed {} vocab tokens", vocab_strings.len());
 
         // Create KV cache
         let kv_cache = kv_cache::KvCache::new(
@@ -141,6 +172,7 @@ impl BrainEngine {
             tokenizer,
             kv_cache,
             sampler,
+            json_grammar,
             path: model_path.to_path_buf(),
         });
 
@@ -192,11 +224,25 @@ impl BrainEngine {
 
             // Only sample after processing all input tokens
             if step >= total_len - 1 {
+                // Apply JSON grammar mask if json_mode is enabled
+                if self.config.json_mode {
+                    model.json_grammar.apply_mask(&mut logits);
+                }
+
                 let all_tokens: Vec<u32> = input_tokens.iter()
                     .chain(output_tokens.iter())
                     .copied()
                     .collect();
                 let next_token = model.sampler.sample(&mut logits, &all_tokens);
+
+                // Update grammar state if in json_mode
+                if self.config.json_mode {
+                    model.json_grammar.accept_token(next_token as usize);
+                    if model.json_grammar.is_complete() {
+                        output_tokens.push(next_token);
+                        break;
+                    }
+                }
 
                 // Check for EOS
                 if next_token == model.tokenizer.eos_id {
@@ -214,9 +260,31 @@ impl BrainEngine {
     }
 
     /// Generate with JSON grammar constraint.
+    ///
+    /// Enables `json_mode` for this call, applies grammar masking during
+    /// generation, then resets the grammar and mode.
     pub fn generate_json(&mut self, prompt: &str) -> Result<serde_json::Value> {
-        let text = self.generate(prompt, self.config.max_tokens)?;
-        Ok(serde_json::json!({"response": text}))
+        // Enable json_mode for this generation
+        let was_json = self.config.json_mode;
+        self.config.json_mode = true;
+
+        // Reset grammar state for fresh generation
+        if let Some(model) = self.model.as_mut() {
+            model.json_grammar.reset();
+        }
+
+        let text = self.generate(prompt, self.config.max_tokens);
+
+        // Restore previous json_mode
+        self.config.json_mode = was_json;
+
+        let text = text?;
+
+        // Try to parse as actual JSON, fallback to wrapped response
+        match serde_json::from_str::<serde_json::Value>(&text) {
+            Ok(json) => Ok(json),
+            Err(_) => Ok(serde_json::json!({"response": text})),
+        }
     }
 
     /// Get the brain config.

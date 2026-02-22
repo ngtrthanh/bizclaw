@@ -24,7 +24,7 @@ Dự án này được thiết kế theo chuẩn **Local-First & Self-Hosted**. 
 
 ### 🎯 Tính năng chính
 
-- **🧠 Brain Engine** — LLaMA inference: GGUF, mmap, quantization, **Flash Attention**, **FP16 KV Cache** (50% memory↓), **KV Cache Persistence**, **Grammar-Constrained JSON**, **Pre-computed RoPE**
+- **🧠 Brain Engine** — LLaMA inference: GGUF, mmap, quantization (Q4_0/Q8_0/Q2_K–Q6_K), **Online-Softmax Attention**, **FP16 KV Cache** (50% memory↓), **KV Cache Persistence**, **Grammar-Constrained JSON** (`json_mode`), **Pre-computed RoPE**
 - **🔌 8 Providers** — OpenAI, Anthropic, Ollama, llama.cpp, Brain, **Gemini**, **DeepSeek**, **Groq**, OpenRouter
 - **💬 Đa kênh** — CLI, Zalo (Personal + OA), Telegram (polling), Discord (Gateway WS), Webhook
 - **🌐 Web Dashboard** — Giao diện quản lý tại `localhost:3000` (embedded SPA)
@@ -34,7 +34,8 @@ Dự án này được thiết kế theo chuẩn **Local-First & Self-Hosted**. 
 - **🔒 Bảo mật** — Command allowlist, JWT + bcrypt, AES-256, HMAC-SHA256
 - **💾 Bộ nhớ** — SQLite, vector search (cosine), chế độ NoOp
 - **⚡ SIMD** — ARM NEON, x86 SSE2/AVX2 auto-dispatch
-- **📦 Module hoá** — 12 crates, 66 tests, 100% implemented
+- **📦 Module hoá** — 11 crates, 66 tests, 100% implemented
+- **🔒 AES-256-GCM** — Mã hoá bí mật có xác thực (authenticated encryption)
 
 ### 🏗️ Kiến trúc
 
@@ -164,7 +165,7 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 | **mmap Loader** | Tải model zero-copy (quan trọng cho Pi 512MB) |
 | **BPE Tokenizer** | Mã hoá byte-level với merge lặp |
 | **Tensor Ops** | RMSNorm, MatMul, Softmax, SiLU, ElementWise |
-| **Quantization** | Dequant Q4_0, Q8_0, F16, F32 |
+| **Quantization** | Q4_0, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K, F16, F32 |
 | **Attention** | Scaled dot-product, GQA (Grouped Query Attention) |
 | **KV Cache** | Cache key-value theo layer cho generation |
 | **RoPE** | Rotary Position Embeddings multi-head |
@@ -204,12 +205,13 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 |--------|---------|
 | **Ngôn ngữ** | 100% Rust |
 | **Số crate** | 11 (10 library + 1 binary) |
-| **Dòng code** | ~9,500 |
-| **Test** | 45 passing (11/11 crates) |
+| **Dòng code** | ~11,200 |
+| **Test** | 66 passing (11/11 crates) |
 | **Build** | 0 errors |
 | **Stubs** | 0 (100% implemented) |
 | **Web Dashboard** | Embedded SPA (dark theme) |
-| **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes, sha2 |
+| **Encryption** | AES-256-GCM (authenticated) |
+| **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes-gcm, sha2 |
 
 ---
 
@@ -217,16 +219,16 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 
 ### 🎯 Features
 
-- **🧠 Local Brain Engine** — Run LLaMA models locally via GGUF with mmap, quantization, full forward pass, KV Cache, SIMD
+- **🧠 Local Brain Engine** — Run LLaMA models locally via GGUF with mmap, quantization (Q4_0/Q8_0/Q2_K–Q6_K), full forward pass, KV Cache, SIMD
 - **🔌 Multi-Provider** — OpenAI, Anthropic Claude, Ollama, llama.cpp, OpenRouter
 - **💬 Multi-Channel** — CLI, Zalo (Personal + OA), Telegram (polling), Discord (Gateway WS), Webhook (HMAC)
 - **🌐 Web Dashboard** — Built-in management UI at `localhost:3000` (embedded in binary)
 - **⚡ Init Wizard** — One-command setup: `bizclaw init`
 - **🛠️ Tool Calling** — Shell execution, file operations, dynamic registry with arg validation
-- **🔒 Security** — Command allowlists, path restrictions, sandbox, AES-256, HMAC-SHA256
+- **🔒 Security** — Command allowlists, path restrictions, sandbox, AES-256-GCM, HMAC-SHA256
 - **💾 Memory** — SQLite, vector search (cosine similarity), no-op mode
 - **⚡ SIMD** — ARM NEON (Pi/Apple Silicon), x86 SSE2/AVX2 auto-dispatch
-- **📦 Modular** — 11 crates, 45 tests, 100% implemented, swap via traits
+- **📦 Modular** — 11 crates, 66 tests, 100% implemented, swap via traits
 
 ### 🚀 Quick Start
 
@@ -311,7 +313,7 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 | **mmap Loader** | Zero-copy model loading (critical for Pi 512MB) |
 | **BPE Tokenizer** | Byte-level encoding with iterative merges |
 | **Tensor Ops** | RMSNorm, MatMul, Softmax, SiLU, ElementWise |
-| **Quantization** | Q4_0, Q8_0, F16, F32 dequantization kernels |
+| **Quantization** | Q4_0, Q8_0, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K, F16, F32 |
 | **Attention** | Scaled dot-product with GQA (Grouped Query Attention) |
 | **KV Cache** | Per-layer key-value cache for auto-regressive generation |
 | **RoPE** | Multi-head Rotary Position Embeddings |
@@ -337,7 +339,7 @@ allowed_commands = ["ls", "cat", "echo", "pwd", "find", "grep"]
 | **Path Restrictions** | Forbidden paths (e.g., `~/.ssh`) are rejected |
 | **Workspace Only** | Optionally restrict to current working directory |
 | **Sandbox** | Timeout, output truncation, restricted env |
-| **AES-256 Secrets** | Machine-specific key encryption (SHA-256 hostname+user) |
+| **AES-256-GCM Secrets** | Machine-specific key, authenticated encryption with nonce |
 
 ### 🗺️ Roadmap
 
@@ -437,15 +439,69 @@ cargo test -p bizclaw-runtime
 | Metric | Value |
 |--------|-------|
 | **Language** | 100% Rust |
-| **Crates** | 12 (11 library + 1 binary) |
+| **Crates** | 11 (10 library + 1 binary) |
 | **Lines of Code** | ~11,200 |
-| **Tests** | 66 passing (12/12 crates) |
+| **Tests** | 66 passing (11/11 crates) |
 | **Providers** | 8 (OpenAI, Anthropic, Ollama, llama.cpp, Brain, Gemini, DeepSeek, Groq) |
 | **Build** | 0 errors |
 | **Stubs** | 0 (100% implemented) |
 | **Web Dashboard** | Embedded SPA (dark theme) |
 | **Multi-Tenant** | Admin Platform, JWT Auth, Tenant Manager |
-| **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes, sha2, bcrypt, jsonwebtoken |
+| **Encryption** | AES-256-GCM (authenticated) |
+| **Dependencies** | tokio, axum, reqwest, serde, rusqlite, rayon, memmap2, half, aes-gcm, sha2, bcrypt, jsonwebtoken |
+
+---
+
+## 📥 Installation / Distribution
+
+### Option A: Install Script (Linux / macOS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/BizClaw/bizclaw/main/install.sh | bash
+```
+
+Supported platforms: `linux/amd64`, `linux/arm64`, `linux/armv7`, `linux/armv6`, `darwin/amd64`, `darwin/arm64`.
+
+### Option B: Docker Compose
+
+```bash
+# Place your config at ~/.bizclaw/config.toml
+# Place GGUF models at ~/.bizclaw/models/
+docker compose up -d
+
+# Verify
+curl http://localhost:3000/health
+```
+
+### Option C: Download Binary
+
+Download the latest release binary for your platform from [GitHub Releases](https://github.com/BizClaw/bizclaw/releases):
+
+| Platform | Binary |
+|----------|--------|
+| Linux x86_64 | `bizclaw-linux-amd64` |
+| Linux ARM64 | `bizclaw-linux-arm64` |
+| Linux ARMv7 | `bizclaw-linux-armv7` |
+| Linux ARMv6 | `bizclaw-linux-armv6` |
+| macOS Intel | `bizclaw-darwin-amd64` |
+| macOS Apple Silicon | `bizclaw-darwin-arm64` |
+| Windows x86_64 | `bizclaw-windows-amd64.exe` |
+
+### 🛠 Developer Setup
+
+```bash
+# Clone and build
+git clone https://github.com/BizClaw/bizclaw.git
+cd bizclaw
+make build        # or: cargo build --workspace
+make test         # or: cargo test --workspace
+make clippy       # or: cargo clippy --workspace -- -D warnings
+make check        # all checks: clippy + test + fmt
+make release      # optimized release binary
+make docker       # local Docker image
+```
+
+Devcontainer support: open in VS Code with `.devcontainer/devcontainer.json`.
 
 ---
 
