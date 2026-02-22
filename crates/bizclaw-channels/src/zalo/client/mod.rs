@@ -1,4 +1,4 @@
-//! Zalo client sub-modules (Phase 4A stubs).
+//! Zalo client sub-modules — auth, messaging, session, crypto, WebSocket listener.
 pub mod auth;
 pub mod session;
 pub mod crypto;

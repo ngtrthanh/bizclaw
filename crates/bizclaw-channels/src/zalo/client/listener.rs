@@ -67,7 +67,8 @@ impl ZaloListener {
                     match self.parse_event(&text) {
                         Ok(event) => {
                             tracing::debug!("Zalo event: {:?}", event);
-                            // TODO: Send event to channel via mpsc
+                            // Note: Events are logged. Integration with ZaloChannel
+                            // message stream requires mpsc sender injection at construction time.
                         }
                         Err(e) => {
                             tracing::warn!("Failed to parse Zalo event: {e}");

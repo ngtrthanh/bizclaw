@@ -231,7 +231,7 @@ async fn chat_ollama(
 
         let mut full_content = String::new();
         let mut chunk_idx: u64 = 0;
-        let mut stream_body = resp;
+        let stream_body = resp;
 
         // Read streaming NDJSON response
         let bytes = stream_body.bytes().await.map_err(|e| e.to_string())?;
@@ -303,12 +303,11 @@ async fn chat_openai(
     request_id: &str,
     messages: &[serde_json::Value],
     model: &str,
-    _stream: bool,
+    stream: bool,
 ) -> Result<String, String> {
     let api_key = {
         let config = state.full_config.lock().unwrap();
-        let key = config.api_key.clone();
-        key
+        config.api_key.clone()
     };
     let api_key = if api_key.is_empty() {
         std::env::var("OPENAI_API_KEY")
@@ -318,36 +317,103 @@ async fn chat_openai(
     };
 
     let client = reqwest::Client::new();
-    let body = serde_json::json!({
-        "model": model,
-        "messages": messages,
-    });
 
-    let resp = client
-        .post("https://api.openai.com/v1/chat/completions")
-        .header("Authorization", format!("Bearer {api_key}"))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("OpenAI request failed: {e}"))?;
+    if stream {
+        // Streaming SSE mode
+        let _ = send_json(socket, &serde_json::json!({
+            "type": "chat_start",
+            "request_id": request_id,
+            "provider": "openai",
+            "model": model,
+        })).await;
 
-    if !resp.status().is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("OpenAI error: {text}"));
+        let body = serde_json::json!({
+            "model": model,
+            "messages": messages,
+            "stream": true,
+        });
+
+        let resp = client
+            .post("https://api.openai.com/v1/chat/completions")
+            .header("Authorization", format!("Bearer {api_key}"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("OpenAI request failed: {e}"))?;
+
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("OpenAI error: {text}"));
+        }
+
+        // Read SSE stream
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+        let text = String::from_utf8_lossy(&bytes);
+        let mut full_content = String::new();
+        let mut chunk_idx: u64 = 0;
+
+        for line in text.lines() {
+            let line = line.trim();
+            if line.is_empty() || line == "data: [DONE]" { continue; }
+            if let Some(data) = line.strip_prefix("data: ") {
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                    if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
+                        if !content.is_empty() {
+                            full_content.push_str(content);
+                            let _ = send_json(socket, &serde_json::json!({
+                                "type": "chat_chunk",
+                                "request_id": request_id,
+                                "content": content,
+                                "index": chunk_idx,
+                            })).await;
+                            chunk_idx += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = send_json(socket, &serde_json::json!({
+            "type": "chat_done",
+            "request_id": request_id,
+            "total_tokens": chunk_idx,
+            "full_content": &full_content,
+        })).await;
+
+        Ok(full_content)
+    } else {
+        // Non-streaming mode
+        let body = serde_json::json!({
+            "model": model,
+            "messages": messages,
+        });
+
+        let resp = client
+            .post("https://api.openai.com/v1/chat/completions")
+            .header("Authorization", format!("Bearer {api_key}"))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("OpenAI request failed: {e}"))?;
+
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("OpenAI error: {text}"));
+        }
+
+        let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        let content = json["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
+
+        let _ = send_json(socket, &serde_json::json!({
+            "type": "chat_response",
+            "request_id": request_id,
+            "content": &content,
+            "provider": "openai",
+            "model": model,
+        })).await;
+
+        Ok(content)
     }
-
-    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    let content = json["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
-
-    let _ = send_json(socket, &serde_json::json!({
-        "type": "chat_response",
-        "request_id": request_id,
-        "content": &content,
-        "provider": "openai",
-        "model": model,
-    })).await;
-
-    Ok(content)
 }
 
 // ═══════════════════════════════════════════════════════════

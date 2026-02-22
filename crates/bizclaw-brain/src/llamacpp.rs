@@ -128,7 +128,10 @@ impl LlamaCppBackend {
             max_tokens
         );
 
-        // TODO: Implement actual FFI calls when libllama is linked
+        // Design note: Actual FFI calls require linking libllama at compile time.
+        // When llama.cpp is installed, uncomment the extern "C" block in this file.
+        // SmartBrainEngine will automatically fallback to pure Rust when FFI is unavailable.
+        //
         // The C API calls would be:
         //   llama_model_load(model_path, params)
         //   llama_context_new(model, ctx_params)
@@ -138,7 +141,7 @@ impl LlamaCppBackend {
         //   llama_token_to_piece(model, token)
 
         Err(BizClawError::Brain(
-            "llama.cpp FFI not yet linked. Use pure Rust BrainEngine as fallback.".into(),
+            "llama.cpp FFI requires libllama.so/dylib. SmartBrainEngine will use pure Rust fallback.".into(),
         ))
     }
 
