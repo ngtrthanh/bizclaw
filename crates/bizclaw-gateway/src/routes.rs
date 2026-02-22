@@ -235,9 +235,9 @@ pub async fn update_config(
     if let Some(mcp) = req.get("mcp_servers")
         && let Ok(servers) =
             serde_json::from_value::<Vec<bizclaw_core::config::McpServerEntry>>(mcp.clone())
-        {
-            cfg.mcp_servers = servers;
-        }
+    {
+        cfg.mcp_servers = servers;
+    }
 
     // Save to disk
     let content = toml::to_string_pretty(&*cfg).unwrap_or_default();
@@ -551,31 +551,32 @@ pub async fn brain_scan_models(State(state): State<Arc<AppState>>) -> Json<serde
             for entry in entries.flatten() {
                 let path = entry.path();
                 if let Some(ext) = path.extension()
-                    && (ext == "gguf" || ext == "bin") {
-                        let abs = path.canonicalize().unwrap_or(path.clone());
-                        if seen_paths.contains(&abs) {
-                            continue;
-                        }
-                        seen_paths.insert(abs.clone());
-
-                        let size_bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                        let size_str = if size_bytes > 1_000_000_000 {
-                            format!("{:.1} GB", size_bytes as f64 / 1e9)
-                        } else {
-                            format!("{} MB", size_bytes / 1_000_000)
-                        };
-                        let name = path
-                            .file_name()
-                            .map(|n| n.to_string_lossy().to_string())
-                            .unwrap_or_default();
-
-                        found_models.push(serde_json::json!({
-                            "name": name,
-                            "path": abs.display().to_string(),
-                            "size": size_str,
-                            "size_bytes": size_bytes,
-                        }));
+                    && (ext == "gguf" || ext == "bin")
+                {
+                    let abs = path.canonicalize().unwrap_or(path.clone());
+                    if seen_paths.contains(&abs) {
+                        continue;
                     }
+                    seen_paths.insert(abs.clone());
+
+                    let size_bytes = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    let size_str = if size_bytes > 1_000_000_000 {
+                        format!("{:.1} GB", size_bytes as f64 / 1e9)
+                    } else {
+                        format!("{} MB", size_bytes / 1_000_000)
+                    };
+                    let name = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    found_models.push(serde_json::json!({
+                        "name": name,
+                        "path": abs.display().to_string(),
+                        "size": size_str,
+                        "size_bytes": size_bytes,
+                    }));
+                }
             }
         }
     }

@@ -34,9 +34,10 @@ async fn require_auth(
         .unwrap_or("");
 
     if let Some(token) = auth_header.strip_prefix("Bearer ")
-        && crate::auth::validate_token(token, &state.jwt_secret).is_ok() {
-            return next.run(req).await;
-        }
+        && crate::auth::validate_token(token, &state.jwt_secret).is_ok()
+    {
+        return next.run(req).await;
+    }
 
     axum::response::Response::builder()
         .status(axum::http::StatusCode::UNAUTHORIZED)

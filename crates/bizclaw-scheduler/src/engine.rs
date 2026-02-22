@@ -155,9 +155,10 @@ impl SchedulerEngine {
         let now = Utc::now();
         for task in self.tasks.iter_mut() {
             if let TaskType::Cron { expression } = &task.task_type
-                && (task.next_run.is_none() || task.next_run.is_some_and(|nr| nr < now)) {
-                    task.next_run = cron::next_run_from_cron(expression, now);
-                }
+                && (task.next_run.is_none() || task.next_run.is_some_and(|nr| nr < now))
+            {
+                task.next_run = cron::next_run_from_cron(expression, now);
+            }
         }
     }
 

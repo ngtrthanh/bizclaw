@@ -467,16 +467,17 @@ impl Tool for PlanTool {
                     let deps = plan.tasks[idx].dependencies.clone();
                     for dep_id in &deps {
                         if let Some(dep) = plan.tasks.iter().find(|t| t.id == *dep_id)
-                            && dep.status != TaskStatus::Completed {
-                                return Ok(ToolResult {
-                                    tool_call_id: String::new(),
-                                    output: format!(
-                                        "🚫 Cannot start task #{} — dependency #{} is not completed ({})",
-                                        task_id, dep_id, dep.status
-                                    ),
-                                    success: false,
-                                });
-                            }
+                            && dep.status != TaskStatus::Completed
+                        {
+                            return Ok(ToolResult {
+                                tool_call_id: String::new(),
+                                output: format!(
+                                    "🚫 Cannot start task #{} — dependency #{} is not completed ({})",
+                                    task_id, dep_id, dep.status
+                                ),
+                                success: false,
+                            });
+                        }
                     }
                     // Now mutate
                     plan.tasks[idx].status = TaskStatus::InProgress;

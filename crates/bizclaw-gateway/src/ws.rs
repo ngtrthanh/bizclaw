@@ -459,20 +459,21 @@ async fn chat_ollama(
             }
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(line)
                 && let Some(content) = json["message"]["content"].as_str()
-                    && !content.is_empty() {
-                        full_content.push_str(content);
-                        let _ = send_json(
-                            socket,
-                            &serde_json::json!({
-                                "type": "chat_chunk",
-                                "request_id": request_id,
-                                "content": content,
-                                "index": chunk_idx,
-                            }),
-                        )
-                        .await;
-                        chunk_idx += 1;
-                    }
+                && !content.is_empty()
+            {
+                full_content.push_str(content);
+                let _ = send_json(
+                    socket,
+                    &serde_json::json!({
+                        "type": "chat_chunk",
+                        "request_id": request_id,
+                        "content": content,
+                        "index": chunk_idx,
+                    }),
+                )
+                .await;
+                chunk_idx += 1;
+            }
         }
 
         let _ = send_json(
@@ -596,21 +597,22 @@ async fn chat_openai(
             }
             if let Some(data) = line.strip_prefix("data: ")
                 && let Ok(json) = serde_json::from_str::<serde_json::Value>(data)
-                    && let Some(content) = json["choices"][0]["delta"]["content"].as_str()
-                        && !content.is_empty() {
-                            full_content.push_str(content);
-                            let _ = send_json(
-                                socket,
-                                &serde_json::json!({
-                                    "type": "chat_chunk",
-                                    "request_id": request_id,
-                                    "content": content,
-                                    "index": chunk_idx,
-                                }),
-                            )
-                            .await;
-                            chunk_idx += 1;
-                        }
+                && let Some(content) = json["choices"][0]["delta"]["content"].as_str()
+                && !content.is_empty()
+            {
+                full_content.push_str(content);
+                let _ = send_json(
+                    socket,
+                    &serde_json::json!({
+                        "type": "chat_chunk",
+                        "request_id": request_id,
+                        "content": content,
+                        "index": chunk_idx,
+                    }),
+                )
+                .await;
+                chunk_idx += 1;
+            }
         }
 
         let _ = send_json(

@@ -359,14 +359,15 @@ impl Agent {
                 if tc.function.name == "shell"
                     && let Ok(args) =
                         serde_json::from_str::<serde_json::Value>(&tc.function.arguments)
-                        && let Some(cmd) = args["command"].as_str()
-                            && !self.security.check_command(cmd).await? {
-                                tool_results.push(Message::tool(
-                                    format!("Permission denied: command '{}' not allowed", cmd),
-                                    &tc.id,
-                                ));
-                                continue;
-                            }
+                    && let Some(cmd) = args["command"].as_str()
+                    && !self.security.check_command(cmd).await?
+                {
+                    tool_results.push(Message::tool(
+                        format!("Permission denied: command '{}' not allowed", cmd),
+                        &tc.id,
+                    ));
+                    continue;
+                }
 
                 // Execute tool
                 if let Some(tool) = self.tools.get(&tc.function.name) {

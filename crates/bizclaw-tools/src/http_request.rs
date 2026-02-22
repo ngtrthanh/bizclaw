@@ -104,9 +104,10 @@ impl Tool for HttpRequestTool {
             for (key, value) in headers {
                 if let Some(val_str) = value.as_str()
                     && let Ok(header_name) = reqwest::header::HeaderName::from_bytes(key.as_bytes())
-                        && let Ok(header_val) = reqwest::header::HeaderValue::from_str(val_str) {
-                            request = request.header(header_name, header_val);
-                        }
+                    && let Ok(header_val) = reqwest::header::HeaderValue::from_str(val_str)
+                {
+                    request = request.header(header_name, header_val);
+                }
             }
         }
 
@@ -118,9 +119,10 @@ impl Tool for HttpRequestTool {
                 .as_object()
                 .map(|h| !h.contains_key("content-type"))
                 .unwrap_or(true)
-                && (body.starts_with('{') || body.starts_with('[')) {
-                    request = request.header("Content-Type", "application/json");
-                }
+                && (body.starts_with('{') || body.starts_with('['))
+            {
+                request = request.header("Content-Type", "application/json");
+            }
         }
 
         let start = std::time::Instant::now();

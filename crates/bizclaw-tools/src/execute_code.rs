@@ -157,10 +157,8 @@ impl Tool for ExecuteCodeTool {
 
         let output = if config.needs_compile {
             // Compile then run
-            let out_path = temp_dir.join(format!(
-                "exec_{}",
-                &uuid::Uuid::new_v4().to_string()[..8]
-            ));
+            let out_path =
+                temp_dir.join(format!("exec_{}", &uuid::Uuid::new_v4().to_string()[..8]));
 
             let compile_output = if config.command == "rustc" {
                 tokio::process::Command::new(config.command)

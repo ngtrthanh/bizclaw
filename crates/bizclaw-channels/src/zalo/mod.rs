@@ -187,9 +187,10 @@ impl ZaloChannel {
             // Support JSON format {"cookie": "..."} or raw cookie string
             if trimmed.starts_with('{')
                 && let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed)
-                    && let Some(cookie) = json["cookie"].as_str() {
-                        return Ok(Some(cookie.to_string()));
-                    }
+                && let Some(cookie) = json["cookie"].as_str()
+            {
+                return Ok(Some(cookie.to_string()));
+            }
 
             Ok(Some(trimmed.to_string()))
         } else {

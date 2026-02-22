@@ -4,8 +4,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 /// Zalo session state.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ZaloSession {
     /// User ID
     pub uid: String,
@@ -20,7 +19,6 @@ pub struct ZaloSession {
     /// Last heartbeat timestamp
     pub last_heartbeat: u64,
 }
-
 
 /// Thread-safe session manager.
 pub struct SessionManager {

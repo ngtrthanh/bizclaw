@@ -50,10 +50,11 @@ impl Allowlist {
 
         // If workspace_only, restrict to workspace directory
         if self.workspace_only
-            && let Ok(cwd) = std::env::current_dir() {
-                return canonical.starts_with(&cwd)
-                    || expanded.starts_with(&cwd.to_string_lossy().to_string());
-            }
+            && let Ok(cwd) = std::env::current_dir()
+        {
+            return canonical.starts_with(&cwd)
+                || expanded.starts_with(&cwd.to_string_lossy().to_string());
+        }
 
         true
     }

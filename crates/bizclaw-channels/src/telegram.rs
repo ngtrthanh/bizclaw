@@ -159,10 +159,11 @@ impl TelegramChannel {
                     Ok(updates) => {
                         for update in updates {
                             if let Some(msg) = update.to_incoming()
-                                && tx.send(msg).is_err() {
-                                    tracing::info!("Telegram polling stopped (receiver dropped)");
-                                    return;
-                                }
+                                && tx.send(msg).is_err()
+                            {
+                                tracing::info!("Telegram polling stopped (receiver dropped)");
+                                return;
+                            }
                         }
                     }
                     Err(e) => {

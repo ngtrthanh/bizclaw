@@ -19,9 +19,10 @@ pub fn validate_args(definition: &ToolDefinition, args: &serde_json::Value) -> R
     if let Some(required) = params.get("required").and_then(|r| r.as_array()) {
         for req in required {
             if let Some(key) = req.as_str()
-                && args.get(key).is_none() {
-                    return Err(format!("Missing required argument: {key}"));
-                }
+                && args.get(key).is_none()
+            {
+                return Err(format!("Missing required argument: {key}"));
+            }
         }
     }
     Ok(())

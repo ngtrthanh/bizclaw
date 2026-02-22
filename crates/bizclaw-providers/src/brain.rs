@@ -117,30 +117,31 @@ impl Provider for BrainProvider {
         // List available models in ~/.bizclaw/models/
         let model_dir = bizclaw_core::config::BizClawConfig::home_dir().join("models");
         if model_dir.exists()
-            && let Ok(entries) = std::fs::read_dir(&model_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.extension().and_then(|e| e.to_str()) == Some("gguf") {
-                        let name = path
-                            .file_name()
-                            .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_default();
-                        let size_mb = std::fs::metadata(&path)
-                            .map(|m| m.len() / 1024 / 1024)
-                            .unwrap_or(0);
+            && let Ok(entries) = std::fs::read_dir(&model_dir)
+        {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) == Some("gguf") {
+                    let name = path
+                        .file_name()
+                        .map(|f| f.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let size_mb = std::fs::metadata(&path)
+                        .map(|m| m.len() / 1024 / 1024)
+                        .unwrap_or(0);
 
-                        if !models.iter().any(|m: &ModelInfo| m.id == name) {
-                            models.push(ModelInfo {
-                                id: name.clone(),
-                                name: format!("{} ({}MB)", name, size_mb),
-                                provider: "brain".into(),
-                                context_length: 2048,
-                                max_output_tokens: Some(256),
-                            });
-                        }
+                    if !models.iter().any(|m: &ModelInfo| m.id == name) {
+                        models.push(ModelInfo {
+                            id: name.clone(),
+                            name: format!("{} ({}MB)", name, size_mb),
+                            provider: "brain".into(),
+                            context_length: 2048,
+                            max_output_tokens: Some(256),
+                        });
                     }
                 }
             }
+        }
 
         if models.is_empty() {
             models.push(ModelInfo {

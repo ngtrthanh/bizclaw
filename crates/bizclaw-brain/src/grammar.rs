@@ -25,8 +25,7 @@ pub struct TokenJsonProps {
 }
 
 /// JSON parsing state — tracks structure validity.
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct JsonState {
     pub brace_depth: i32,
     pub bracket_depth: i32,
@@ -35,7 +34,6 @@ pub struct JsonState {
     pub started: bool,
     pub completed: bool,
 }
-
 
 impl JsonGrammar {
     /// Analyze all tokens in vocabulary for JSON properties (done once at load).

@@ -11,8 +11,7 @@ use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
 
 /// WhatsApp Business channel configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct WhatsAppConfig {
     /// Facebook Graph API access token
     pub access_token: String,
@@ -25,7 +24,6 @@ pub struct WhatsAppConfig {
     #[serde(default)]
     pub business_id: String,
 }
-
 
 /// WhatsApp Business channel implementation.
 pub struct WhatsAppChannel {

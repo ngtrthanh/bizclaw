@@ -203,17 +203,18 @@ impl SmartBrainEngine {
     pub fn load_model(&mut self, model_path: &Path) -> Result<()> {
         // Try llama.cpp first
         if self.prefer_llamacpp
-            && let Some(ref mut backend) = self.llamacpp {
-                match backend.load_model(model_path) {
-                    Ok(()) => {
-                        tracing::info!("✅ Using llama.cpp backend (3-5x faster)");
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        tracing::warn!("llama.cpp not available: {e}, falling back to pure Rust");
-                    }
+            && let Some(ref mut backend) = self.llamacpp
+        {
+            match backend.load_model(model_path) {
+                Ok(()) => {
+                    tracing::info!("✅ Using llama.cpp backend (3-5x faster)");
+                    return Ok(());
+                }
+                Err(e) => {
+                    tracing::warn!("llama.cpp not available: {e}, falling back to pure Rust");
                 }
             }
+        }
 
         // Fallback to pure Rust
         self.brain.load_model(model_path)?;
@@ -225,9 +226,10 @@ impl SmartBrainEngine {
     pub fn generate(&mut self, prompt: &str, max_tokens: u32) -> Result<String> {
         // Try llama.cpp first
         if let Some(ref backend) = self.llamacpp
-            && backend.is_loaded() {
-                return backend.generate(prompt, max_tokens);
-            }
+            && backend.is_loaded()
+        {
+            return backend.generate(prompt, max_tokens);
+        }
 
         // Fallback to pure Rust
         self.brain.generate(prompt, max_tokens)
@@ -236,9 +238,10 @@ impl SmartBrainEngine {
     /// Get info about which backend is active.
     pub fn backend_info(&self) -> String {
         if let Some(ref backend) = self.llamacpp
-            && backend.is_loaded() {
-                return format!("🚀 {}", backend.info());
-            }
+            && backend.is_loaded()
+        {
+            return format!("🚀 {}", backend.info());
+        }
         format!(
             "🧠 Pure Rust BrainEngine ({})",
             self.brain.model_info().unwrap_or_else(|| "no model".into())
