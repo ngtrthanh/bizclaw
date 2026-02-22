@@ -109,7 +109,8 @@ td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--muted)}
     <li><a href="#identity">Thiết lập Identity (nhân cách AI)</a></li>
     <li><a href="#providers">Cấu hình AI Provider</a></li>
     <li><a href="#brain">Brain Engine (LLM Offline)</a></li>
-    <li><a href="#channels">Kết nối Channels (Zalo, Telegram, Discord)</a></li>
+    <li><a href="#channels">Kết nối Channels (Zalo, Telegram, Discord, Email)</a></li>
+    <li><a href="#mcp">MCP Servers (mở rộng Agent)</a></li>
     <li><a href="#gateway">Gateway & Web Dashboard</a></li>
     <li><a href="#security">Bảo mật & Autonomy</a></li>
     <li><a href="#multitenant">Multi-Tenant Platform</a></li>
@@ -341,9 +342,46 @@ Khi khách hỏi giá, hãy hỏi khu vực và ngân sách trước.
 <span class="key">allowed_channel_ids</span> = [<span class="value">1234567890</span>]</pre>
 </div>
 
-<!-- 8. GATEWAY -->
+<!-- 8. MCP SERVERS -->
+<div class="doc-section" id="mcp">
+  <h2>8. MCP Servers (mở rộng Agent)</h2>
+  <p>BizClaw hỗ trợ <strong>Model Context Protocol (MCP)</strong> — chuẩn mở cho phép kết nối hàng trăm công cụ bên ngoài vào Agent: GitHub, Postgres, Brave Search, Browser automation, Memory...</p>
+
+  <h3>8.1 Cấu hình qua config.toml</h3>
+<pre><span class="comment"># Thêm MCP server vào config.toml</span>
+[[<span class="key">mcp_servers</span>]]
+<span class="key">name</span> = <span class="string">"filesystem"</span>
+<span class="key">command</span> = <span class="string">"npx"</span>
+<span class="key">args</span> = [<span class="string">"-y"</span>, <span class="string">"@modelcontextprotocol/server-filesystem"</span>, <span class="string">"/home"</span>]
+<span class="key">enabled</span> = <span class="value">true</span>
+
+[[<span class="key">mcp_servers</span>]]
+<span class="key">name</span> = <span class="string">"github"</span>
+<span class="key">command</span> = <span class="string">"npx"</span>
+<span class="key">args</span> = [<span class="string">"-y"</span>, <span class="string">"@modelcontextprotocol/server-github"</span>]
+<span class="key">enabled</span> = <span class="value">true</span>
+[<span class="key">mcp_servers.env</span>]
+<span class="key">GITHUB_TOKEN</span> = <span class="string">"ghp_xxx"</span></pre>
+
+  <h3>8.2 Quản lý qua Dashboard</h3>
+  <p>Vào <strong>🔗 MCP Servers</strong> trên sidebar → <strong>+ Add Server</strong> → Nhập name, command, args, env → Save. Bật/tắt và xoá server trực tiếp trên giao diện.</p>
+
+  <h3>8.3 MCP Servers phổ biến</h3>
+  <table>
+    <tr><th>Server</th><th>Command</th><th>Mô tả</th></tr>
+    <tr><td>Filesystem</td><td><code>npx -y @modelcontextprotocol/server-filesystem /path</code></td><td>Đọc/ghi file</td></tr>
+    <tr><td>GitHub</td><td><code>npx -y @modelcontextprotocol/server-github</code></td><td>Issues, PRs, repos</td></tr>
+    <tr><td>Memory</td><td><code>npx -y @modelcontextprotocol/server-memory</code></td><td>Bộ nhớ lâu dài</td></tr>
+    <tr><td>Brave Search</td><td><code>npx -y @modelcontextprotocol/server-brave-search</code></td><td>Tìm kiếm web</td></tr>
+    <tr><td>Postgres</td><td><code>npx -y @modelcontextprotocol/server-postgres "pg://..."</code></td><td>Truy vấn database</td></tr>
+    <tr><td>Puppeteer</td><td><code>npx -y @modelcontextprotocol/server-puppeteer</code></td><td>Browser automation</td></tr>
+  </table>
+  <div class="tip"><strong>💡 Danh sách đầy đủ:</strong> <a href="https://github.com/modelcontextprotocol/servers" target="_blank" style="color:var(--accent2)">github.com/modelcontextprotocol/servers</a></div>
+</div>
+
+<!-- 9. GATEWAY -->
 <div class="doc-section" id="gateway">
-  <h2>8. Gateway & Web Dashboard</h2>
+  <h2>9. Gateway & Web Dashboard</h2>
   <p>BizClaw đi kèm Web Dashboard để quản lý trực quan.</p>
 <pre>[<span class="key">gateway</span>]
 <span class="key">port</span> = <span class="value">3000</span>
@@ -360,7 +398,7 @@ Khi khách hỏi giá, hãy hỏi khu vực và ngân sách trước.
 
 <!-- 9. SECURITY -->
 <div class="doc-section" id="security">
-  <h2>9. Bảo mật & Autonomy</h2>
+  <h2>10. Bảo mật & Autonomy</h2>
   <p>BizClaw có 3 mức autonomy để kiểm soát AI chạy lệnh:</p>
   <table>
     <tr><th>Mức</th><th>Mô tả</th></tr>
@@ -380,7 +418,7 @@ Khi khách hỏi giá, hãy hỏi khu vực và ngân sách trước.
 
 <!-- 10. MULTITENANT -->
 <div class="doc-section" id="multitenant">
-  <h2>10. Multi-Tenant Platform</h2>
+  <h2>11. Multi-Tenant Platform</h2>
   <p>Chạy 50+ AI Agent trên 1 VPS — mỗi agent có config riêng, port riêng:</p>
 <pre><span class="comment"># Chạy BizClaw Platform (quản lý nhiều agent)</span>
 <span class="cmd">./target/release/bizclaw-platform</span>
@@ -395,7 +433,7 @@ Khi khách hỏi giá, hãy hỏi khu vực và ngân sách trước.
 
 <!-- 11. DOCKER -->
 <div class="doc-section" id="docker">
-  <h2>11. Docker</h2>
+  <h2>12. Docker</h2>
 <pre><span class="comment"># Build Docker image</span>
 <span class="cmd">docker build -t bizclaw .</span>
 
@@ -409,7 +447,7 @@ Khi khách hỏi giá, hãy hỏi khu vực và ngân sách trước.
 
 <!-- 12. RASPBERRY -->
 <div class="doc-section" id="raspberry">
-  <h2>12. Raspberry Pi</h2>
+  <h2>13. Raspberry Pi</h2>
   <p>BizClaw được tối ưu cho ARM — chạy mượt trên Pi 3B+ trở lên:</p>
 <pre><span class="comment"># Trên Raspberry Pi (ARM64)</span>
 <span class="cmd">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</span>
@@ -446,7 +484,7 @@ WantedBy=multi-user.target
 
 <!-- 13. FAQ -->
 <div class="doc-section" id="faq">
-  <h2>13. FAQ</h2>
+  <h2>14. FAQ</h2>
 
   <h3>❓ BizClaw có cần internet không?</h3>
   <p>Không bắt buộc. Nếu dùng Brain Engine (GGUF offline), hoạt động hoàn toàn offline. Nếu dùng cloud providers (OpenAI, Gemini...) thì cần internet.</p>
