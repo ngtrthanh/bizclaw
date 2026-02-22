@@ -340,8 +340,12 @@ async function checkPairing(){
   showPairingGate();
 }
 
-// ═══ NAVIGATION ═══
-function showPage(name) {
+// ═══ NAVIGATION (Hash Router) ═══
+function showPage(name, pushState) {
+  // Update URL hash
+  if (pushState !== false) {
+    location.hash = '#/' + name;
+  }
   document.querySelectorAll('[id^=page-]').forEach(p => p.style.display = 'none');
   document.querySelectorAll('.nav a').forEach(a => a.classList.remove('active'));
   const page = document.getElementById('page-' + name);
@@ -352,6 +356,18 @@ function showPage(name) {
   if (name === 'settings') loadSettingsForm();
   if (name === 'channels') renderChannelCards();
   if (name === 'configfile') loadConfigToml();
+}
+
+// Handle browser back/forward
+window.addEventListener('hashchange', () => {
+  const hash = location.hash.replace('#/', '') || 'dashboard';
+  showPage(hash, false);
+});
+
+// Route from current hash on load
+function routeFromHash() {
+  const hash = location.hash.replace('#/', '') || 'dashboard';
+  showPage(hash, false);
 }
 
 // ═══ DASHBOARD ═══
@@ -738,6 +754,7 @@ function setLang(lang){
 // ═══ INIT ═══
 async function initApp(){
   setLang(currentLang);
+  routeFromHash();
   await loadConfig();
   loadDashboard();
   loadProviders();
