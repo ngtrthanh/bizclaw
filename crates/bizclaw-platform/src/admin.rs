@@ -370,18 +370,26 @@ async fn zalo_get_qr(
     use bizclaw_channels::zalo::client::auth::{ZaloAuth, ZaloCredentials};
 
     let creds = ZaloCredentials::default();
-    let auth = ZaloAuth::new(creds);
+    let mut auth = ZaloAuth::new(creds);
 
     match auth.get_qr_code().await {
-        Ok(qr_data) => Json(serde_json::json!({
+        Ok(qr) => Json(serde_json::json!({
             "ok": true,
-            "qr_code": qr_data,
-            "message": "Mở ứng dụng Zalo trên điện thoại → Quét mã QR này để đăng nhập"
+            "qr_code": qr.image,
+            "qr_id": qr.code,
+            "imei": auth.credentials().imei,
+            "instructions": [
+                "1. Mở ứng dụng Zalo trên điện thoại",
+                "2. Nhấn biểu tượng QR ở thanh tìm kiếm",
+                "3. Quét mã QR này để đăng nhập",
+                "4. Xác nhận đăng nhập trên điện thoại"
+            ],
+            "message": "Quét mã QR bằng Zalo trên điện thoại"
         })),
         Err(e) => Json(serde_json::json!({
             "ok": false,
             "error": e.to_string(),
-            "fallback": "Vui lòng paste cookie Zalo Web trực tiếp vào ô phía dưới"
+            "fallback": "Vui lòng vào chat.zalo.me → F12 → Application → Cookies → Copy toàn bộ và paste vào ô Cookie bên dưới"
         })),
     }
 }

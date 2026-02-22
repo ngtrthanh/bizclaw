@@ -31,3 +31,4 @@ lettre.workspace = true
 imap.workspace = true
 native-tls.workspace = true
 mail-parser.workspace = true
+regex = "1"
