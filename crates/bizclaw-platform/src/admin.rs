@@ -1,6 +1,7 @@
 //! Admin HTTP server — REST API for the admin control plane.
 
 use axum::{Router, Json, routing::{get, post, delete}, extract::{State, Path}};
+use axum::middleware;
 use std::sync::{Arc, Mutex};
 use crate::db::PlatformDb;
 use crate::tenant::TenantManager;
@@ -14,14 +15,41 @@ pub struct AdminState {
     pub base_port: u16,
 }
 
+/// JWT auth middleware — validates Authorization: Bearer <token>.
+async fn require_auth(
+    State(state): State<Arc<AdminState>>,
+    req: axum::http::Request<axum::body::Body>,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let auth_header = req.headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if let Some(token) = auth_header.strip_prefix("Bearer ") {
+        if crate::auth::validate_token(token, &state.jwt_secret).is_ok() {
+            return next.run(req).await;
+        }
+    }
+
+    axum::response::Response::builder()
+        .status(axum::http::StatusCode::UNAUTHORIZED)
+        .header("Content-Type", "application/json")
+        .body(axum::body::Body::from(
+            serde_json::json!({"ok": false, "error": "Unauthorized — invalid or missing JWT token"}).to_string()
+        ))
+        .unwrap()
+}
+
 /// Admin API server.
 pub struct AdminServer;
 
 impl AdminServer {
     /// Build the admin router.
     pub fn router(state: Arc<AdminState>) -> Router {
-        Router::new()
-            // Dashboard
+        // Protected routes — require valid JWT
+        let protected = Router::new()
+            // Dashboard data
             .route("/api/admin/stats", get(get_stats))
             .route("/api/admin/activity", get(get_activity))
             // Tenants
@@ -40,12 +68,15 @@ impl AdminServer {
             .route("/api/admin/tenants/{id}/channels/zalo/qr", post(zalo_get_qr))
             // Users
             .route("/api/admin/users", get(list_users))
-            // Auth
+            .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
+
+        // Public routes — no auth required
+        let public = Router::new()
             .route("/api/admin/login", post(login))
             .route("/api/admin/pairing/validate", post(validate_pairing))
-            // Dashboard HTML
-            .route("/", get(admin_dashboard_page))
-            .with_state(state)
+            .route("/", get(admin_dashboard_page));
+
+        protected.merge(public).with_state(state)
     }
 
     /// Start the admin server.

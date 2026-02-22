@@ -127,6 +127,11 @@ port = {}
 
         std::fs::write(&config_path, config_content).ok();
 
+        // Write pairing code for gateway auth
+        if let Some(ref code) = tenant.pairing_code {
+            std::fs::write(tenant_dir.join(".pairing_code"), code).ok();
+        }
+
         let child = Command::new(bizclaw_bin)
             .args(["serve", "--port", &tenant.port.to_string()])
             .env("BIZCLAW_CONFIG", config_path.to_str().unwrap_or(""))
