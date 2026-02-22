@@ -16,6 +16,8 @@ pub struct AppState {
     pub config_path: PathBuf,
     pub start_time: std::time::Instant,
     pub pairing_code: Option<String>,
+    /// The Agent engine — handles chat with tools, memory, and all providers.
+    pub agent: Arc<tokio::sync::Mutex<Option<bizclaw_agent::Agent>>>,
 }
 
 /// Serve the dashboard HTML page.
@@ -122,16 +124,27 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         BizClawConfig::default()
     };
 
+    // Try to create the Agent engine
+    let agent: Option<bizclaw_agent::Agent> = match bizclaw_agent::Agent::new(full_config.clone()) {
+        Ok(a) => {
+            tracing::info!("✅ Agent engine initialized (provider={}, tools={})",
+                a.provider_name(), "6");
+            Some(a)
+        }
+        Err(e) => {
+            tracing::warn!("⚠️ Agent engine not available: {e} — falling back to direct provider calls");
+            None
+        }
+    };
+
     let state = AppState {
         gateway_config: config.clone(),
         full_config: Arc::new(Mutex::new(full_config)),
         config_path: config_path.clone(),
         start_time: std::time::Instant::now(),
         pairing_code: if config.require_pairing {
-            // Read pairing code from platform DB or generate one
             let code = std::env::var("BIZCLAW_PAIRING_CODE").ok()
                 .or_else(|| {
-                    // Try to extract from config directory
                     config_path.parent().and_then(|d| {
                         let pc = d.join(".pairing_code");
                         std::fs::read_to_string(pc).ok().map(|s| s.trim().to_string())
@@ -141,6 +154,7 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         } else {
             None
         },
+        agent: Arc::new(tokio::sync::Mutex::new(agent)),
     };
 
     let app = build_router(state);

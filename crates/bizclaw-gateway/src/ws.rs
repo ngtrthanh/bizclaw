@@ -1,5 +1,10 @@
 //! WebSocket handler for real-time streaming chat via gateway.
 //!
+//! Architecture:
+//! - If Agent Engine is available → uses it for FULL processing (tools + memory + all providers)
+//! - Streaming mode → direct provider HTTP for UX, then saves to Agent memory
+//! - Fallback → raw HTTP calls to Ollama/OpenAI if Agent unavailable
+//!
 //! Protocol:
 //! → Client sends: {"type":"chat","content":"...","stream":true}
 //! ← Server sends: {"type":"chat_start","request_id":"..."}
@@ -23,7 +28,6 @@ pub async fn ws_handler(
 
 /// Resolve Ollama URL from config or env.
 fn ollama_url(_state: &AppState) -> String {
-    // Check env first
     if let Ok(url) = std::env::var("OLLAMA_HOST") {
         return url;
     }
@@ -51,21 +55,39 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
     let provider = active_provider(&state);
     let model = active_model(&state);
 
-    // Send welcome
+    // Check if Agent Engine is available
+    let has_agent = {
+        let agent = state.agent.lock().await;
+        agent.is_some()
+    };
+
+    // Send welcome with capabilities
     let welcome = serde_json::json!({
         "type": "connected",
         "message": "BizClaw Gateway — WebSocket connected",
         "version": env!("CARGO_PKG_VERSION"),
         "provider": &provider,
         "model": &model,
-        "capabilities": ["chat", "stream", "ping"],
+        "agent_engine": has_agent,
+        "capabilities": if has_agent {
+            vec!["chat", "stream", "ping", "tools", "memory"]
+        } else {
+            vec!["chat", "stream", "ping"]
+        },
     });
     if send_json(&mut socket, &welcome).await.is_err() {
         return;
     }
 
+    if has_agent {
+        tracing::info!("WS session using Agent Engine (tools + memory enabled)");
+    } else {
+        tracing::info!("WS session using direct provider calls (no tools/memory)");
+    }
+
     let mut request_counter: u64 = 0;
-    let mut history: Vec<serde_json::Value> = vec![
+    // Fallback history for direct mode (when Agent engine is not available)
+    let mut fallback_history: Vec<serde_json::Value> = vec![
         serde_json::json!({"role": "system", "content": "Bạn là BizClaw AI Assistant. Trả lời ngắn gọn, hữu ích bằng tiếng Việt. Nếu user nói tiếng Anh thì trả lời tiếng Anh."})
     ];
 
@@ -95,51 +117,116 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                             continue;
                         }
 
-                        // Add user message to history
-                        history.push(serde_json::json!({"role": "user", "content": &content}));
+                        tracing::info!("Chat req={request_id}: provider={provider}, model={model}, stream={stream}, len={}, agent={has_agent}",
+                            content.len());
 
-                        // Keep history manageable (last 20 messages + system)
-                        if history.len() > 21 {
-                            let system = history[0].clone();
-                            let skip = history.len() - 20;
-                            let tail: Vec<_> = history.drain(skip..).collect();
-                            history.clear();
-                            history.push(system);
-                            history.extend(tail);
-                        }
+                        if has_agent && !stream {
+                            // ═══════════════════════════════════════════
+                            // AGENT ENGINE MODE (tools + memory + all providers)
+                            // ═══════════════════════════════════════════
+                            let _ = send_json(&mut socket, &serde_json::json!({
+                                "type": "chat_start",
+                                "request_id": &request_id,
+                                "provider": &provider,
+                                "model": &model,
+                                "mode": "agent",
+                            })).await;
 
-                        tracing::info!("Chat req={request_id}: provider={provider}, model={model}, stream={stream}, len={}", content.len());
-
-                        // Route to provider
-                        let result = match provider.as_str() {
-                            "ollama" | "brain" => {
-                                chat_ollama(&mut socket, &state, &request_id, &history, &model, stream).await
-                            }
-                            "openai" => {
-                                chat_openai(&mut socket, &state, &request_id, &history, &model, stream).await
-                            }
-                            _ => {
-                                // Fallback: try Ollama first, then OpenAI
-                                let r = chat_ollama(&mut socket, &state, &request_id, &history, &model, stream).await;
-                                if r.is_err() {
-                                    chat_openai(&mut socket, &state, &request_id, &history, "gpt-4o-mini", stream).await
+                            let result = {
+                                let mut agent = state.agent.lock().await;
+                                if let Some(agent) = agent.as_mut() {
+                                    Some(agent.process(&content).await)
                                 } else {
-                                    r
+                                    None
+                                }
+                            };
+
+                            match result {
+                                Some(Ok(response)) => {
+                                    let _ = send_json(&mut socket, &serde_json::json!({
+                                        "type": "chat_response",
+                                        "request_id": &request_id,
+                                        "content": &response,
+                                        "provider": &provider,
+                                        "model": &model,
+                                        "mode": "agent",
+                                    })).await;
+                                    let _ = send_json(&mut socket, &serde_json::json!({
+                                        "type": "chat_done",
+                                        "request_id": &request_id,
+                                        "full_content": &response,
+                                        "mode": "agent",
+                                    })).await;
+                                }
+                                Some(Err(e)) => {
+                                    let _ = send_json(&mut socket, &serde_json::json!({
+                                        "type": "chat_error",
+                                        "request_id": &request_id,
+                                        "error": e.to_string(),
+                                    })).await;
+                                }
+                                None => {
+                                    send_error(&mut socket, "Agent engine not available").await;
                                 }
                             }
-                        };
+                        } else {
+                            // ═══════════════════════════════════════════
+                            // STREAMING / DIRECT MODE
+                            // ═══════════════════════════════════════════
+                            // Add user message to fallback history
+                            fallback_history.push(serde_json::json!({"role": "user", "content": &content}));
 
-                        match result {
-                            Ok(response) => {
-                                // Add assistant response to history
-                                history.push(serde_json::json!({"role": "assistant", "content": &response}));
+                            // Keep history manageable (last 20 messages + system)
+                            if fallback_history.len() > 21 {
+                                let system = fallback_history[0].clone();
+                                let skip = fallback_history.len() - 20;
+                                let tail: Vec<_> = fallback_history.drain(skip..).collect();
+                                fallback_history.clear();
+                                fallback_history.push(system);
+                                fallback_history.extend(tail);
                             }
-                            Err(e) => {
-                                let _ = send_json(&mut socket, &serde_json::json!({
-                                    "type": "chat_error",
-                                    "request_id": &request_id,
-                                    "error": e,
-                                })).await;
+
+                            // Route to provider
+                            let result = match provider.as_str() {
+                                "ollama" | "brain" => {
+                                    chat_ollama(&mut socket, &state, &request_id, &fallback_history, &model, stream).await
+                                }
+                                "openai" => {
+                                    chat_openai(&mut socket, &state, &request_id, &fallback_history, &model, stream).await
+                                }
+                                _ => {
+                                    // Fallback: try Ollama first, then OpenAI
+                                    let r = chat_ollama(&mut socket, &state, &request_id, &fallback_history, &model, stream).await;
+                                    if r.is_err() {
+                                        chat_openai(&mut socket, &state, &request_id, &fallback_history, "gpt-4o-mini", stream).await
+                                    } else {
+                                        r
+                                    }
+                                }
+                            };
+
+                            match result {
+                                Ok(response) => {
+                                    // Add assistant response to fallback history
+                                    fallback_history.push(serde_json::json!({"role": "assistant", "content": &response}));
+
+                                    // Also save to Agent memory if available
+                                    if has_agent {
+                                        let mut agent = state.agent.lock().await;
+                                        if let Some(agent) = agent.as_mut() {
+                                            // Feed the streamed conversation into agent's memory
+                                            // by processing but we just save to memory directly
+                                            agent.save_memory_public(&content, &response).await;
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    let _ = send_json(&mut socket, &serde_json::json!({
+                                        "type": "chat_error",
+                                        "request_id": &request_id,
+                                        "error": e,
+                                    })).await;
+                                }
                             }
                         }
                     }
@@ -153,12 +240,30 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                     }
 
                     "status" => {
+                        let agent_info = if has_agent {
+                            let agent = state.agent.lock().await;
+                            if let Some(agent) = agent.as_ref() {
+                                serde_json::json!({
+                                    "provider": agent.provider_name(),
+                                    "conversation_length": agent.conversation().len(),
+                                    "tools_available": true,
+                                    "memory_enabled": true,
+                                })
+                            } else {
+                                serde_json::json!(null)
+                            }
+                        } else {
+                            serde_json::json!(null)
+                        };
+
                         let status = serde_json::json!({
                             "type": "status",
                             "requests_processed": request_counter,
                             "uptime_secs": state.start_time.elapsed().as_secs(),
                             "provider": &provider,
                             "model": &model,
+                            "agent_engine": has_agent,
+                            "agent": agent_info,
                         });
                         let _ = send_json(&mut socket, &status).await;
                     }
@@ -231,10 +336,9 @@ async fn chat_ollama(
 
         let mut full_content = String::new();
         let mut chunk_idx: u64 = 0;
-        let stream_body = resp;
 
         // Read streaming NDJSON response
-        let bytes = stream_body.bytes().await.map_err(|e| e.to_string())?;
+        let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
         let text = String::from_utf8_lossy(&bytes);
 
         for line in text.lines() {

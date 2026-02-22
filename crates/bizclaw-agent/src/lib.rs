@@ -141,7 +141,7 @@ impl Agent {
         Ok(content)
     }
 
-    /// Save interaction to memory.
+    /// Save interaction to memory (internal).
     async fn save_memory(&self, user_msg: &str, assistant_msg: &str) {
         if self.config.memory.auto_save {
             let entry = bizclaw_core::traits::memory::MemoryEntry {
@@ -156,6 +156,12 @@ impl Agent {
                 tracing::warn!("Failed to save memory: {e}");
             }
         }
+    }
+
+    /// Public wrapper to save streamed conversations to memory.
+    /// Used by gateway WS handler when streaming bypasses the Agent engine.
+    pub async fn save_memory_public(&self, user_msg: &str, assistant_msg: &str) {
+        self.save_memory(user_msg, assistant_msg).await;
     }
 
     /// Process incoming message and create an outgoing response.
