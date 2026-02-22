@@ -48,6 +48,9 @@ jobs:
 
       - name: Build release
         run: cross build --release --target ${{ matrix.target }}
+        env:
+          OPENSSL_STATIC: "1"
+          OPENSSL_VENDORED: "1"
 
       - name: Package binary
         run: |
