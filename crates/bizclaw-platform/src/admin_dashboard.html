@@ -82,10 +82,11 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 <body>
 <aside class="sidebar">
   <div class="logo"><h2>BizClaw</h2><p>Admin Platform</p></div>
-  <a class="active" onclick="showPage('dashboard')" href="#"><span>📊</span> <span>Dashboard</span></a>
-  <a onclick="showPage('tenants')" href="#"><span>🏢</span> <span>Tenants</span></a>
-  <a onclick="showPage('users')" href="#"><span>👥</span> <span>Users</span></a>
-  <a onclick="showPage('audit')" href="#"><span>📋</span> <span>Audit Log</span></a>
+  <a class="active" href="/dashboard" data-page="dashboard"><span>📊</span> <span>Dashboard</span></a>
+  <a href="/tenants" data-page="tenants"><span>🏢</span> <span>Tenants</span></a>
+  <a href="/users" data-page="users"><span>👥</span> <span>Users</span></a>
+  <a href="/audit" data-page="audit"><span>📋</span> <span>Audit Log</span></a>
+  <a href="/ollama" data-page="ollama"><span>🧠</span> <span>Ollama</span></a>
   <div class="bottom"><a href="#" onclick="logout()">⏏ Logout</a></div>
 </aside>
 
@@ -283,26 +284,76 @@ async function doLogin(){
   try{
     const res=await fetch(API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
     const r=await res.json();
-    if(r.ok){authToken=r.token;localStorage.setItem('bizclaw_admin_token',authToken);hideLogin();loadPage();toast('\u2705 Login successful');}
+    if(r.ok){authToken=r.token;localStorage.setItem('bizclaw_admin_token',authToken);hideLogin();initRouter();toast('\u2705 Login successful');}
     else{errEl.textContent=r.error||'Login failed';errEl.style.display='block';}
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
 function checkAuth(){
-  if(!authToken){showLogin();}else{hideLogin();loadPage();}
+  if(!authToken){showLogin();}else{hideLogin();initRouter();}
 }
 
-// ── Navigation ──────────────────────────────────────────
-function showPage(p){
+// ── Navigation (URL-based routing) ──────────────────────────────────
+const ROUTE_MAP = {
+  '/': 'dashboard',
+  '/dashboard': 'dashboard',
+  '/tenants': 'tenants',
+  '/users': 'users',
+  '/audit': 'audit',
+  '/ollama': 'ollama',
+};
+
+function showPage(p, pushState = true){
   document.querySelectorAll('.main>div').forEach(d=>d.classList.add('hidden'));
   const page = document.getElementById('page-'+p);
   if(page) page.classList.remove('hidden');
-  document.querySelectorAll('.sidebar a').forEach(a=>a.classList.remove('active'));
-  if(typeof event !== 'undefined' && event && event.target){
-    const link = event.target.closest('a');
-    if(link && link.closest('.sidebar')) link.classList.add('active');
+
+  // Update sidebar active state
+  document.querySelectorAll('.sidebar a[data-page]').forEach(a=>{
+    a.classList.toggle('active', a.dataset.page === p);
+  });
+
+  // Push URL to browser history (so back/forward works)
+  const url = p === 'dashboard' ? '/dashboard' : '/' + p;
+  if(pushState && window.location.pathname !== url){
+    history.pushState({page: p}, '', url);
   }
+
   currentPage=p;loadPage();
 }
+
+// Handle browser back/forward
+window.addEventListener('popstate', (e) => {
+  const p = e.state?.page || routeFromPath();
+  showPage(p, false);
+});
+
+// Read route from current URL path
+function routeFromPath(){
+  const path = window.location.pathname;
+  // Check for /tenants/{id} pattern
+  const tenantMatch = path.match(/^\/tenants\/(.+)/);
+  if(tenantMatch) return 'tenant-detail';
+  return ROUTE_MAP[path] || 'dashboard';
+}
+
+// Initialize routing — sidebar link interception + URL-based page load
+function initRouter(){
+  // Intercept sidebar link clicks (prevent full page reload)
+  document.querySelectorAll('.sidebar a[data-page]').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      showPage(a.dataset.page);
+    });
+  });
+
+  // Also intercept inline links like "View all" that call showPage
+  // These still use onclick="showPage(...)" which works fine
+
+  // Load the page based on current URL
+  const page = routeFromPath();
+  showPage(page, false);
+}
+
 function loadPage(){
   if(currentPage==='dashboard')loadDashboard();
   else if(currentPage==='tenants')loadTenants();
@@ -403,6 +454,9 @@ function openTenantDetail(id, name, slug, provider, model, status, plan, pairing
   detailTenantData = {id, name, slug, provider, model, status, plan, pairing, port};
   channelTenantId = id;
   channelTenantName = name;
+
+  // Push URL for this tenant detail
+  history.pushState({page: 'tenant-detail', tenantId: id}, '', '/tenants/' + id);
 
   document.getElementById('detail-tenant-name').textContent = name;
 
