@@ -77,10 +77,9 @@ axum = { version = "0.8", features = ["ws"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 # Email
-lettre = { version = "0.11", features = ["tokio1-rustls-tls", "builder"] }
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "builder", "smtp-transport"] }
 imap = "2"
 native-tls = "0.2"
-openssl-sys = { version = "0.9", features = ["vendored"] }
 mail-parser = "0.9"
 
 # Internal crates

@@ -26,8 +26,20 @@ pub async fn execute_with_stderr(
     command: &str,
     workdir: Option<&str>,
 ) -> Result<(String, String, i32)> {
-    let mut cmd = tokio::process::Command::new("sh");
-    cmd.arg("-c").arg(command);
+    #[cfg(windows)]
+    let mut cmd = {
+        let mut c = tokio::process::Command::new("cmd");
+        c.arg("/C").arg(command);
+        c
+    };
+    
+    #[cfg(not(windows))]
+    let mut cmd = {
+        let mut c = tokio::process::Command::new("sh");
+        c.arg("-c").arg(command);
+        c
+    };
+    
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 

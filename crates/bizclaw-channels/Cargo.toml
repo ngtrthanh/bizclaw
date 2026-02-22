@@ -30,6 +30,8 @@ async-stream = "0.3"
 lettre.workspace = true
 imap.workspace = true
 native-tls.workspace = true
-openssl-sys.workspace = true
 mail-parser.workspace = true
 regex = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+openssl-sys = { version = "0.9", features = ["vendored"] }
