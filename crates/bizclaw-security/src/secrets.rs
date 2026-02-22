@@ -92,7 +92,7 @@ impl SecretStore {
                 .mode(0o600)
                 .open(&self.secrets_path)?;
             file.write_all(content.as_bytes())?;
-            return Ok(());
+            Ok(())
         }
 
         #[cfg(not(unix))]
