@@ -1475,9 +1475,11 @@ pub async fn update_agent(
     let system_prompt = body["system_prompt"].as_str();
 
     // Phase 1: Update basic metadata + check if re-creation needed
+    tracing::info!("📝 update_agent '{}' — Phase 1: locking orchestrator", name);
     let mut needs_recreate = false;
     {
         let mut orch = state.orchestrator.lock().await;
+        tracing::info!("📝 update_agent '{}' — Phase 1: lock acquired", name);
         let updated = orch.update_agent(&name, role, description);
         if !updated {
             return Json(serde_json::json!({"ok": false, "message": format!("Agent '{}' not found", name)}));
@@ -1492,12 +1494,13 @@ pub async fn update_agent(
             if let Some(m) = model {
                 if !m.is_empty() && m != cur_model { needs_recreate = true; }
             }
-            // System prompt can be updated in DB without re-creating the agent
         }
+        tracing::info!("📝 update_agent '{}' — Phase 1: done, needs_recreate={}", name, needs_recreate);
     } // lock released here
 
     // Phase 2: Re-create agent ONLY if provider/model actually changed
     if needs_recreate {
+        tracing::info!("📝 update_agent '{}' — Phase 2: re-creating agent", name);
         let mut agent_config = state.full_config.lock().unwrap().clone();
         {
             let mut orch = state.orchestrator.lock().await;
@@ -1544,8 +1547,10 @@ pub async fn update_agent(
     }
 
     // Phase 3: Persist to DB — always save metadata/prompt even without re-creation
+    tracing::info!("📝 update_agent '{}' — Phase 3: persisting to DB", name);
     {
         let orch = state.orchestrator.lock().await;
+        tracing::info!("📝 update_agent '{}' — Phase 3: orch locked, listing agents", name);
         let agents_list = orch.list_agents();
         let current = agents_list.iter().find(|a| a["name"].as_str() == Some(&name));
         let final_role = current.and_then(|a| a["role"].as_str()).unwrap_or("assistant");
@@ -1559,12 +1564,15 @@ pub async fn update_agent(
         let final_prompt = system_prompt.unwrap_or(
             current.and_then(|a| a["system_prompt"].as_str()).unwrap_or("")
         );
+        tracing::info!("📝 update_agent '{}' — Phase 3: calling upsert_agent", name);
         if let Err(e) = state.db.upsert_agent(&name, final_role, final_desc, final_provider, final_model, final_prompt) {
             tracing::warn!("DB persist failed for agent '{}': {}", name, e);
         }
+        tracing::info!("📝 update_agent '{}' — Phase 3: DB done", name);
     }
 
     // Persist to legacy agents.json
+    tracing::info!("📝 update_agent '{}' — Phase 4: saving agents.json", name);
     {
         let orch = state.orchestrator.lock().await;
         let agents_path = state.config_path.parent()
@@ -1572,6 +1580,7 @@ pub async fn update_agent(
             .join("agents.json");
         orch.save_agents_metadata(&agents_path);
     }
+    tracing::info!("📝 update_agent '{}' — DONE ✅", name);
 
     Json(serde_json::json!({
         "ok": true,
