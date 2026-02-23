@@ -12,11 +12,12 @@ permissions:
   packages: write
 
 jobs:
-  # Linux builds (x86_64, aarch64, armv7, armv6)
+  # ── Linux builds (x86_64, aarch64, armv7, armv6) ────────────────────────────
   build-linux:
     name: Build Linux (${{ matrix.target }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
@@ -36,15 +37,19 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
+      # Use the official cross action instead of building from source every run
       - name: Install cross
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
 
       - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
@@ -72,11 +77,12 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.tar.gz
 
-  # macOS build (Apple Silicon only)
+  # ── macOS build (Apple Silicon) ──────────────────────────────────────────────
   build-macos:
     name: Build macOS (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - target: aarch64-apple-darwin
@@ -94,7 +100,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
@@ -118,7 +123,7 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}.tar.gz
 
-  # Windows build
+  # ── Windows build (x86_64) ───────────────────────────────────────────────────
   build-windows:
     name: Build Windows (x86_64)
     runs-on: windows-latest
@@ -132,13 +137,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-release-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-release-
+          key: ${{ runner.os }}-x86_64-pc-windows-msvc-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-x86_64-pc-windows-msvc-release-
 
       - name: Build release
         run: cargo build --release
@@ -155,7 +159,7 @@ jobs:
           name: bizclaw-windows-amd64
           path: dist/bizclaw-windows-amd64.zip
 
-  # Create GitHub Release
+  # ── GitHub Release ───────────────────────────────────────────────────────────
   release:
     name: Create Release
     needs: [build-linux, build-macos, build-windows]
@@ -176,7 +180,7 @@ jobs:
             artifacts/**/*.tar.gz
             artifacts/**/*.zip
 
-  # Docker multi-arch image
+  # ── Docker multi-arch image ──────────────────────────────────────────────────
   docker:
     name: Build & Push Docker Image
     needs: [build-linux]
@@ -188,6 +192,40 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Prepare binaries for Docker
+        run: |
+          mkdir -p \
+            docker-bin/linux/amd64 \
+            docker-bin/linux/arm64 \
+            docker-bin/linux/arm/v7 \
+            docker-bin/linux/arm/v6
+
+          tar xzf artifacts/bizclaw-linux-amd64/bizclaw-linux-amd64.tar.gz \
+            -C docker-bin/linux/amd64
+          tar xzf artifacts/bizclaw-linux-arm64/bizclaw-linux-arm64.tar.gz \
+            -C docker-bin/linux/arm64
+          tar xzf artifacts/bizclaw-linux-armv7/bizclaw-linux-armv7.tar.gz \
+            -C docker-bin/linux/arm/v7
+          tar xzf artifacts/bizclaw-linux-armv6/bizclaw-linux-armv6.tar.gz \
+            -C docker-bin/linux/arm/v6
+
+          # Rename all platform-specific binaries to just "bizclaw".
+          # find is used instead of a glob so nested dirs (arm/v7, arm/v6) are reached.
+          find docker-bin -mindepth 2 -name 'bizclaw-*' -exec sh -c \
+            'mv "$1" "$(dirname "$1")/bizclaw"' _ {} \;
+
+          # Verify all four binaries are in place before handing off to Buildx
+          for platform in amd64 arm64 arm/v7 arm/v6; do
+            if [ ! -f "docker-bin/linux/${platform}/bizclaw" ]; then
+              echo "ERROR: missing binary for linux/${platform}" >&2
+              exit 1
+            fi
+          done
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -202,22 +240,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version
-        id: version
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
-
-      - name: Prepare binaries for Docker
-        run: |
-          mkdir -p docker-bin/linux/amd64 docker-bin/linux/arm64 docker-bin/linux/arm/v7 docker-bin/linux/arm/v6
-          tar xzf artifacts/bizclaw-linux-amd64/bizclaw-linux-amd64.tar.gz -C docker-bin/linux/amd64
-          tar xzf artifacts/bizclaw-linux-arm64/bizclaw-linux-arm64.tar.gz -C docker-bin/linux/arm64
-          tar xzf artifacts/bizclaw-linux-armv7/bizclaw-linux-armv7.tar.gz -C docker-bin/linux/arm/v7
-          tar xzf artifacts/bizclaw-linux-armv6/bizclaw-linux-armv6.tar.gz -C docker-bin/linux/arm/v6
-          # Rename all to just "bizclaw"
-          for dir in docker-bin/linux/*/; do
-            mv "$dir"/bizclaw-* "$dir"/bizclaw 2>/dev/null || true
-          done
-
       - name: Build and push multi-arch image
         uses: docker/build-push-action@v6
         with:
@@ -228,7 +250,5 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
-          build-args: |
-            TARGETPLATFORM
           cache-from: type=gha
           cache-to: type=gha,mode=max
