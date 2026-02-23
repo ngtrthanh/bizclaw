@@ -1431,7 +1431,9 @@ pub async fn create_agent(
             let provider = agent.provider_name().to_string();
             let model = agent.model_name().to_string();
             let system_prompt = agent.system_prompt().to_string();
+            tracing::info!("create_agent — Agent::new done, acquiring orch lock...");
             let mut orch = state.orchestrator.lock().await;
+            tracing::info!("create_agent — orch lock acquired");
             orch.add_agent(name, role, description, agent);
             // Persist to SQLite DB
             if let Err(e) = state.db.upsert_agent(name, role, description, &provider, &model, &system_prompt) {
