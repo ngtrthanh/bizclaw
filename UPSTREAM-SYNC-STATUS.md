@@ -95,7 +95,40 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 - `crates/bizclaw-gateway/src/server.rs` - Integrated database into AppState
 - `crates/bizclaw-gateway/src/routes.rs` - Updated test helper
 
-## Phase 3: Channels (NEXT)
+## Phase 3: Channels ✅ COMPLETE
+
+**Commit**: `7853bb9` (pushed to origin)
+**Upstream Source**: `7936063`
+
+### Features Integrated:
+1. **Webhook Channel Configuration** (`crates/bizclaw-core/src/config.rs`)
+   - Added `WebhookChannelConfig` struct
+   - Supports inbound webhook secret for HMAC-SHA256 verification
+   - Supports outbound URL for sending replies
+   - Integrated into `ChannelConfig`
+
+2. **Gateway API Updates** (`crates/bizclaw-gateway/src/routes.rs`)
+   - Added webhook config to `/api/v1/config` endpoint
+   - Masked secret display for security
+   - Shows webhook enabled status and outbound URL
+
+3. **Existing Webhook Channel**
+   - Webhook channel implementation already exists in `crates/bizclaw-channels/src/webhook.rs`
+   - Supports signature verification
+   - Supports inbound message injection
+   - Supports outbound message posting
+
+### Quality Checks:
+- ✅ Code compiles successfully
+- ✅ Clippy clean with `-D warnings`
+- ✅ Code formatted with `cargo fmt`
+- ✅ No breaking changes
+
+### Files Modified:
+- `crates/bizclaw-core/src/config.rs` - Added WebhookChannelConfig
+- `crates/bizclaw-gateway/src/routes.rs` - Added webhook to config API
+
+## Phase 4: UI Features (NEXT)
 
 ### Target Commits:
 - `7936063` - Generic webhook inbound channel
@@ -104,15 +137,19 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 - Webhook channel improvements
 - Config updates for webhook support
 
-## Phase 4: UI Features (PLANNED)
+## Phase 4: UI Features (NEXT)
 
 ### Target Commits:
-- Gallery page API
-- Provider selection per agent
-- Agent-channel binding
+- `ae6d855` - Gallery page API + custom skills + agent-channel binding
+- `5f6b7dc` - Gallery templates + data persistence
+- `68bf9dc` - Provider/model in edit + MD→agent + business gallery templates
+- `26d3c4e` - Provider/model selection per agent + rename to AI Agent
 
-### Note:
-UI changes (dashboard.html) will be merged separately to avoid conflicts.
+### Strategy:
+- Focus on backend API changes only
+- Skip dashboard.html changes (will merge separately)
+- Add gallery API endpoints
+- Add provider/model selection to agent CRUD
 
 ## Phase 5: Fixes & Polish (PLANNED)
 
@@ -124,10 +161,11 @@ UI changes (dashboard.html) will be merged separately to avoid conflicts.
 ## Current Status
 
 **Branch**: `features/upstream-sync`
-**Commits Ahead**: 2 (Phase 1 + Phase 2)
+**Commits Ahead**: 3 (Phase 1 + Phase 2 + Phase 3)
 **Upstream Position**: `11dee2e` (latest)
 **Build**: ✅ Compiles successfully
-**Next Action**: Phase 3 - Webhook channel integration
+**Clippy**: ✅ Clean
+**Next Action**: Phase 4 - Gallery API and provider/model selection
 
 ## Notes
 
