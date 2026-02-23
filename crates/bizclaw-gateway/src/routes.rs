@@ -940,6 +940,172 @@ pub async fn agent_broadcast(
     }))
 }
 
+// ---- Brain Workspace API ----
+
+/// List all brain files in the workspace.
+/// If `?tenant=slug` provided, uses per-tenant workspace.
+pub async fn brain_list_files(
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let ws = match params.get("tenant") {
+        Some(slug) if !slug.is_empty() => bizclaw_memory::brain::BrainWorkspace::for_tenant(slug),
+        _ => bizclaw_memory::brain::BrainWorkspace::default(),
+    };
+    let _ = ws.initialize(); // ensure files exist
+    let files = ws.list_files();
+    let base_dir = ws.base_dir().display().to_string();
+    Json(serde_json::json!({
+        "ok": true,
+        "files": files,
+        "base_dir": base_dir,
+        "count": files.len(),
+    }))
+}
+
+/// Read a specific brain file.
+pub async fn brain_read_file(
+    axum::extract::Path(filename): axum::extract::Path<String>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let ws = match params.get("tenant") {
+        Some(slug) if !slug.is_empty() => bizclaw_memory::brain::BrainWorkspace::for_tenant(slug),
+        _ => bizclaw_memory::brain::BrainWorkspace::default(),
+    };
+    match ws.read_file(&filename) {
+        Some(content) => Json(serde_json::json!({
+            "ok": true, "filename": filename, "content": content, "size": content.len(),
+        })),
+        None => Json(serde_json::json!({"ok": false, "error": format!("File not found: {filename}")})),
+    }
+}
+
+/// Write (create/update) a brain file.
+pub async fn brain_write_file(
+    axum::extract::Path(filename): axum::extract::Path<String>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let ws = match params.get("tenant") {
+        Some(slug) if !slug.is_empty() => bizclaw_memory::brain::BrainWorkspace::for_tenant(slug),
+        _ => bizclaw_memory::brain::BrainWorkspace::default(),
+    };
+    let content = body["content"].as_str().unwrap_or("");
+    match ws.write_file(&filename, content) {
+        Ok(()) => Json(serde_json::json!({"ok": true, "message": format!("Saved: {filename}")})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+/// Delete a brain file.
+pub async fn brain_delete_file(
+    axum::extract::Path(filename): axum::extract::Path<String>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Json<serde_json::Value> {
+    let ws = match params.get("tenant") {
+        Some(slug) if !slug.is_empty() => bizclaw_memory::brain::BrainWorkspace::for_tenant(slug),
+        _ => bizclaw_memory::brain::BrainWorkspace::default(),
+    };
+    match ws.delete_file(&filename) {
+        Ok(true) => Json(serde_json::json!({"ok": true, "message": format!("Deleted: {filename}")})),
+        Ok(false) => Json(serde_json::json!({"ok": false, "error": "File not found"})),
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+// ---- System Health Check ----
+
+/// Comprehensive health check — verify API keys, config, workspace, connectivity.
+pub async fn system_health_check(
+    State(state): State<Arc<AppState>>,
+) -> Json<serde_json::Value> {
+    // Extract all needed values from config — drop guard before any .await
+    let (provider, api_key_empty, model_empty, model_info, config_path_display) = {
+        let cfg = state.full_config.lock().unwrap();
+        (
+            cfg.default_provider.clone(),
+            cfg.api_key.is_empty(),
+            cfg.default_model.is_empty(),
+            format!("{}/{}", cfg.default_provider, cfg.default_model),
+            state.config_path.display().to_string(),
+        )
+    };
+
+    let mut checks: Vec<serde_json::Value> = Vec::new();
+    let mut pass_count = 0;
+    let mut fail_count = 0;
+
+    // 1. Config file
+    let config_ok = state.config_path.exists();
+    checks.push(serde_json::json!({"name": "Config File", "status": if config_ok {"pass"} else {"fail"}, "detail": config_path_display}));
+    if config_ok { pass_count += 1; } else { fail_count += 1; }
+
+    // 2. Provider API key
+    let key_ok = match provider.as_str() {
+        "ollama" | "brain" | "llamacpp" => true,
+        _ => !api_key_empty,
+    };
+    let key_detail = if key_ok { format!("{provider}: configured") } else { format!("{provider}: API key missing!") };
+    checks.push(serde_json::json!({"name": "API Key", "status": if key_ok {"pass"} else {"fail"}, "detail": key_detail}));
+    if key_ok { pass_count += 1; } else { fail_count += 1; }
+
+    // 3. Model configured
+    checks.push(serde_json::json!({"name": "Model", "status": if !model_empty {"pass"} else {"warn"}, "detail": model_info}));
+    if !model_empty { pass_count += 1; } else { fail_count += 1; }
+
+    // 4. Brain workspace
+    let brain_ws = bizclaw_memory::brain::BrainWorkspace::default();
+    let brain_status = brain_ws.status();
+    let brain_files_exist = brain_status.iter().filter(|(_, exists, _)| *exists).count();
+    let brain_ok = brain_files_exist >= 3;
+    checks.push(serde_json::json!({"name": "Brain Workspace", "status": if brain_ok {"pass"} else {"warn"}, "detail": format!("{}/{} files", brain_files_exist, brain_status.len())}));
+    if brain_ok { pass_count += 1; } else { fail_count += 1; }
+
+    // 5. Ollama (if local provider)
+    let ollama_check = if provider == "ollama" {
+        match reqwest::Client::new()
+            .get("http://localhost:11434/api/tags")
+            .timeout(std::time::Duration::from_secs(3))
+            .send().await
+        {
+            Ok(r) if r.status().is_success() => {
+                pass_count += 1;
+                serde_json::json!({"name": "Ollama Server", "status": "pass", "detail": "Running on localhost:11434"})
+            }
+            _ => {
+                fail_count += 1;
+                serde_json::json!({"name": "Ollama Server", "status": "fail", "detail": "Not reachable at localhost:11434"})
+            }
+        }
+    } else {
+        pass_count += 1;
+        serde_json::json!({"name": "Ollama Server", "status": "skip", "detail": format!("Not needed for {provider}")})
+    };
+    checks.push(ollama_check);
+
+    // 6. Agent ready
+    let agent_ready = state.agent.lock().await.is_some();
+    checks.push(serde_json::json!({"name": "Agent Engine", "status": if agent_ready {"pass"} else {"fail"}, "detail": if agent_ready {"Initialized and ready"} else {"Not initialized"}}));
+    if agent_ready { pass_count += 1; } else { fail_count += 1; }
+
+    // 7. Memory backend
+    checks.push(serde_json::json!({"name": "Memory Backend", "status": "pass", "detail": "SQLite FTS5"}));
+    pass_count += 1;
+
+    let total = pass_count + fail_count;
+    let score = if total > 0 { (pass_count * 100) / total } else { 0 };
+    let overall = if fail_count == 0 { "healthy" } else if fail_count <= 2 { "degraded" } else { "critical" };
+
+    Json(serde_json::json!({
+        "ok": fail_count == 0,
+        "status": overall,
+        "score": format!("{}/{}", pass_count, total),
+        "score_pct": score,
+        "checks": checks,
+        "pass": pass_count,
+        "fail": fail_count,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

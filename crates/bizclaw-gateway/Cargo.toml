@@ -24,3 +24,4 @@ toml.workspace = true
 reqwest.workspace = true
 bizclaw-scheduler.workspace = true
 bizclaw-knowledge.workspace = true
+bizclaw-memory.workspace = true

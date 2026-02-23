@@ -396,15 +396,50 @@ tr:hover td{background:rgba(255,255,255,.02)}
       </div>
     </div>
 
-    <!-- ═══ BRAIN ENGINE ═══ -->
+    <!-- ═══ BRAIN ENGINE + WORKSPACE + HEALTH ═══ -->
     <div id="page-brain" style="display:none">
-      <div class="page-header"><h1>🧠 <span data-i18n="brain.title">Brain Engine</span></h1></div>
+      <div class="page-header"><div><h1>🧠 <span data-i18n="brain.title">Brain Engine</span></h1><div class="sub" data-i18n="brain.ws_sub">Brain workspace, personality files, and system health check</div></div>
+        <button class="btn btn-primary" onclick="runHealthCheck()">🩺 <span data-i18n="brain.health_btn">Health Check</span></button>
+      </div>
       <div class="stats">
         <div class="card"><div class="card-label" data-i18n="brain.engine">Động cơ</div><div class="card-value green">GGUF v3</div></div>
         <div class="card"><div class="card-label">SIMD</div><div class="card-value accent" id="brain-simd">—</div></div>
         <div class="card"><div class="card-label" data-i18n="brain.quant">Lượng tử hóa</div><div class="card-value blue">Q4_0 / Q8_0 / F16</div></div>
-        <div class="card"><div class="card-label" data-i18n="brain.features">Tính năng</div><div class="card-value cyan">Flash Attn + KV Cache</div></div>
+        <div class="card"><div class="card-label" data-i18n="brain.files_count">Brain Files</div><div class="card-value cyan" id="brain-files-count">0</div></div>
       </div>
+
+      <!-- Health Check Results -->
+      <div id="health-results" class="card" style="display:none;margin-top:16px">
+        <h3>🩺 <span data-i18n="brain.health_title">System Health Check</span></h3>
+        <div id="health-summary" style="margin:8px 0"></div>
+        <table><thead><tr><th data-i18n="brain.check_name">Check</th><th data-i18n="brain.check_status">Status</th><th data-i18n="brain.check_detail">Detail</th></tr></thead>
+        <tbody id="health-checks-body"></tbody></table>
+      </div>
+
+      <!-- Brain Files Editor -->
+      <div class="form-section" style="margin-top:16px"><h2>📝 <span data-i18n="brain.ws_title">Brain Workspace</span></h2>
+        <div class="sub" id="brain-base-dir" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <input id="brain-new-filename" placeholder="CUSTOM.md" style="flex:1">
+          <button class="btn btn-primary" onclick="createBrainFile()">+ <span data-i18n="brain.new_file">New File</span></button>
+        </div>
+        <div id="brain-files-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px"></div>
+      </div>
+
+      <!-- File Editor (hidden until a file is clicked) -->
+      <div id="brain-editor" class="card" style="display:none;margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3 id="brain-editor-title">📄 SOUL.md</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="saveBrainFile()">💾 <span data-i18n="brain.save">Save</span></button>
+            <button class="btn" style="background:#dc3545" onclick="deleteBrainFile()">🗑️</button>
+            <button class="btn" onclick="closeBrainEditor()">✕</button>
+          </div>
+        </div>
+        <textarea id="brain-editor-content" style="width:100%;min-height:300px;font-family:monospace;font-size:13px;margin-top:8px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;resize:vertical"></textarea>
+      </div>
+
+      <!-- Models Table -->
       <div class="form-section"><h2 data-i18n="brain.models">Mô hình có sẵn</h2>
         <div class="card"><table><thead><tr><th data-i18n="set.model">Mô hình</th><th data-i18n="brain.size">Kích thước</th><th data-i18n="brain.download">Tải về</th></tr></thead><tbody>
           <tr><td><strong>TinyLlama 1.1B</strong></td><td>~638 MB</td><td><code>bizclaw brain download tinyllama-1.1b</code></td></tr>
@@ -569,6 +604,7 @@ function showPage(name, pushState) {
   if (name === 'mcp') loadMcpServers();
   if (name === 'agents') loadAgents();
   if (name === 'knowledge') loadKnowledgeDocs();
+  if (name === 'brain') loadBrainFiles();
 }
 
 // Handle browser back/forward
@@ -1066,6 +1102,100 @@ async function toggleMcp(index, enabled) {
   } catch(e) { toast('❌ ' + e.message, 'error'); }
 }
 
+// ═══ BRAIN WORKSPACE EDITOR ═══
+let _brainEditFile = '';
+
+async function loadBrainFiles() {
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files');
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('brain-files-count').textContent = data.count || 0;
+    document.getElementById('brain-base-dir').textContent = '📁 ' + (data.base_dir || '~/.bizclaw');
+    const list = document.getElementById('brain-files-list');
+    list.innerHTML = '';
+    (data.files || []).forEach(f => {
+      const icon = f.is_custom ? '📎' : (f.exists ? '📄' : '⬜');
+      const badge = f.exists ? `<span style="color:var(--green);font-size:12px">● ${(f.size/1024).toFixed(1)}KB</span>` : '<span style="color:var(--orange);font-size:12px">○ empty</span>';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.cursor = 'pointer';
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><strong>${icon} ${f.filename}</strong>${badge}</div><div class="card-sub" style="margin-top:4px">${f.section}</div>`;
+      card.onclick = () => openBrainEditor(f.filename, f.content);
+      list.appendChild(card);
+    });
+  } catch(e) { console.warn('Brain files load error:', e); }
+}
+
+function openBrainEditor(filename, content) {
+  _brainEditFile = filename;
+  document.getElementById('brain-editor-title').textContent = '📄 ' + filename;
+  document.getElementById('brain-editor-content').value = content || '';
+  document.getElementById('brain-editor').style.display = '';
+  document.getElementById('brain-editor-content').focus();
+}
+
+function closeBrainEditor() {
+  document.getElementById('brain-editor').style.display = 'none';
+  _brainEditFile = '';
+}
+
+async function saveBrainFile() {
+  if (!_brainEditFile) return;
+  const content = document.getElementById('brain-editor-content').value;
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files/' + encodeURIComponent(_brainEditFile), {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content})
+    });
+    const data = await res.json();
+    if (data.ok) { toast('💾 ' + _brainEditFile + ' saved'); loadBrainFiles(); }
+    else toast('❌ ' + (data.error||'Save failed'), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function deleteBrainFile() {
+  if (!_brainEditFile || !confirm('Delete ' + _brainEditFile + '?')) return;
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files/' + encodeURIComponent(_brainEditFile), {method:'DELETE'});
+    const data = await res.json();
+    if (data.ok) { toast('🗑️ Deleted'); closeBrainEditor(); loadBrainFiles(); }
+    else toast('❌ ' + (data.error||''), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function createBrainFile() {
+  const name = document.getElementById('brain-new-filename').value.trim();
+  if (!name) return toast('Enter a filename (e.g. CUSTOM.md)', 'error');
+  const filename = name.endsWith('.md') ? name : name + '.md';
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files/' + encodeURIComponent(filename), {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content: '# ' + filename.replace('.md','') + '\n\n'})
+    });
+    const data = await res.json();
+    if (data.ok) { toast('✅ Created: ' + filename); document.getElementById('brain-new-filename').value = ''; loadBrainFiles(); }
+    else toast('❌ ' + (data.error||''), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+// ═══ HEALTH CHECK ═══
+async function runHealthCheck() {
+  try {
+    const res = await authFetch(API + '/api/v1/health');
+    const data = await res.json();
+    document.getElementById('health-results').style.display = '';
+    const badge = data.status === 'healthy' ? '🟢' : data.status === 'degraded' ? '🟡' : '🔴';
+    document.getElementById('health-summary').innerHTML = `<span style="font-size:18px">${badge} <strong>${data.status.toUpperCase()}</strong></span> — Score: <strong>${data.score}</strong> (${data.score_pct}%)`;
+    const body = document.getElementById('health-checks-body');
+    body.innerHTML = '';
+    (data.checks || []).forEach(c => {
+      const color = c.status === 'pass' ? 'var(--green)' : c.status === 'fail' ? '#dc3545' : c.status === 'warn' ? 'var(--orange)' : 'var(--text-dim)';
+      const icon = c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : c.status === 'warn' ? '⚠️' : '⏭️';
+      body.innerHTML += `<tr><td>${c.name}</td><td style="color:${color}">${icon} ${c.status}</td><td>${c.detail}</td></tr>`;
+    });
+    toast(`🩺 Health: ${data.score} (${data.status})`);
+  } catch(e) { toast('❌ Health check failed: ' + e.message, 'error'); }
+}
+
 // ═══ MULTI-AGENT ORCHESTRATOR ═══
 function showCreateAgentForm() { document.getElementById('agent-create-form').style.display = ''; }
 
@@ -1495,7 +1625,11 @@ const I18N = {
     // Brain Engine
     'brain.title':'Brain Engine','brain.engine':'Động cơ','brain.quant':'Lượng tử hóa',
     'brain.features':'Tính năng','brain.models':'Mô hình có sẵn','brain.size':'Kích thước',
-    'brain.download':'Tải về',
+    'brain.download':'Tải về','brain.ws_sub':'Workspace não, tệp tính cách và kiểm tra sức khỏe hệ thống',
+    'brain.health_btn':'Kiểm tra sức khỏe','brain.health_title':'Kiểm tra sức khỏe hệ thống',
+    'brain.check_name':'Kiểm tra','brain.check_status':'Trạng thái','brain.check_detail':'Chi tiết',
+    'brain.ws_title':'Workspace Não','brain.new_file':'Tệp mới','brain.save':'Lưu',
+    'brain.files_count':'Brain Files',
     // Forms
     'form.name':'Tên','form.command':'Lệnh','form.args':'Tham số (phân cách bằng dấu phẩy)',
     'form.env':'Biến môi trường (KEY=VALUE, mỗi dòng một cặp)','form.save':'Lưu','form.cancel':'Hủy',
@@ -1580,7 +1714,11 @@ const I18N = {
     // Brain Engine
     'brain.title':'Brain Engine','brain.engine':'Engine','brain.quant':'Quantization',
     'brain.features':'Features','brain.models':'Available Models','brain.size':'Size',
-    'brain.download':'Download',
+    'brain.download':'Download','brain.ws_sub':'Brain workspace, personality files, and system health check',
+    'brain.health_btn':'Health Check','brain.health_title':'System Health Check',
+    'brain.check_name':'Check','brain.check_status':'Status','brain.check_detail':'Detail',
+    'brain.ws_title':'Brain Workspace','brain.new_file':'New File','brain.save':'Save',
+    'brain.files_count':'Brain Files',
     // Forms
     'form.name':'Name','form.command':'Command','form.args':'Arguments (comma-separated)',
     'form.env':'Environment Variables (KEY=VALUE, one per line)','form.save':'Save','form.cancel':'Cancel',

@@ -116,6 +116,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/v1/agents/{name}", axum::routing::delete(super::routes::delete_agent))
         .route("/api/v1/agents/{name}/chat", post(super::routes::agent_chat))
         .route("/api/v1/agents/broadcast", post(super::routes::agent_broadcast))
+        // Brain Workspace API
+        .route("/api/v1/brain/files", get(super::routes::brain_list_files))
+        .route("/api/v1/brain/files/{filename}", get(super::routes::brain_read_file))
+        .route("/api/v1/brain/files/{filename}", axum::routing::put(super::routes::brain_write_file))
+        .route("/api/v1/brain/files/{filename}", axum::routing::delete(super::routes::brain_delete_file))
+        // Health Check
+        .route("/api/v1/health", get(super::routes::system_health_check))
         .route("/ws", get(super::ws::ws_handler))
         .route_layer(axum::middleware::from_fn_with_state(shared.clone(), require_pairing));
 
