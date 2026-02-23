@@ -172,6 +172,30 @@ pub fn build_router(state: AppState) -> Router {
             "/api/v1/agents/broadcast",
             post(super::routes::agent_broadcast),
         )
+        // Gallery API
+        .route("/api/v1/gallery", get(super::routes::gallery_list))
+        .route("/api/v1/gallery", post(super::routes::gallery_create))
+        .route(
+            "/api/v1/gallery/{id}",
+            axum::routing::delete(super::routes::gallery_delete),
+        )
+        .route(
+            "/api/v1/gallery/{id}/md",
+            post(super::routes::gallery_upload_md),
+        )
+        .route(
+            "/api/v1/gallery/{id}/md",
+            get(super::routes::gallery_get_md),
+        )
+        // Agent-Channel Bindings
+        .route(
+            "/api/v1/agents/{name}/channels",
+            post(super::routes::agent_bind_channels),
+        )
+        .route(
+            "/api/v1/agents/channels",
+            get(super::routes::agent_channel_bindings),
+        )
         // Telegram Bot ↔ Agent API
         .route(
             "/api/v1/agents/{name}/telegram",

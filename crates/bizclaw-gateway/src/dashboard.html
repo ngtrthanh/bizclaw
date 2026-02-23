@@ -173,6 +173,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <a href="/tools" onclick="navigateTo(event,'tools')" id="nav-tools">🛠️ <span data-i18n="nav.tools">Công cụ</span></a>
       <a href="/mcp" onclick="navigateTo(event,'mcp')" id="nav-mcp">🔗 <span data-i18n="nav.mcp">Máy chủ MCP</span></a>
       <a href="/agents" onclick="navigateTo(event,'agents')" id="nav-agents">🤖 <span data-i18n="nav.agents">AI Agent</span></a>
+      <a href="/gallery" onclick="navigateTo(event,'gallery')" id="nav-gallery">📦 <span data-i18n="nav.gallery">Gallery</span></a>
       <a href="/knowledge" onclick="navigateTo(event,'knowledge')" id="nav-knowledge">📚 <span data-i18n="nav.knowledge">Kho tri thức</span></a>
       <div class="nav-sep"></div>
       <a href="/brain" onclick="navigateTo(event,'brain')" id="nav-brain">🧠 <span data-i18n="nav.brain">Brain Engine</span></a>
@@ -614,6 +615,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
             <option value="analyst">Phân tích viên</option><option value="translator">Phiên dịch</option>
           </select></div>
           <div class="form-row"><span class="form-label" data-i18n="form.description">Mô tả</span><input id="edit-agent-desc"></div>
+          <!-- Channel Binding Section -->
+          <div style="margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
+            <div style="font-weight:600;margin-bottom:8px">🔗 Gán Agent với Kênh</div>
+            <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Chọn kênh mà agent này sẽ xử lý tin nhắn. Khi bot/tài khoản được add vào nhóm trên kênh đó → agent tự động phản hồi.</div>
+            <div id="edit-agent-channels" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
           <!-- Telegram Bot Section -->
           <div style="margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
             <div style="font-weight:600;margin-bottom:8px">🤖 Telegram Bot</div>
@@ -638,22 +645,63 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <button class="btn btn-primary btn-sm" onclick="broadcastMessage()">📢 <span data-i18n="agents.send_all">Gửi tất cả</span></button>
         <div id="broadcast-results" style="margin-top:12px"></div>
       </div>
-      <!-- Agent Gallery -->
-      <div style="margin-top:24px">
-        <h2 style="margin-bottom:4px">📦 Agent Gallery — Mẫu sẵn có</h2>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Chọn agent → gán Nhà cung cấp → Cài đặt 1 click. Mỗi agent có skill riêng, tiết kiệm token.</div>
-        <!-- Category filter -->
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="gallery-filters">
-          <button class="btn btn-primary btn-sm" onclick="filterGallery('all')" style="font-size:11px">Tất cả</button>
-          <button class="btn btn-outline btn-sm" onclick="filterGallery('foundation')" style="font-size:11px">🧠 Nền tảng</button>
-          <button class="btn btn-outline btn-sm" onclick="filterGallery('creative')" style="font-size:11px">✍️ Sáng tạo</button>
-          <button class="btn btn-outline btn-sm" onclick="filterGallery('dev')" style="font-size:11px">💻 Lập trình</button>
-          <button class="btn btn-outline btn-sm" onclick="filterGallery('design')" style="font-size:11px">🎨 Thiết kế</button>
-          <button class="btn btn-outline btn-sm" onclick="filterGallery('marketing')" style="font-size:11px">📈 Marketing</button>
-          <button class="btn btn-outline btn-sm" onclick="filterGallery('productivity')" style="font-size:11px">📋 Năng suất</button>
-        </div>
-        <div id="agent-gallery" class="ch-grid"></div>
+    </div>
+
+    <!-- ═══ GALLERY PAGE ═══ -->
+    <div id="page-gallery" style="display:none">
+      <div class="page-header"><div><h1>📦 <span data-i18n="gallery.title">Gallery</span></h1><div class="sub" data-i18n="gallery.subtitle">50 mẫu agent từ ClawHub.ai + tự tạo. Upload file MD mở rộng khả năng.</div></div>
+        <button class="btn btn-primary" onclick="showCreateGalleryForm()">+ Tạo Skill mới</button>
       </div>
+      <div class="stats">
+        <div class="card"><div class="card-label">Tổng Skills</div><div class="card-value accent" id="gallery-total">0</div></div>
+        <div class="card"><div class="card-label">Built-in</div><div class="card-value green" id="gallery-builtin">0</div></div>
+        <div class="card"><div class="card-label">Tự tạo</div><div class="card-value blue" id="gallery-custom">0</div></div>
+        <div class="card"><div class="card-label">Có file MD</div><div class="card-value orange" id="gallery-withmd">0</div></div>
+      </div>
+      <!-- Create Custom Skill Form -->
+      <div id="gallery-create-form" class="card" style="display:none;margin-bottom:16px">
+        <h3>➕ Tạo Skill mới</h3>
+        <div class="form-row"><span class="form-label">ID</span><input id="new-skill-id" placeholder="my-custom-skill"></div>
+        <div class="form-row"><span class="form-label">Tên</span><input id="new-skill-name" placeholder="My Custom Skill"></div>
+        <div class="form-row"><span class="form-label">Icon</span><input id="new-skill-icon" placeholder="🆕" style="width:60px"></div>
+        <div class="form-row"><span class="form-label">Vai trò</span><select id="new-skill-role">
+          <option value="assistant">Trợ lý</option><option value="coder">Lập trình viên</option>
+          <option value="analyst">Phân tích viên</option><option value="designer">Thiết kế</option>
+          <option value="marketer">Marketing</option><option value="researcher">Nghiên cứu</option>
+          <option value="editor">Biên tập</option>
+        </select></div>
+        <div class="form-row"><span class="form-label">Danh mục</span><select id="new-skill-cat">
+          <option value="productivity">📋 Năng suất</option><option value="dev">💻 Lập trình</option>
+          <option value="creative">✍️ Sáng tạo</option><option value="marketing">📈 Marketing</option>
+          <option value="design">🎨 Thiết kế</option><option value="ai">🧠 AI</option>
+          <option value="search">🔍 Tìm kiếm</option><option value="finance">💰 Tài chính</option>
+          <option value="utility">🔧 Tiện ích</option><option value="analytics">📊 Phân tích</option>
+        </select></div>
+        <div class="form-row"><span class="form-label">Mô tả</span><input id="new-skill-desc" placeholder="Mô tả ngắn về skill..."></div>
+        <div class="form-row"><span class="form-label">System Prompt</span><textarea id="new-skill-prompt" placeholder="You are a..." style="min-height:100px"></textarea></div>
+        <div class="form-row"><span class="form-label">Upload MD (tùy chọn)</span><input type="file" id="new-skill-md" accept=".md,.txt,.markdown"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary" onclick="createGallerySkill()">💾 Lưu</button>
+          <button class="btn btn-outline" onclick="document.getElementById('gallery-create-form').style.display='none'">Hủy</button>
+        </div>
+      </div>
+      <!-- Category filter -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="gallery-filters">
+        <button class="btn btn-primary btn-sm gallery-filter-btn" onclick="filterGallery('all')" style="font-size:11px">Tất cả</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('productivity')" style="font-size:11px">📋 Năng suất</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('dev')" style="font-size:11px">💻 Lập trình</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('creative')" style="font-size:11px">✍️ Sáng tạo</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('marketing')" style="font-size:11px">📈 Marketing</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('design')" style="font-size:11px">🎨 Thiết kế</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('ai')" style="font-size:11px">🧠 AI</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('search')" style="font-size:11px">🔍 Tìm kiếm</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('finance')" style="font-size:11px">💰 Tài chính</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('utility')" style="font-size:11px">🔧 Tiện ích</button>
+        <button class="btn btn-outline btn-sm gallery-filter-btn" onclick="filterGallery('analytics')" style="font-size:11px">📊 Phân tích</button>
+      </div>
+      <!-- Search -->
+      <div style="margin-bottom:16px"><input id="gallery-search" placeholder="🔍 Tìm skill..." oninput="filterGalleryBySearch()" style="width:100%;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px"></div>
+      <div id="agent-gallery" class="ch-grid"></div>
     </div>
 
     <!-- Groups page removed — merged into Chat page -->
@@ -774,7 +822,8 @@ function showPage(name, pushState) {
   if (name === 'channels') renderChannelCards();
   if (name === 'configfile') loadConfigToml();
   if (name === 'mcp') loadMcpServers();
-  if (name === 'agents') { loadAgents(); ensureGalleryLoaded(); }
+  if (name === 'agents') { loadAgents(); }
+  if (name === 'gallery') { loadGalleryPage(); }
   if (name === 'knowledge') loadKnowledgeDocs();
   if (name === 'brain') loadBrainFiles();
   if (name === 'groups') { navigateTo(null, 'chat'); return; } // redirect groups to chat
@@ -790,7 +839,7 @@ window.addEventListener('popstate', (ev) => {
 function getPageFromPath() {
   const path = location.pathname.replace(/^\//, '').replace(/\/$/, '');
   // Map valid page names
-  const validPages = ['dashboard','chat','settings','providers','channels','tools','brain','configfile','mcp','agents','knowledge'];
+  const validPages = ['dashboard','chat','settings','providers','channels','tools','brain','configfile','mcp','agents','gallery','knowledge'];
   if (path === 'groups') return 'chat'; // redirect groups page to chat
   if (!path || path === '' || !validPages.includes(path)) return 'dashboard';
   return path;
@@ -1706,7 +1755,12 @@ function filterGallery(cat) {
   const btns = document.querySelectorAll('#gallery-filters button');
   btns.forEach(b => b.className = 'btn btn-outline btn-sm');
   event.target.className = 'btn btn-primary btn-sm';
-  renderGallery(cat);
+  // Gallery page uses API-backed cards; Agents page uses inline templates
+  if (document.getElementById('page-gallery').style.display !== 'none') {
+    renderGalleryCards(cat);
+  } else {
+    renderGallery(cat);
+  }
 }
 
 async function installTemplate(idx) {
@@ -1747,6 +1801,173 @@ async function ensureGalleryLoaded() {
     } catch(e) {}
   }
   renderGallery('all');
+}
+
+// ═══ GALLERY PAGE (API-backed) ═══
+let _gallerySkills = [];
+let _galleryFilter = 'all';
+
+async function loadGalleryPage() {
+  try {
+    const res = await authFetch(API + '/api/v1/gallery');
+    const data = await res.json();
+    if (!data.ok) { toast('❌ Gallery load failed', 'error'); return; }
+    _gallerySkills = data.skills || [];
+    // Update stats
+    document.getElementById('gallery-total').textContent = _gallerySkills.length;
+    document.getElementById('gallery-builtin').textContent = _gallerySkills.filter(s => s.source === 'builtin').length;
+    document.getElementById('gallery-custom').textContent = _gallerySkills.filter(s => s.source === 'user').length;
+    document.getElementById('gallery-withmd').textContent = _gallerySkills.filter(s => s.has_md).length;
+    renderGalleryCards('all');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+function renderGalleryCards(filter) {
+  _galleryFilter = filter || 'all';
+  const el = document.getElementById('agent-gallery');
+  let skills = _gallerySkills;
+  if (filter && filter !== 'all') {
+    skills = skills.filter(s => s.category === filter || s.cat === filter);
+  }
+  // Apply search filter
+  const searchVal = (document.getElementById('gallery-search')?.value || '').toLowerCase().trim();
+  if (searchVal) {
+    skills = skills.filter(s =>
+      (s.name || '').toLowerCase().includes(searchVal) ||
+      (s.description || s.desc || '').toLowerCase().includes(searchVal) ||
+      (s.id || '').toLowerCase().includes(searchVal)
+    );
+  }
+  if (!skills.length) {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:48px;margin-bottom:12px">📦</div><div>Không tìm thấy skill nào.</div></div>';
+    return;
+  }
+  el.innerHTML = skills.map(s => {
+    const icon = s.icon || '🆕';
+    const name = s.name || s.id || 'Unknown';
+    const desc = s.description || s.desc || '';
+    const cat = s.category || s.cat || '';
+    const role = s.role || 'assistant';
+    const source = s.source || 'builtin';
+    const hasMd = s.has_md ? '<span style="font-size:10px;background:var(--orange);color:#000;padding:1px 5px;border-radius:6px;margin-left:4px">📄MD</span>' : '';
+    const sourceTag = source === 'user'
+      ? '<span style="font-size:10px;background:var(--cyan);color:#000;padding:1px 5px;border-radius:6px;margin-left:4px">Custom</span>'
+      : '<span style="font-size:10px;background:var(--bg2);color:var(--text2);padding:1px 5px;border-radius:6px;margin-left:4px">Built-in</span>';
+    const deleteBtn = source === 'user'
+      ? `<button class="btn btn-outline btn-sm" onclick="deleteGallerySkill('${(s.id||'').replace(/'/g,"\\'")}')" style="font-size:10px;color:var(--red)" title="Xóa">🗑️</button>`
+      : '';
+    return `<div class="card" data-cat="${cat}" style="position:relative">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-size:28px">${icon}</span>
+        <div style="flex:1">
+          <div style="font-weight:600;color:var(--text)">${name} ${sourceTag}${hasMd}</div>
+          <div style="font-size:10px;color:var(--text2)">${role} • ${cat}</div>
+        </div>
+        ${deleteBtn}
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;min-height:32px">${desc}</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-primary btn-sm" onclick="installGallerySkill('${(s.id||'').replace(/'/g,"\\'")}')" style="flex:1;font-size:11px">⚡ Cài Agent</button>
+        ${s.has_md ? `<button class="btn btn-outline btn-sm" onclick="viewGalleryMd('${(s.id||'').replace(/'/g,"\\'")}')" style="font-size:11px" title="Xem MD">📄</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterGalleryBySearch() {
+  renderGalleryCards(_galleryFilter);
+}
+
+function showCreateGalleryForm() {
+  document.getElementById('gallery-create-form').style.display = '';
+}
+
+async function createGallerySkill() {
+  const id = document.getElementById('new-skill-id').value.trim();
+  const name = document.getElementById('new-skill-name').value.trim();
+  const icon = document.getElementById('new-skill-icon').value.trim() || '🆕';
+  const role = document.getElementById('new-skill-role').value;
+  const category = document.getElementById('new-skill-cat').value;
+  const desc = document.getElementById('new-skill-desc').value.trim();
+  const prompt = document.getElementById('new-skill-prompt').value.trim();
+  const mdFile = document.getElementById('new-skill-md').files[0];
+  if (!id || !name) { toast('ID và Tên là bắt buộc', 'error'); return; }
+  // Create skill via API
+  try {
+    const body = { id, name, icon, role, category, description: desc, system_prompt: prompt };
+    const res = await authFetch(API + '/api/v1/gallery', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const r = await res.json();
+    if (!r.ok) { toast('❌ ' + r.error, 'error'); return; }
+    toast('✅ Skill "' + name + '" đã tạo!');
+    // Upload MD file if provided
+    if (mdFile) {
+      const mdContent = await mdFile.text();
+      await authFetch(API + '/api/v1/gallery/' + encodeURIComponent(id) + '/md', {
+        method: 'POST', headers: {'Content-Type':'text/plain'},
+        body: mdContent
+      });
+      toast('📄 File MD đã upload cho skill "' + name + '"');
+    }
+    // Reset form
+    document.getElementById('gallery-create-form').style.display = 'none';
+    ['new-skill-id','new-skill-name','new-skill-icon','new-skill-desc','new-skill-prompt'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('new-skill-md').value = '';
+    loadGalleryPage();
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function deleteGallerySkill(id) {
+  if (!confirm('Xóa skill "' + id + '"?')) return;
+  try {
+    const res = await authFetch(API + '/api/v1/gallery/' + encodeURIComponent(id), { method: 'DELETE' });
+    const r = await res.json();
+    if (r.ok) { toast('🗑️ Đã xóa skill "' + id + '"'); loadGalleryPage(); }
+    else toast('❌ ' + (r.error || 'Delete failed'), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function installGallerySkill(id) {
+  const skill = _gallerySkills.find(s => s.id === id);
+  if (!skill) { toast('❌ Skill not found', 'error'); return; }
+  const body = {
+    name: skill.name || id,
+    role: skill.role || 'assistant',
+    description: skill.description || skill.desc || '',
+    system_prompt: skill.system_prompt || skill.prompt || '',
+  };
+  try {
+    const res = await authFetch(API + '/api/v1/agents', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const r = await res.json();
+    if (r.ok) { toast('⚡ Agent "' + body.name + '" đã cài từ Gallery!'); }
+    else { toast('❌ ' + r.error, 'error'); }
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function viewGalleryMd(id) {
+  try {
+    const res = await authFetch(API + '/api/v1/gallery/' + encodeURIComponent(id) + '/md');
+    const data = await res.json();
+    if (data.ok) {
+      // Show in a simple overlay
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+      overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
+      overlay.innerHTML = `<div style="width:90%;max-width:700px;max-height:80vh;overflow:auto;background:var(--bg);padding:24px;border-radius:16px;border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h3 style="margin:0">📄 ${id}.md</h3>
+          <button class="btn btn-outline btn-sm" onclick="this.closest('div[style*=fixed]').remove()">✕ Đóng</button>
+        </div>
+        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:var(--text)">${data.content.replace(/</g,'&lt;')}</pre>
+      </div>`;
+      document.body.appendChild(overlay);
+    } else { toast('❌ ' + (data.error || 'Not found'), 'error'); }
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
 }
 
 async function showCreateAgentForm() {
@@ -2593,7 +2814,8 @@ const I18N = {
     'nav.dashboard':'Bảng điều khiển','nav.webchat':'Trò chuyện','nav.settings':'Cài đặt',
     'nav.providers':'Nhà cung cấp','nav.channels':'Kênh liên lạc','nav.tools':'Công cụ',
     'nav.brain':'Brain Engine','nav.mcp':'Máy chủ MCP','nav.agents':'AI Agent',
-    'nav.knowledge':'Kho tri thức','nav.config':'Tệp cấu hình',
+    'nav.gallery':'Gallery','nav.knowledge':'Kho tri thức','nav.config':'Tệp cấu hình',
+    'gallery.title':'Gallery','gallery.subtitle':'50 mẫu agent từ ClawHub.ai + tự tạo. Upload file MD mở rộng khả năng.',
     // Dashboard
     'dash.title':'Bảng điều khiển','dash.subtitle':'Trung tâm quản lý Agent Gateway',
     'dash.status':'Trạng thái','dash.version':'Phiên bản','dash.provider':'Nhà cung cấp',
@@ -2698,7 +2920,8 @@ const I18N = {
     'nav.dashboard':'Dashboard','nav.webchat':'WebChat','nav.settings':'Settings',
     'nav.providers':'Providers','nav.channels':'Channels','nav.tools':'Tools',
     'nav.brain':'Brain Engine','nav.mcp':'MCP Servers','nav.agents':'AI Agent',
-    'nav.knowledge':'Knowledge','nav.config':'Config File',
+    'nav.gallery':'Gallery','nav.knowledge':'Knowledge','nav.config':'Config File',
+    'gallery.title':'Gallery','gallery.subtitle':'50 agent templates from ClawHub.ai + custom. Upload MD files to extend capabilities.',
     // Dashboard
     'dash.title':'Dashboard','dash.subtitle':'Agent Gateway Control Panel',
     'dash.status':'Status','dash.version':'Version','dash.provider':'Provider',
