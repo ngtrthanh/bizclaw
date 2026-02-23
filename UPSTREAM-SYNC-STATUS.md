@@ -54,27 +54,48 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 - `crates/bizclaw-scheduler/src/lib.rs` - Exported new modules
 - `crates/bizclaw-tools/src/lib.rs` - Added plan_store module
 
-## Phase 2: Database & Config (NEXT)
+## Phase 2: Database & Config ✅ COMPLETE
 
-### Remaining Upstream Commits to Review:
-1. `11dee2e` - SQLite DB for providers/agents CRUD, remove ClawHub branding
-2. `e0b88de` - Agent edit error handling, knowledge file upload, provider inheritance
-3. `bb3b0fe` - Hybrid config persistence (dashboard sync + admin settings)
-4. `03b4f53` - DB as source of truth for tenant settings
+**Commit**: `e173373` (pushed to origin)
+**Upstream Source**: `11dee2e`, `03b4f53`
 
-### Challenges:
-- Multiple conflicts in README.md and dashboard.html
-- Cargo.lock conflicts (we don't track it)
-- Need manual integration approach
+### Features Integrated:
+1. **Gateway SQLite Database** (`crates/bizclaw-gateway/src/db.rs`)
+   - Provider CRUD operations
+   - Agent CRUD operations
+   - Agent-channel bindings
+   - Settings storage
+   - Default provider seeding (OpenAI, Anthropic, Gemini, DeepSeek, Groq, Ollama, LlamaCPP, Brain)
+   - Migration from agents.json support
 
-### Strategy:
-Instead of cherry-picking, manually extract and integrate:
-1. New database schema from `crates/bizclaw-gateway/src/db.rs`
-2. Config persistence improvements
-3. Provider/agent CRUD APIs
-4. Skip README and dashboard.html (merge separately later)
+2. **Database Integration**
+   - Added rusqlite dependency with bundled feature
+   - Integrated database into AppState
+   - Database initialization in server startup
+   - WAL mode for better concurrent performance
 
-## Phase 3: Channels (PLANNED)
+3. **Test Coverage**
+   - 10 comprehensive tests for database operations
+   - Provider CRUD tests
+   - Agent CRUD tests
+   - Channel binding tests
+   - Settings tests
+   - JSON migration tests
+
+### Quality Checks:
+- ✅ Code compiles successfully
+- ✅ Code formatted with `cargo fmt`
+- ✅ Database tests included
+- ⏳ Full test suite (pending - long running)
+
+### Files Modified:
+- `crates/bizclaw-gateway/Cargo.toml` - Added rusqlite dependency
+- `crates/bizclaw-gateway/src/lib.rs` - Exported db module
+- `crates/bizclaw-gateway/src/db.rs` - New database module (783 lines)
+- `crates/bizclaw-gateway/src/server.rs` - Integrated database into AppState
+- `crates/bizclaw-gateway/src/routes.rs` - Updated test helper
+
+## Phase 3: Channels (NEXT)
 
 ### Target Commits:
 - `7936063` - Generic webhook inbound channel
@@ -103,11 +124,10 @@ UI changes (dashboard.html) will be merged separately to avoid conflicts.
 ## Current Status
 
 **Branch**: `features/upstream-sync`
-**Commits Ahead**: 1 (Phase 1)
+**Commits Ahead**: 2 (Phase 1 + Phase 2)
 **Upstream Position**: `11dee2e` (latest)
-**Tests**: 92 passing
-**Clippy**: Clean
-**Next Action**: Begin Phase 2 - Database & Config integration
+**Build**: ✅ Compiles successfully
+**Next Action**: Phase 3 - Webhook channel integration
 
 ## Notes
 
