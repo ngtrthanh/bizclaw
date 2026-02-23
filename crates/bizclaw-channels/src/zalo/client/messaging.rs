@@ -42,22 +42,26 @@ pub enum ThreadType {
 }
 
 /// Zalo service map — dynamic URLs obtained after login.
-/// These replace the hardcoded tt-chat-wpa endpoint.
+/// Based on `zpw_service_map_v3` response from `getLoginInfo`.
+/// Reference: https://github.com/RFS-ADRENO/zca-js/blob/main/src/context.ts
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ZaloServiceMap {
-    /// Chat API endpoints (e.g., ["wpa-xx.chat.zalo.me"])
+    /// Chat API endpoints (message sending for User threads)
     #[serde(default)]
     pub chat: Vec<String>,
-    /// Group API endpoints
+    /// Group API endpoints (group management + messages)
     #[serde(default)]
     pub group: Vec<String>,
+    /// Group poll endpoints (getAllGroups)
+    #[serde(default)]
+    pub group_poll: Vec<String>,
     /// File upload endpoints
     #[serde(default)]
     pub file: Vec<String>,
-    /// Friend endpoints
+    /// Friend endpoints (friend requests)
     #[serde(default)]
     pub friend: Vec<String>,
-    /// Profile endpoints
+    /// Profile endpoints (friends list, user info)
     #[serde(default)]
     pub profile: Vec<String>,
     /// Sticker endpoints
@@ -82,6 +86,7 @@ impl ZaloServiceMap {
         Self {
             chat: get_urls("chat"),
             group: get_urls("group"),
+            group_poll: get_urls("group_poll"),
             file: get_urls("file"),
             friend: get_urls("friend"),
             profile: get_urls("profile"),
@@ -91,25 +96,52 @@ impl ZaloServiceMap {
         }
     }
 
-    /// Get the best chat URL, with fallback to default.
+    /// Get the best chat URL (for User thread messaging).
+    /// zca-js: api.zpwServiceMap.chat[0]
     pub fn chat_url(&self) -> &str {
         self.chat.first()
             .map(|s| s.as_str())
-            .unwrap_or("https://tt-chat-wpa.chat.zalo.me/api")
+            .unwrap_or("https://wpa.chat.zalo.me")
     }
 
-    /// Get the best group URL, with fallback.
+    /// Get the best group URL (for Group thread messaging + management).
+    /// zca-js: api.zpwServiceMap.group[0]
     pub fn group_url(&self) -> &str {
         self.group.first()
             .map(|s| s.as_str())
-            .unwrap_or("https://tt-group-wpa.chat.zalo.me/api")
+            .unwrap_or("https://wpa.chat.zalo.me")
     }
 
-    /// Get the best reaction URL, with fallback.
+    /// Get the best group_poll URL (for getAllGroups).
+    /// zca-js: api.zpwServiceMap.group_poll[0]
+    pub fn group_poll_url(&self) -> &str {
+        self.group_poll.first()
+            .map(|s| s.as_str())
+            .unwrap_or("https://wpa.chat.zalo.me")
+    }
+
+    /// Get the best reaction URL.
+    /// zca-js: api.zpwServiceMap.reaction[0]
     pub fn reaction_url(&self) -> &str {
         self.reaction.first()
             .map(|s| s.as_str())
-            .unwrap_or("https://tt-chat-wpa.chat.zalo.me/api")
+            .unwrap_or("https://wpa.chat.zalo.me")
+    }
+
+    /// Get the best profile URL (for friends list, user info).
+    /// zca-js: api.zpwServiceMap.profile[0]
+    pub fn profile_url(&self) -> &str {
+        self.profile.first()
+            .map(|s| s.as_str())
+            .unwrap_or("https://wpa.chat.zalo.me")
+    }
+
+    /// Get the best friend URL (for friend requests).
+    /// zca-js: api.zpwServiceMap.friend[0]
+    pub fn friend_url(&self) -> &str {
+        self.friend.first()
+            .map(|s| s.as_str())
+            .unwrap_or("https://wpa.chat.zalo.me")
     }
 }
 
@@ -135,7 +167,7 @@ impl ZaloMessaging {
             service_map,
             secret_key: None,
             uid: None,
-            zpw_ver: 645,
+            zpw_ver: 671,
             zpw_type: 30,
         }
     }
@@ -166,6 +198,8 @@ impl ZaloMessaging {
     }
 
     /// Send a text message (works for both User and Group threads).
+    /// zca-js: POST {chat[0]}/api/message (User) or {group[0]}/api/group (Group)
+    /// with nretry=0 query param
     pub async fn send_text(
         &self,
         thread_id: &str,
@@ -173,23 +207,27 @@ impl ZaloMessaging {
         content: &str,
         cookie: &str,
     ) -> Result<String> {
+        // zca-js: api.zpwServiceMap.chat[0] + "/api/message" (User)
+        //         api.zpwServiceMap.group[0] + "/api/group" (Group)
         let base_url = if thread_type == ThreadType::User {
-            format!("{}/message/sms", self.service_map.chat_url())
+            format!("{}/api/message", self.service_map.chat_url())
         } else {
-            format!("{}/group/sendmsg", self.service_map.group_url())
+            format!("{}/api/group", self.service_map.group_url())
         };
 
-        let endpoint = self.add_api_params(&base_url);
+        let endpoint = self.add_api_params(&format!("{}?nretry=0", base_url));
 
         let params = serde_json::json!({
             "toid": thread_id,
-            "message": content,
+            "msg": content,
             "clientId": generate_client_id(),
         });
 
         let response = self.client
             .post(&endpoint)
             .header("cookie", cookie)
+            .header("origin", "https://chat.zalo.me")
+            .header("referer", "https://chat.zalo.me/")
             .form(&params)
             .send()
             .await
@@ -230,7 +268,7 @@ impl ZaloMessaging {
             "rType": reaction,
         });
 
-        let endpoint = self.add_api_params(&format!("{}/message/reaction", self.service_map.reaction_url()));
+        let endpoint = self.add_api_params(&format!("{}/api/message/reaction", self.service_map.reaction_url()));
 
         self.client
             .post(&endpoint)
@@ -255,7 +293,7 @@ impl ZaloMessaging {
             "toid": thread_id,
         });
 
-        let endpoint = self.add_api_params(&format!("{}/message/undo", self.service_map.chat_url()));
+        let endpoint = self.add_api_params(&format!("{}/api/message/undo", self.service_map.chat_url()));
 
         self.client
             .post(&endpoint)

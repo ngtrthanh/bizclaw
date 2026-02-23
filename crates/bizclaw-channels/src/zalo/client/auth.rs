@@ -41,7 +41,10 @@ pub struct LoginData {
     pub uid: String,
     pub zpw_enk: Option<String>,
     pub zpw_key: Option<String>,
-    pub zpw_service_map: Option<serde_json::Value>,
+    /// Service map v3 — dynamic URLs for each API category (chat, group, file, friend, profile, etc.)
+    pub zpw_service_map_v3: Option<serde_json::Value>,
+    /// WebSocket URL for real-time listening
+    pub zpw_ws: Option<Vec<String>>,
 }
 
 /// QR code generation result (from /authen/qr/generate).
@@ -118,32 +121,58 @@ impl ZaloAuth {
             ));
         }
 
-        // Send login request to Zalo Web API
-        let response = self.client
-            .get("https://tt-chat-wpa.chat.zalo.me/api/login/getServerInfo")
+        // Step 1: Login to get user info + secret key + service map (zca-js protocol)
+        // URL: https://wpa.chat.zalo.me/api/login/getLoginInfo (NOT tt-chat-wpa!)
+        let login_response = self.client
+            .get("https://wpa.chat.zalo.me/api/login/getLoginInfo")
             .header("cookie", cookie)
             .header("user-agent", &self.credentials.user_agent)
+            .header("origin", "https://chat.zalo.me")
+            .header("referer", "https://chat.zalo.me/")
             .send()
             .await
             .map_err(|e| BizClawError::AuthFailed(format!("Login request failed: {e}")))?;
 
-        let body: serde_json::Value = response.json().await
+        let login_body: serde_json::Value = login_response.json().await
             .map_err(|e| BizClawError::AuthFailed(format!("Invalid login response: {e}")))?;
 
-        let error_code = body["error_code"].as_i64().unwrap_or(-1);
-        if error_code != 0 {
+        let login_error = login_body["error_code"].as_i64().unwrap_or(-1);
+        if login_error != 0 {
             return Err(BizClawError::AuthFailed(format!(
                 "Login failed with error code: {} - {}",
-                error_code,
-                body["error_message"].as_str().unwrap_or("unknown")
+                login_error,
+                login_body["error_message"].as_str().unwrap_or("unknown")
             )));
         }
 
+        let login_data = &login_body["data"];
+
+        // Step 2: Get server info to get settings + extra_ver
+        // URL: https://wpa.chat.zalo.me/api/login/getServerInfo
+        let _server_response = self.client
+            .get("https://wpa.chat.zalo.me/api/login/getServerInfo")
+            .header("cookie", cookie)
+            .header("user-agent", &self.credentials.user_agent)
+            .header("origin", "https://chat.zalo.me")
+            .header("referer", "https://chat.zalo.me/")
+            .query(&[("imei", &self.credentials.imei)])
+            .query(&[("type", "30")])
+            .query(&[("client_version", "671")])
+            .query(&[("computer_name", "Web")])
+            .send()
+            .await
+            .map_err(|e| BizClawError::AuthFailed(format!("Get server info failed: {e}")))?;
+
+        // Parse zpw_ws array
+        let zpw_ws = login_data["zpw_ws"].as_array()
+            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
+
         Ok(LoginData {
-            uid: body["data"]["uid"].as_str().unwrap_or("").into(),
-            zpw_enk: body["data"]["zpw_enk"].as_str().map(String::from),
-            zpw_key: body["data"]["zpw_key"].as_str().map(String::from),
-            zpw_service_map: body["data"]["zpw_service_map"].as_object().map(|m| serde_json::to_value(m).unwrap_or_default()),
+            uid: login_data["uid"].as_str().unwrap_or("").into(),
+            zpw_enk: login_data["zpw_enk"].as_str().map(String::from),
+            zpw_key: login_data["zpw_key"].as_str().map(String::from),
+            zpw_service_map_v3: login_data["zpw_service_map_v3"].as_object().map(|m| serde_json::to_value(m).unwrap_or_default()),
+            zpw_ws,
         })
     }
 

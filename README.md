@@ -8,9 +8,9 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-76%20passing-brightgreen)]()
 [![Crates](https://img.shields.io/badge/crates-14-success)]()
-[![LOC](https://img.shields.io/badge/lines-20500-informational)]()
+[![LOC](https://img.shields.io/badge/lines-21161-informational)]()
 
-<!-- AUTO-GENERATED STATS — updated 2026-02-23 @ 3ec8360 -->
+<!-- AUTO-GENERATED STATS — updated 2026-02-23 @ ef7b9d2 -->
 
 ---
 
@@ -28,7 +28,7 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 |----------|----------|
 | **🧠 Brain Engine** | LLaMA inference: GGUF, mmap, quantization, Flash Attention, FP16 KV Cache |
 | **🔌 9 Providers** | OpenAI, Anthropic, Ollama, llama.cpp, Brain, Gemini, DeepSeek, Groq |
-| **💬 17 Channels** | CLI, Zalo Personal, Telegram, Discord, Email (IMAP/SMTP), Webhook |
+| **💬 18 Channels** | CLI, Zalo Personal, Telegram, Discord, Email (IMAP/SMTP), Webhook |
 | **🏢 Multi-Tenant** | Admin Platform, JWT Auth, Tenant Manager, Pairing Codes, Audit Log |
 | **🌐 Web Dashboard** | Chat UI (VI/EN), WebSocket real-time, LobsterBoard-inspired widgets |
 | **🛠️ 15 Tools** | Shell, File, Web Search, Group Summarizer, Calendar, Document Reader |
@@ -128,7 +128,7 @@ ollama pull llama3.2      # ~3.8GB
 | `bizclaw-core` | Traits, types, config, errors | ✅ |
 | `bizclaw-brain` | GGUF inference + SIMD | ✅ |
 | `bizclaw-providers` | 9 LLM providers | ✅ |
-| `bizclaw-channels` | 17 channels | ✅ |
+| `bizclaw-channels` | 18 channels | ✅ |
 | `bizclaw-memory` | SQLite + RAG retrieval | ✅ |
 | `bizclaw-tools` | 15 native tools | ✅ |
 | `bizclaw-mcp` | MCP client (JSON-RPC) | ✅ |
@@ -144,13 +144,13 @@ ollama pull llama3.2      # ~3.8GB
 |--------|-------|
 | **Language** | 100% Rust |
 | **Crates** | 14 |
-| **Lines of Code** | ~20500 |
+| **Lines of Code** | ~21161 |
 | **Tests** | 76 passing |
 | **Providers** | 9 |
-| **Channels** | 17 |
+| **Channels** | 18 |
 | **Tools** | 15 + MCP |
 | **Binary Size** | bizclaw 11M, platform 7.1M |
-| **Last Updated** | 2026-02-23 (3ec8360) |
+| **Last Updated** | 2026-02-23 (ef7b9d2) |
 
 ---
 
@@ -160,7 +160,7 @@ ollama pull llama3.2      # ~3.8GB
 
 - **🧠 Brain Engine** — Local LLaMA inference via GGUF with SIMD
 - **🔌 9 Providers** — OpenAI, Anthropic, Ollama, llama.cpp, Brain, Gemini, DeepSeek, Groq
-- **💬 17 Channels** — CLI, Zalo, Telegram, Discord, Email, Webhook
+- **💬 18 Channels** — CLI, Zalo, Telegram, Discord, Email, Webhook
 - **🔗 MCP Support** — Connect any MCP server for unlimited tools
 - **🏢 Multi-Tenant Platform** — Admin dashboard, JWT auth, tenant lifecycle
 - **🌐 Web Dashboard** — Bilingual (VI/EN), real-time WebSocket chat

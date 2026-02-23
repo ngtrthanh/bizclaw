@@ -51,6 +51,20 @@ impl ZaloChannel {
     /// Login with cookie from config or parameter.
     async fn login_cookie(&mut self, cookie: &str) -> Result<()> {
         let login_data = self.auth.login_with_cookie(cookie).await?;
+
+        // Apply service map to messaging client (critical for correct API URLs)
+        if let Some(ref map) = login_data.zpw_service_map_v3 {
+            let service_map = client::messaging::ZaloServiceMap::from_login_data(map);
+            self.messaging.set_service_map(service_map);
+            tracing::info!("Zalo: service map applied from login response");
+        }
+
+        // Set login credentials
+        self.messaging.set_login_info(
+            &login_data.uid,
+            login_data.zpw_enk.as_deref(),
+        );
+
         self.session.set_session(
             login_data.uid.clone(),
             login_data.zpw_enk,
