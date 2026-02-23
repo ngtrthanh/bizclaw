@@ -8,9 +8,9 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-89%20passing-brightgreen)]()
 [![Crates](https://img.shields.io/badge/crates-14-success)]()
-[![LOC](https://img.shields.io/badge/lines-23995-informational)]()
+[![LOC](https://img.shields.io/badge/lines-23996-informational)]()
 
-<!-- AUTO-GENERATED STATS — updated 2026-02-23 @ ae6d855 -->
+<!-- AUTO-GENERATED STATS — updated 2026-02-23 @ 68bf9dc -->
 
 ---
 
@@ -174,13 +174,13 @@ ollama pull llama3.2      # ~3.8GB
 |--------|-------|
 | **Language** | 100% Rust |
 | **Crates** | 14 |
-| **Lines of Code** | ~23995 |
+| **Lines of Code** | ~23996 |
 | **Tests** | 89 passing |
 | **Providers** | 3 |
 | **Channels** | 18 |
 | **Tools** | 15 + MCP |
 | **Binary Size** | bizclaw 11M, platform 7.1M |
-| **Last Updated** | 2026-02-23 (ae6d855) |
+| **Last Updated** | 2026-02-23 (68bf9dc) |
 
 ---
 

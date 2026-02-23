@@ -617,6 +617,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <div class="form-row"><span class="form-label" data-i18n="form.description">Mô tả</span><input id="edit-agent-desc"></div>
           <div class="form-row"><span class="form-label">Nhà cung cấp</span><select id="edit-agent-provider" onchange="loadAgentModels(this.value,'edit-agent-model')"><option value="">— Giữ nguyên —</option></select></div>
           <div class="form-row"><span class="form-label">Mô hình AI</span><select id="edit-agent-model"><option value="">— Giữ nguyên —</option></select></div>
+          <div class="form-row"><span class="form-label" data-i18n="set.sysprompt">System Prompt</span><textarea id="edit-agent-prompt" placeholder="Lời nhắc hệ thống cho agent..." style="min-height:120px;font-size:12px"></textarea></div>
           <!-- Channel Binding Section -->
           <div style="margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
             <div style="font-weight:600;margin-bottom:8px">🔗 Gán Agent với Kênh</div>
@@ -1676,6 +1677,7 @@ async function runHealthCheck() {
 
 // ═══ MULTI-AGENT ORCHESTRATOR ═══
 let _providersCache = null; // cache from GET /api/v1/providers
+let _agentsList = []; // cache from GET /api/v1/agents
 
 // ═══ AGENT TEMPLATES GALLERY ═══
 const AGENT_TEMPLATES = [
@@ -2069,13 +2071,14 @@ async function loadAgents() {
     document.getElementById('agents-messages').textContent = 
       (data.recent_messages || []).length;
     
+    _agentsList = data.agents || [];
     const list = document.getElementById('agents-list');
-    if (!data.agents || data.agents.length === 0) {
+    if (!_agentsList.length) {
       list.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:48px;margin-bottom:12px">🤖</div><div>No agents yet. Click <b>+ Create Agent</b> to build your AI team.</div></div>';
       return;
     }
     
-    list.innerHTML = data.agents.map(a => {
+    list.innerHTML = _agentsList.map(a => {
       const safeName = a.name.replace(/'/g, "\\'");
       const icon = a.role === 'coder' ? '💻' : a.role === 'researcher' ? '🔬' : a.role === 'writer' ? '✍️' : a.role === 'analyst' ? '📊' : a.role === 'translator' ? '🌐' : '🤖';
       return `
@@ -2086,7 +2089,7 @@ async function loadAgents() {
             <div style="font-weight:600;color:var(--text)">${a.name} ${a.is_default ? '<span style="font-size:10px;background:var(--accent);color:#000;padding:2px 6px;border-radius:8px">DEFAULT</span>' : ''}</div>
             <div style="font-size:11px;color:var(--text2)">${a.role} • ${a.provider}${a.model ? '/' + a.model : ''} • ${a.tools} tools</div>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="editAgent('${safeName}','${a.role}','${a.description.replace(/'/g, "\\'").replace(/"/g,'&quot;')}','${a.provider||''}','${a.model||''}')" style="font-size:11px" title="Sửa">✏️</button>
+          <button class="btn btn-outline btn-sm" onclick="editAgent('${safeName}')" style="font-size:11px" title="Sửa">✏️</button>
         </div>
         <div style="font-size:12px;color:var(--text2)">${a.description}</div>
         <div style="font-size:11px;color:var(--text2);margin-top:6px">💬 ${a.messages_processed} messages • 📝 ${a.conversation_length} in context</div>
@@ -2177,11 +2180,14 @@ async function chatWithAgent(name) {
   } catch(e) { respEl.innerHTML = `<span style="color:var(--red)">❌ ${e.message}</span>`; }
 }
 
-async function editAgent(name, role, desc, provider, model) {
+async function editAgent(name) {
+  const a = (_agentsList || []).find(x => x.name === name);
+  if (!a) { toast('❌ Agent not found'); return; }
   document.getElementById('edit-agent-name-hidden').value = name;
   document.getElementById('edit-agent-title').textContent = name;
-  document.getElementById('edit-agent-role').value = role;
-  document.getElementById('edit-agent-desc').value = desc.replace(/&quot;/g, '"');
+  document.getElementById('edit-agent-role').value = a.role || 'assistant';
+  document.getElementById('edit-agent-desc').value = a.description || '';
+  document.getElementById('edit-agent-prompt').value = a.system_prompt || '';
   document.getElementById('edit-agent-tg-token').value = '';
   document.getElementById('agent-edit-modal').style.display = 'flex';
   // Populate provider dropdown (only active/configured)
@@ -2201,7 +2207,7 @@ async function editAgent(name, role, desc, provider, model) {
         const typeIcon = p.type === 'local' ? '🖥️' : '☁️';
         const badge = p.status === 'active' ? ' ⚡' : '';
         opt.textContent = `${typeIcon} ${p.name}${badge}`;
-        if (p.name === provider) opt.selected = true;
+        if (p.name === a.provider) opt.selected = true;
         sel.appendChild(opt);
       });
     }
@@ -2209,9 +2215,9 @@ async function editAgent(name, role, desc, provider, model) {
   // Populate model dropdown
   const modelSel = document.getElementById('edit-agent-model');
   modelSel.innerHTML = '<option value="">— Giữ nguyên —</option>';
-  if (provider) {
-    await loadAgentModels(provider, 'edit-agent-model');
-    if (model) modelSel.value = model;
+  if (a.provider) {
+    await loadAgentModels(a.provider, 'edit-agent-model');
+    if (a.model) modelSel.value = a.model;
   }
   // Load telegram status
   loadTelegramStatus(name);
@@ -2282,9 +2288,11 @@ async function saveAgentEdit() {
   const desc = document.getElementById('edit-agent-desc').value.trim();
   const provider = document.getElementById('edit-agent-provider').value;
   const model = document.getElementById('edit-agent-model').value;
+  const prompt = document.getElementById('edit-agent-prompt').value.trim();
   const body = { role, description: desc };
   if (provider) body.provider = provider;
   if (model) body.model = model;
+  if (prompt) body.system_prompt = prompt;
   try {
     const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(name), {
       method: 'PUT', headers: {'Content-Type':'application/json'},

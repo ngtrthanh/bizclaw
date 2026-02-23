@@ -204,6 +204,7 @@ impl Orchestrator {
                     "active": a.active,
                     "provider": a.agent.provider_name(),
                     "model": a.agent.model_name(),
+                    "system_prompt": a.agent.system_prompt(),
                     "tools": a.agent.tool_count(),
                     "messages_processed": a.message_count,
                     "conversation_length": a.agent.conversation().len(),
