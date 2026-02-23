@@ -29,9 +29,9 @@ jobs:
           - target: armv7-unknown-linux-gnueabihf
             artifact: bizclaw-linux-armv7
             platform: linux/arm/v7
-            #target: arm-unknown-linux-gnueabihf
-            #artifact: bizclaw-linux-armv6
-            #platform: linux/arm/v6
+          - target: arm-unknown-linux-gnueabihf
+            artifact: bizclaw-linux-armv6
+            platform: linux/arm/v6
     steps:
       - uses: actions/checkout@v4
 
