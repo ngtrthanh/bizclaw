@@ -28,6 +28,8 @@ pub struct AppState {
     pub scheduler: Arc<tokio::sync::Mutex<bizclaw_scheduler::SchedulerEngine>>,
     /// Knowledge base — personal RAG with FTS5 search.
     pub knowledge: Arc<tokio::sync::Mutex<Option<bizclaw_knowledge::KnowledgeStore>>>,
+    /// Per-tenant SQLite database for persistent CRUD (providers, agents, channels, settings).
+    pub db: Arc<super::db::GatewayDb>,
 }
 
 /// Serve the dashboard HTML page.
@@ -280,6 +282,22 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
     let orchestrator = bizclaw_agent::orchestrator::Orchestrator::new();
     tracing::info!("🤖 Multi-Agent Orchestrator initialized");
 
+    // Initialize Gateway Database
+    let db_path = config_path
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("gateway.db");
+    let db = match super::db::GatewayDb::open(&db_path) {
+        Ok(db) => {
+            tracing::info!("💾 Gateway database initialized: {}", db_path.display());
+            Arc::new(db)
+        }
+        Err(e) => {
+            tracing::error!("❌ Failed to open gateway database: {e}");
+            return Err(anyhow::anyhow!("Database initialization failed: {e}"));
+        }
+    };
+
     // Wrap orchestrator in Arc for shared access
     let orchestrator_arc = Arc::new(tokio::sync::Mutex::new(orchestrator));
 
@@ -322,6 +340,7 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
         orchestrator: orchestrator_arc.clone(),
         scheduler,
         knowledge: Arc::new(tokio::sync::Mutex::new(knowledge)),
+        db,
     };
 
     let app = build_router(state);

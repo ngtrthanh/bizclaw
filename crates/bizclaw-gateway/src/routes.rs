@@ -1059,6 +1059,8 @@ mod tests {
     use std::sync::Mutex;
 
     fn test_state() -> State<Arc<AppState>> {
+        let temp_db = std::env::temp_dir().join("bizclaw-test-gateway.db");
+        let db = crate::db::GatewayDb::open(&temp_db).unwrap();
         State(Arc::new(AppState {
             gateway_config: bizclaw_core::config::GatewayConfig::default(),
             full_config: Arc::new(Mutex::new(bizclaw_core::config::BizClawConfig::default())),
@@ -1075,6 +1077,7 @@ mod tests {
                 ),
             )),
             knowledge: Arc::new(tokio::sync::Mutex::new(None)),
+            db: Arc::new(db),
         }))
     }
 
