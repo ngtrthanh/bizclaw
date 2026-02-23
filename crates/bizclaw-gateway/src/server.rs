@@ -415,6 +415,21 @@ pub async fn start(config: &GatewayConfig) -> anyhow::Result<()> {
                 agent_cfg.identity.system_prompt = agent_rec.system_prompt.clone();
             }
             agent_cfg.identity.name = agent_rec.name.clone();
+
+            // Inject per-provider API key and base_url from DB
+            // This enables agents to use different providers (e.g. Ollama, DeepSeek)
+            let provider_name = &agent_cfg.default_provider;
+            if let Ok(db_provider) = gateway_db.get_provider(provider_name) {
+                if !db_provider.api_key.is_empty() {
+                    agent_cfg.api_key = db_provider.api_key;
+                }
+                if !db_provider.base_url.is_empty() && agent_cfg.api_base_url.is_empty() {
+                    if db_provider.provider_type == "local" || db_provider.provider_type == "proxy" {
+                        agent_cfg.api_base_url = db_provider.base_url;
+                    }
+                }
+            }
+
             // Use sync Agent::new() for fast startup — MCP tools loaded lazily on first chat
             match bizclaw_agent::Agent::new(agent_cfg) {
                 Ok(agent) => {

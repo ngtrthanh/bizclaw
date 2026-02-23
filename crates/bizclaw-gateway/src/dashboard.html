@@ -73,6 +73,7 @@ a{color:var(--accent2);text-decoration:none}
 /* Badges */
 .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
 .badge-green{background:rgba(52,211,153,.12);color:var(--green)}
+.badge-yellow{background:rgba(250,204,21,.12);color:#facc15}
 .badge-blue{background:rgba(96,165,250,.12);color:var(--blue)}
 .badge-orange{background:rgba(251,146,60,.12);color:var(--orange)}
 .badge-red{background:rgba(239,68,68,.12);color:var(--red)}
@@ -988,21 +989,22 @@ async function renderProviderCards() {
 
   document.getElementById('providers-grid').innerHTML = _dbProviders.map(p => {
     const isActive = p.name === 'cliproxy' ? isClipActive : (p.name === activeProvider && !isClipActive);
-    const savedKey = p.api_key_set && isActive;
+    const hasKey = p.api_key_set;
+    const isLocal = p.type === 'local';
+    const isConfigured = hasKey || isLocal; // Local providers don't need API key
     const typeLabel = p.type === 'cloud' ? cloudLabel : (p.type === 'proxy' ? proxyLabel : localLabel);
     const fields = p.name === 'brain' ? PROVIDER_FIELDS.brain : (PROVIDER_FIELDS[p.type] || PROVIDER_FIELDS.cloud);
     const provModels = p.models || [];
     
+    // Always populate field values — not just when active
     const fieldVals = {};
-    if (isActive) {
-      fields.forEach(f => {
-        if (f.key === 'api_key') fieldVals[f.key] = savedKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '';
-        else if (f.key === 'model') fieldVals[f.key] = activeModel;
-        else if (f.key === 'base_url') fieldVals[f.key] = proxyUrl || p.base_url;
-        else if (f.key === 'model_path') fieldVals[f.key] = (c.brain||{}).model_path || '';
-        else if (f.key === 'threads') fieldVals[f.key] = (c.brain||{}).threads || 4;
-      });
-    }
+    fields.forEach(f => {
+      if (f.key === 'api_key') fieldVals[f.key] = hasKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '';
+      else if (f.key === 'model') fieldVals[f.key] = isActive ? activeModel : (provModels[0] || '');
+      else if (f.key === 'base_url') fieldVals[f.key] = (isActive ? proxyUrl : '') || p.base_url || '';
+      else if (f.key === 'model_path') fieldVals[f.key] = isActive ? ((c.brain||{}).model_path || '') : '';
+      else if (f.key === 'threads') fieldVals[f.key] = (c.brain||{}).threads || 4;
+    });
 
     // Models summary for card subtitle
     const modelsCount = provModels.length;
@@ -1044,11 +1046,11 @@ async function renderProviderCards() {
       return `<label>${f.label}</label><input type="${f.type||'text'}" id="prov-${p.name}-${f.key}" value="${val}" placeholder="${f.placeholder}">`;
     }).join('');
 
-    return `<div class="ch-card" style="${isActive?'border-color:var(--accent);box-shadow:0 0 24px rgba(99,102,241,.15)':''}">
+    return `<div class="ch-card" style="${isActive?'border-color:var(--accent);box-shadow:0 0 24px rgba(99,102,241,.15)':isConfigured&&!isActive?'border-color:rgba(250,204,21,.3)':''}">
       <div class="ch-header">
         <span class="ch-name">${p.icon || '🤖'} ${p.label || p.name}</span>
         <div style="display:flex;align-items:center;gap:8px">
-          <span class="badge badge-${isActive?'green':p.type==='proxy'?'purple':'blue'}">${isActive?'\u25cf '+activeLabel:typeLabel}</span>
+          <span class="badge badge-${isActive?'green':isConfigured?'yellow':p.type==='proxy'?'purple':'blue'}">${isActive?'\u25cf '+activeLabel:isConfigured?'✓ Sẵn sàng':typeLabel}</span>
         </div>
       </div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:10px">${modelsHint || 'Bấm 🔄 Models để tải danh sách'}</div>
@@ -1059,6 +1061,7 @@ async function renderProviderCards() {
       ${p.name === 'brain' ? '' : ''}
       <div class="ch-actions">
         <button class="btn ${isActive?'btn-green':'btn-primary'} btn-sm" onclick="setActiveProvider('${p.name}')">${isActive?activeBtn:activateBtn}</button>
+        <button class="btn btn-outline btn-sm" onclick="saveProviderConfig('${p.name}')" title="Lưu API key & config riêng cho provider này">💾</button>
         ${p.name !== 'brain' ? `<button class="btn btn-outline btn-sm" onclick="fetchModelsLive('${p.name}')" title="Tải model mới nhất từ API nhà cung cấp">🔄 Models</button>` : ''}
         ${!BUILTIN_PROVIDERS.includes(p.name) ? `<button class="btn btn-outline btn-sm" onclick="deleteProviderCard('${p.name}')" style="color:var(--red)">🗑️</button>` : ''}
       </div>
@@ -1140,6 +1143,37 @@ async function deleteProviderCard(name) {
     } else {
       toast('❌ ' + r.error);
     }
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+// Save API key & base_url per-provider to DB (without activating it as default)
+async function saveProviderConfig(name) {
+  const meta = _dbProviders ? _dbProviders.find(p => p.name === name) : null;
+  const fields = name === 'brain' ? PROVIDER_FIELDS.brain : (PROVIDER_FIELDS[meta?.type || 'cloud'] || PROVIDER_FIELDS.cloud);
+  const body = {};
+  fields.forEach(f => {
+    const el = document.getElementById('prov-' + name + '-' + f.key);
+    if (!el) return;
+    const val = el.value.trim();
+    if (!val || val.startsWith('\u2022')) return; // skip masked values
+    if (f.key === 'api_key') body.api_key = val;
+    else if (f.key === 'base_url') body.base_url = val;
+  });
+  if (!body.api_key && !body.base_url) {
+    toast('⚠️ Nhập API key hoặc Base URL để lưu');
+    return;
+  }
+  try {
+    const res = await authFetch(API + '/api/v1/providers/' + encodeURIComponent(name), {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const r = await res.json();
+    if (r.ok) {
+      toast('✅ Đã lưu cấu hình cho ' + (meta?.label || name));
+      _dbProviders = null; // force refresh
+      await renderProviderCards();
+    } else { toast('❌ ' + r.error); }
   } catch(e) { toast('❌ ' + e.message); }
 }
 

@@ -4,6 +4,7 @@ use axum::{Json, extract::State};
 use std::sync::Arc;
 
 use super::server::AppState;
+use super::db::GatewayDb;
 
 /// Mask a secret string for display — show first 4 chars + •••
 fn mask_secret(s: &str) -> String {
@@ -14,6 +15,33 @@ fn mask_secret(s: &str) -> String {
         return "••••".to_string();
     }
     format!("{}••••", &s[..4])
+}
+
+/// Enrich agent config with per-provider API key and base_url from the gateway DB.
+/// This is the critical function that enables multi-provider support — each agent
+/// gets the credentials specific to its chosen provider, not the global default.
+fn apply_provider_config_from_db(
+    db: &GatewayDb,
+    config: &mut bizclaw_core::config::BizClawConfig,
+) {
+    let provider_name = &config.default_provider;
+    if provider_name.is_empty() {
+        return;
+    }
+    if let Ok(db_provider) = db.get_provider(provider_name) {
+        // Use provider-specific API key if it has one, overriding global config
+        if !db_provider.api_key.is_empty() {
+            config.api_key = db_provider.api_key;
+        }
+        // Use provider-specific base_url if set (for Ollama custom host, etc.)
+        if !db_provider.base_url.is_empty() && config.api_base_url.is_empty() {
+            // Don't override if user explicitly set api_base_url in global config
+            // But for local providers, always use their registered URL
+            if db_provider.provider_type == "local" || db_provider.provider_type == "proxy" {
+                config.api_base_url = db_provider.base_url;
+            }
+        }
+    }
 }
 
 /// Health check endpoint.
@@ -1412,10 +1440,14 @@ pub async fn create_agent(
     // Use current config as base, optionally override provider/model
     let mut agent_config = state.full_config.lock().unwrap().clone();
     if let Some(provider) = body["provider"].as_str() {
-        agent_config.default_provider = provider.to_string();
+        if !provider.is_empty() {
+            agent_config.default_provider = provider.to_string();
+        }
     }
     if let Some(model) = body["model"].as_str() {
-        agent_config.default_model = model.to_string();
+        if !model.is_empty() {
+            agent_config.default_model = model.to_string();
+        }
     }
     if let Some(persona) = body["persona"].as_str() {
         agent_config.identity.persona = persona.to_string();
@@ -1424,6 +1456,11 @@ pub async fn create_agent(
         agent_config.identity.system_prompt = sys_prompt.to_string();
     }
     agent_config.identity.name = name.to_string();
+
+    // Critical: inject per-provider API key and base_url from DB
+    // This enables agents to use different providers (e.g. Ollama, DeepSeek)
+    // without needing the global config to match.
+    apply_provider_config_from_db(&state.db, &mut agent_config);
 
     // Use sync Agent::new() — MCP tools are shared at orchestrator level
     match bizclaw_agent::Agent::new(agent_config) {
@@ -1547,6 +1584,9 @@ pub async fn update_agent(
             agent_config.identity.system_prompt = sp.to_string();
         }
         agent_config.identity.name = name.clone();
+
+        // Critical: inject per-provider API key from DB
+        apply_provider_config_from_db(&state.db, &mut agent_config);
 
         // Re-create agent with sync Agent::new() — fast, no MCP hang
         match bizclaw_agent::Agent::new(agent_config) {
