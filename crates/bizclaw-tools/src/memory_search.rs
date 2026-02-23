@@ -9,18 +9,26 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 /// Note: Agent also auto-retrieves memory during processing, but this tool
 /// gives the agent explicit control over when/what to search.
 pub struct MemorySearchTool {
-    memory: std::sync::Arc<tokio::sync::Mutex<Option<Box<dyn bizclaw_core::traits::memory::MemoryBackend>>>>,
+    memory: std::sync::Arc<
+        tokio::sync::Mutex<Option<Box<dyn bizclaw_core::traits::memory::MemoryBackend>>>,
+    >,
 }
 
 impl MemorySearchTool {
-    pub fn new(memory: std::sync::Arc<tokio::sync::Mutex<Option<Box<dyn bizclaw_core::traits::memory::MemoryBackend>>>>) -> Self {
+    pub fn new(
+        memory: std::sync::Arc<
+            tokio::sync::Mutex<Option<Box<dyn bizclaw_core::traits::memory::MemoryBackend>>>,
+        >,
+    ) -> Self {
         Self { memory }
     }
 }
 
 #[async_trait]
 impl Tool for MemorySearchTool {
-    fn name(&self) -> &str { "memory_search" }
+    fn name(&self) -> &str {
+        "memory_search"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -47,7 +55,8 @@ impl Tool for MemorySearchTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let query = args["query"].as_str()
+        let query = args["query"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'query'".into()))?;
         let limit = args["limit"].as_u64().unwrap_or(5) as usize;
 
@@ -72,7 +81,11 @@ impl Tool for MemorySearchTool {
                         success: true,
                     })
                 } else {
-                    let mut output = format!("Found {} past conversation(s) matching '{}':\n\n", results.len(), query);
+                    let mut output = format!(
+                        "Found {} past conversation(s) matching '{}':\n\n",
+                        results.len(),
+                        query
+                    );
                     for (i, r) in results.iter().enumerate() {
                         let content = if r.entry.content.len() > 500 {
                             format!("{}...", &r.entry.content[..500])
@@ -94,13 +107,11 @@ impl Tool for MemorySearchTool {
                     })
                 }
             }
-            Err(e) => {
-                Ok(ToolResult {
-                    tool_call_id: String::new(),
-                    output: format!("Memory search error: {e}"),
-                    success: false,
-                })
-            }
+            Err(e) => Ok(ToolResult {
+                tool_call_id: String::new(),
+                output: format!("Memory search error: {e}"),
+                success: false,
+            }),
         }
     }
 }

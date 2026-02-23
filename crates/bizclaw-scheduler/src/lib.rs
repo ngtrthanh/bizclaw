@@ -21,13 +21,13 @@
 //!                      └── Email (priority 3)
 //! ```
 
-pub mod tasks;
 pub mod cron;
+pub mod engine;
 pub mod notify;
 pub mod store;
-pub mod engine;
+pub mod tasks;
 
 pub use engine::SchedulerEngine;
-pub use tasks::{Task, TaskType, TaskStatus};
 pub use notify::{Notification, NotifyChannel, NotifyRouter};
 pub use store::TaskStore;
+pub use tasks::{Task, TaskStatus, TaskType};

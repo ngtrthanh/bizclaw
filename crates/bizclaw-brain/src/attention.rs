@@ -23,7 +23,9 @@ pub fn attention(
     debug_assert_eq!(output.len(), head_dim);
 
     if seq_len == 0 {
-        for v in output.iter_mut() { *v = 0.0; }
+        for v in output.iter_mut() {
+            *v = 0.0;
+        }
         return;
     }
 
@@ -33,7 +35,9 @@ pub fn attention(
     // Maintains running max and normalizer, avoiding score materialization.
     let mut running_max = f32::NEG_INFINITY;
     let mut running_sum = 0.0f32;
-    for v in output.iter_mut() { *v = 0.0; }
+    for v in output.iter_mut() {
+        *v = 0.0;
+    }
 
     for t in 0..seq_len {
         let k_offset = t * head_dim;
@@ -128,14 +132,18 @@ fn attention_strided(
     v_base: usize,
 ) {
     if seq_len == 0 {
-        for v in output.iter_mut() { *v = 0.0; }
+        for v in output.iter_mut() {
+            *v = 0.0;
+        }
         return;
     }
 
     let scale = 1.0 / (head_dim as f32).sqrt();
     let mut running_max = f32::NEG_INFINITY;
     let mut running_sum = 0.0f32;
-    for v in output.iter_mut() { *v = 0.0; }
+    for v in output.iter_mut() {
+        *v = 0.0;
+    }
 
     for t in 0..seq_len {
         let k_offset = t * kv_stride + k_base;
@@ -193,23 +201,18 @@ mod tests {
         let head_dim = 4;
         let seq_len = 3;
         let q = vec![1.0, 0.5, 0.0, 0.0];
-        let key_cache = vec![
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.5, 0.5, 0.0, 0.0,
-        ];
-        let value_cache = vec![
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-        ];
+        let key_cache = vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0];
+        let value_cache = vec![1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0];
         let mut output = vec![0.0; head_dim];
 
         attention(&mut output, &q, &key_cache, &value_cache, seq_len, head_dim);
 
         // Output should be a weighted combination of values
         let total: f32 = output.iter().sum();
-        assert!((total - 1.0).abs() < 1e-4, "Attention weights should sum to ~1.0, got {total}");
+        assert!(
+            (total - 1.0).abs() < 1e-4,
+            "Attention weights should sum to ~1.0, got {total}"
+        );
     }
 
     #[test]

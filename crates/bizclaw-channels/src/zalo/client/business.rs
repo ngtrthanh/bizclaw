@@ -1,8 +1,8 @@
 //! Zalo business features — catalog, products, auto-reply.
 //! For Zalo OA (Official Account) mode.
 
-use bizclaw_core::error::{BizClawError, Result};
 use super::models::{ZaloCatalog, ZaloProduct};
+use bizclaw_core::error::{BizClawError, Result};
 
 /// Zalo business/OA client.
 pub struct ZaloBusiness {
@@ -20,14 +20,17 @@ impl ZaloBusiness {
 
     /// Get product catalog (OA mode).
     pub async fn get_catalog(&self, access_token: &str) -> Result<Vec<ZaloCatalog>> {
-        let response = self.client
+        let response = self
+            .client
             .get(&format!("{}/store/getslice", self.base_url))
             .bearer_auth(access_token)
             .send()
             .await
             .map_err(|e| BizClawError::Channel(format!("Get catalog failed: {e}")))?;
 
-        let body: serde_json::Value = response.json().await
+        let body: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("Invalid catalog response: {e}")))?;
 
         // Parse catalog items
@@ -37,14 +40,17 @@ impl ZaloBusiness {
                 vec![ZaloCatalog {
                     id: "default".into(),
                     name: "Product Catalog".into(),
-                    products: arr.iter().filter_map(|p| {
-                        Some(ZaloProduct {
-                            id: p["id"].as_str()?.into(),
-                            name: p["name"].as_str().unwrap_or("").into(),
-                            price: p["price"].as_f64(),
-                            photo_url: p["photo"].as_str().map(String::from),
+                    products: arr
+                        .iter()
+                        .filter_map(|p| {
+                            Some(ZaloProduct {
+                                id: p["id"].as_str()?.into(),
+                                name: p["name"].as_str().unwrap_or("").into(),
+                                price: p["price"].as_f64(),
+                                photo_url: p["photo"].as_str().map(String::from),
+                            })
                         })
-                    }).collect(),
+                        .collect(),
                 }]
             })
             .unwrap_or_default();
@@ -68,7 +74,8 @@ impl ZaloBusiness {
             }
         });
 
-        let response = self.client
+        let response = self
+            .client
             .post(&format!("{}/message/cs", self.base_url))
             .bearer_auth(access_token)
             .json(&body)
@@ -76,7 +83,9 @@ impl ZaloBusiness {
             .await
             .map_err(|e| BizClawError::Channel(format!("OA send failed: {e}")))?;
 
-        let result: serde_json::Value = response.json().await
+        let result: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Channel(format!("OA send response error: {e}")))?;
 
         if result["error"].as_i64().unwrap_or(-1) != 0 {
@@ -91,5 +100,7 @@ impl ZaloBusiness {
 }
 
 impl Default for ZaloBusiness {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

@@ -23,7 +23,14 @@ impl KvCache {
     pub fn new(n_layers: usize, max_seq_len: usize, n_kv_heads: usize, head_dim: usize) -> Self {
         let kv_dim = n_kv_heads * head_dim;
         let total = n_layers * max_seq_len * kv_dim;
-        Self { key_cache: vec![0.0; total], value_cache: vec![0.0; total], n_layers, max_seq_len, kv_dim, pos: 0 }
+        Self {
+            key_cache: vec![0.0; total],
+            value_cache: vec![0.0; total],
+            n_layers,
+            max_seq_len,
+            kv_dim,
+            pos: 0,
+        }
     }
 
     pub fn key_at_mut(&mut self, layer: usize, pos: usize) -> &mut [f32] {
@@ -46,8 +53,12 @@ impl KvCache {
         &self.value_cache[offset..offset + seq_len * self.kv_dim]
     }
 
-    pub fn advance(&mut self) { self.pos += 1; }
-    pub fn pos(&self) -> usize { self.pos }
+    pub fn advance(&mut self) {
+        self.pos += 1;
+    }
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
 
     pub fn reset(&mut self) {
         self.key_cache.fill(0.0);
@@ -61,7 +72,6 @@ impl KvCache {
 }
 
 // ── FP16 KV Cache (memory optimised) ──────────────────────
-
 
 /// Convert f32 to IEEE 754 half-precision float (FP16).
 #[inline(always)]
@@ -183,10 +193,14 @@ impl Fp16KvCache {
     }
 
     /// Advance the position counter.
-    pub fn advance(&mut self) { self.pos += 1; }
+    pub fn advance(&mut self) {
+        self.pos += 1;
+    }
 
     /// Get current position.
-    pub fn pos(&self) -> usize { self.pos }
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
 
     /// Reset cache.
     pub fn reset(&mut self) {
@@ -210,11 +224,15 @@ impl Fp16KvCache {
         file.write_all(&(self.kv_dim as u32).to_le_bytes())?;
         file.write_all(&(self.pos as u32).to_le_bytes())?;
         // Data
-        let key_bytes: Vec<u8> = self.key_cache.iter()
+        let key_bytes: Vec<u8> = self
+            .key_cache
+            .iter()
             .flat_map(|&v| v.to_le_bytes())
             .collect();
         file.write_all(&key_bytes)?;
-        let val_bytes: Vec<u8> = self.value_cache.iter()
+        let val_bytes: Vec<u8> = self
+            .value_cache
+            .iter()
             .flat_map(|&v| v.to_le_bytes())
             .collect();
         file.write_all(&val_bytes)?;
@@ -227,28 +245,44 @@ impl Fp16KvCache {
         let mut magic = [0u8; 4];
         file.read_exact(&mut magic)?;
         if &magic != b"BCKV" {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Not a BizClaw KV cache file"));
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Not a BizClaw KV cache file",
+            ));
         }
         let mut buf4 = [0u8; 4];
-        file.read_exact(&mut buf4)?; let n_layers = u32::from_le_bytes(buf4) as usize;
-        file.read_exact(&mut buf4)?; let max_seq_len = u32::from_le_bytes(buf4) as usize;
-        file.read_exact(&mut buf4)?; let kv_dim = u32::from_le_bytes(buf4) as usize;
-        file.read_exact(&mut buf4)?; let pos = u32::from_le_bytes(buf4) as usize;
+        file.read_exact(&mut buf4)?;
+        let n_layers = u32::from_le_bytes(buf4) as usize;
+        file.read_exact(&mut buf4)?;
+        let max_seq_len = u32::from_le_bytes(buf4) as usize;
+        file.read_exact(&mut buf4)?;
+        let kv_dim = u32::from_le_bytes(buf4) as usize;
+        file.read_exact(&mut buf4)?;
+        let pos = u32::from_le_bytes(buf4) as usize;
 
         let total = n_layers * max_seq_len * kv_dim;
         let mut key_bytes = vec![0u8; total * 2];
         file.read_exact(&mut key_bytes)?;
-        let key_cache: Vec<u16> = key_bytes.chunks_exact(2)
+        let key_cache: Vec<u16> = key_bytes
+            .chunks_exact(2)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
 
         let mut val_bytes = vec![0u8; total * 2];
         file.read_exact(&mut val_bytes)?;
-        let value_cache: Vec<u16> = val_bytes.chunks_exact(2)
+        let value_cache: Vec<u16> = val_bytes
+            .chunks_exact(2)
             .map(|c| u16::from_le_bytes([c[0], c[1]]))
             .collect();
 
-        Ok(Self { key_cache, value_cache, n_layers, max_seq_len, kv_dim, pos })
+        Ok(Self {
+            key_cache,
+            value_cache,
+            n_layers,
+            max_seq_len,
+            kv_dim,
+            pos,
+        })
     }
 }
 
@@ -277,12 +311,19 @@ impl RopeTable {
             }
         }
 
-        Self { cos_table, sin_table, max_seq_len, half_dim }
+        Self {
+            cos_table,
+            sin_table,
+            max_seq_len,
+            half_dim,
+        }
     }
 
     /// Apply RoPE using pre-computed tables (table lookup, no trig calls).
     pub fn apply(&self, vec: &mut [f32], pos: usize, head_dim: usize) {
-        if pos >= self.max_seq_len { return; }
+        if pos >= self.max_seq_len {
+            return;
+        }
         let half_dim = head_dim / 2;
         let table_offset = pos * self.half_dim;
 
@@ -318,7 +359,10 @@ mod tests {
             let back = fp16_to_fp32(fp16);
             let err = (v - back).abs();
             let tolerance = v.abs() * 0.01 + 0.001; // ~1% relative + absolute
-            assert!(err < tolerance, "fp16 roundtrip failed for {v}: got {back}, err={err}");
+            assert!(
+                err < tolerance,
+                "fp16 roundtrip failed for {v}: got {back}, err={err}"
+            );
         }
     }
 
@@ -342,7 +386,11 @@ mod tests {
         let fp16 = Fp16KvCache::new(32, 2048, 8, 128);
         let f32_size = 32 * 2048 * 8 * 128 * 4 * 2; // f32 key+value
         let fp16_size = fp16.memory_usage();
-        assert_eq!(fp16_size, f32_size / 2, "FP16 should be exactly half the size");
+        assert_eq!(
+            fp16_size,
+            f32_size / 2,
+            "FP16 should be exactly half the size"
+        );
     }
 
     #[test]

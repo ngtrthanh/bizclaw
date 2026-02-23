@@ -59,9 +59,7 @@ impl ConversationContext {
             self.messages.extend(recent);
 
             // Recalculate token estimate
-            self.max_tokens_estimate = self.messages.iter()
-                .map(|m| m.content.len() / 4)
-                .sum();
+            self.max_tokens_estimate = self.messages.iter().map(|m| m.content.len() / 4).sum();
         }
     }
 

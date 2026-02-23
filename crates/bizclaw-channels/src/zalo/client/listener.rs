@@ -1,10 +1,10 @@
 //! Zalo WebSocket event listener.
 //! Handles: message, reaction, undo, group_event, typing.
 
+use super::models::ZaloMessage;
+use bizclaw_core::error::{BizClawError, Result};
 use futures::StreamExt;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
-use bizclaw_core::error::{BizClawError, Result};
-use super::models::ZaloMessage;
 
 /// WebSocket event types from Zalo.
 #[derive(Debug, Clone)]
@@ -14,11 +14,19 @@ pub enum ZaloEvent {
     /// Message recalled/undone
     MessageUndo { msg_id: String, thread_id: String },
     /// Reaction on a message
-    Reaction { msg_id: String, reactor_id: String, reaction: String },
+    Reaction {
+        msg_id: String,
+        reactor_id: String,
+        reaction: String,
+    },
     /// Typing indicator
     Typing { thread_id: String, user_id: String },
     /// Group member event (join/leave/kicked)
-    GroupEvent { group_id: String, event_type: String, data: serde_json::Value },
+    GroupEvent {
+        group_id: String,
+        event_type: String,
+        data: serde_json::Value,
+    },
     /// Connection state changed
     ConnectionState(ConnectionState),
     /// Raw/unknown event
@@ -110,7 +118,7 @@ impl ZaloListener {
                     thread_id: json["data"]["toid"].as_str().unwrap_or("").into(),
                     sender_id: json["data"]["uidFrom"].as_str().unwrap_or("").into(),
                     content: super::models::ZaloMessageContent::Text(
-                        json["data"]["content"].as_str().unwrap_or("").into()
+                        json["data"]["content"].as_str().unwrap_or("").into(),
                     ),
                     timestamp: json["data"]["ts"].as_u64().unwrap_or(0),
                     is_self: false,
@@ -131,9 +139,7 @@ impl ZaloListener {
                     reaction: json["data"]["rType"].as_str().unwrap_or("").into(),
                 })
             }
-            _ => {
-                Ok(ZaloEvent::Raw(json))
-            }
+            _ => Ok(ZaloEvent::Raw(json)),
         }
     }
 

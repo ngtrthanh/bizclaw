@@ -11,7 +11,7 @@ use futures::stream::{self, Stream};
 
 use super::client::{
     auth::{ZaloAuth, ZaloCredentials},
-    messaging::{ZaloMessaging, ThreadType as ZaloThreadType},
+    messaging::{ThreadType as ZaloThreadType, ZaloMessaging},
     session::SessionManager,
 };
 
@@ -44,11 +44,13 @@ impl ZaloPersonalChannel {
     /// Login with cookie.
     pub async fn login_cookie(&mut self, cookie: &str) -> Result<()> {
         let login_data = self.auth.login_with_cookie(cookie).await?;
-        self.session.set_session(
-            login_data.uid.clone(),
-            login_data.zpw_enk,
-            login_data.zpw_key,
-        ).await;
+        self.session
+            .set_session(
+                login_data.uid.clone(),
+                login_data.zpw_enk,
+                login_data.zpw_key,
+            )
+            .await;
         self.cookie = Some(cookie.to_string());
         self.connected = true;
         tracing::info!("Zalo Personal logged in: uid={}", login_data.uid);
@@ -58,7 +60,9 @@ impl ZaloPersonalChannel {
 
 #[async_trait]
 impl Channel for ZaloPersonalChannel {
-    fn name(&self) -> &str { "zalo-personal" }
+    fn name(&self) -> &str {
+        "zalo-personal"
+    }
 
     async fn connect(&mut self) -> Result<()> {
         if self.cookie.is_none() {
@@ -73,17 +77,23 @@ impl Channel for ZaloPersonalChannel {
         Ok(())
     }
 
-    fn is_connected(&self) -> bool { self.connected }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 
     async fn send(&self, message: OutgoingMessage) -> Result<()> {
-        let cookie = self.cookie.as_ref()
+        let cookie = self
+            .cookie
+            .as_ref()
             .ok_or_else(|| BizClawError::Channel("Not logged in".into()))?;
-        self.messaging.send_text(
-            &message.thread_id,
-            ZaloThreadType::User,
-            &message.content,
-            cookie,
-        ).await?;
+        self.messaging
+            .send_text(
+                &message.thread_id,
+                ZaloThreadType::User,
+                &message.content,
+                cookie,
+            )
+            .await?;
         Ok(())
     }
 

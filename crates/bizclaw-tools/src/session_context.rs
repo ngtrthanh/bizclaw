@@ -29,7 +29,9 @@ impl Default for SessionInfo {
     fn default() -> Self {
         Self {
             session_id: "default".into(),
-            created_at: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+            created_at: chrono::Utc::now()
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string(),
             provider: "unknown".into(),
             model: "unknown".into(),
             message_count: 0,
@@ -64,7 +66,9 @@ impl SessionContextTool {
 
 #[async_trait]
 impl Tool for SessionContextTool {
-    fn name(&self) -> &str { "session_context" }
+    fn name(&self) -> &str {
+        "session_context"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -86,8 +90,8 @@ impl Tool for SessionContextTool {
     }
 
     async fn execute(&self, arguments: &str) -> Result<ToolResult> {
-        let args: serde_json::Value = serde_json::from_str(arguments)
-            .unwrap_or_else(|_| serde_json::json!({}));
+        let args: serde_json::Value =
+            serde_json::from_str(arguments).unwrap_or_else(|_| serde_json::json!({}));
 
         let field = args["field"].as_str().unwrap_or("all");
         let info = self.info.lock().await;
@@ -96,25 +100,41 @@ impl Tool for SessionContextTool {
             "session_id" => format!("Session ID: {}", info.session_id),
             "provider" => format!("Provider: {} (model: {})", info.provider, info.model),
             "model" => format!("Model: {}", info.model),
-            "tokens" => format!("Estimated tokens: {} / {} ({:.1}%)",
-                info.estimated_tokens, info.max_context, info.context_utilization),
+            "tokens" => format!(
+                "Estimated tokens: {} / {} ({:.1}%)",
+                info.estimated_tokens, info.max_context, info.context_utilization
+            ),
             "context" => format!(
                 "Context:\n  Messages: {}\n  Tokens: ~{}\n  Utilization: {:.1}%\n  Max context: {}",
-                info.message_count, info.estimated_tokens, info.context_utilization, info.max_context
+                info.message_count,
+                info.estimated_tokens,
+                info.context_utilization,
+                info.max_context
             ),
             "tools" => {
                 if info.tools_available.is_empty() {
                     "Available tools: (loading...)".into()
                 } else {
-                    format!("Available tools ({}):\n  {}",
+                    format!(
+                        "Available tools ({}):\n  {}",
                         info.tools_available.len(),
-                        info.tools_available.join(", "))
+                        info.tools_available.join(", ")
+                    )
                 }
-            },
-            "workspace" => format!("Workspace: {}\nBrain: {}\nMemory: {}\nKnowledge docs: {}",
+            }
+            "workspace" => format!(
+                "Workspace: {}\nBrain: {}\nMemory: {}\nKnowledge docs: {}",
                 info.workspace_path,
-                if info.brain_enabled { "enabled" } else { "disabled" },
-                if info.memory_enabled { "enabled" } else { "disabled" },
+                if info.brain_enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
+                if info.memory_enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                },
                 info.knowledge_docs
             ),
             "uptime" | "all" | _ => {
@@ -137,12 +157,23 @@ impl Tool for SessionContextTool {
                      Workspace: {}",
                     info.session_id,
                     info.created_at,
-                    info.provider, info.model,
+                    info.provider,
+                    info.model,
                     info.message_count,
-                    info.estimated_tokens, info.max_context, info.context_utilization,
+                    info.estimated_tokens,
+                    info.max_context,
+                    info.context_utilization,
                     info.tools_available.len(),
-                    if info.brain_enabled { "enabled" } else { "disabled" },
-                    if info.memory_enabled { "enabled" } else { "disabled" },
+                    if info.brain_enabled {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    },
+                    if info.memory_enabled {
+                        "enabled"
+                    } else {
+                        "disabled"
+                    },
                     info.knowledge_docs,
                     info.workspace_path,
                 )

@@ -2,7 +2,7 @@
 //! Based on reverse-engineered Zalo Web encryption protocol.
 
 use aes::Aes256;
-use aes::cipher::{BlockEncrypt, BlockDecrypt, KeyInit, generic_array::GenericArray};
+use aes::cipher::{BlockDecrypt, BlockEncrypt, KeyInit, generic_array::GenericArray};
 
 /// Encrypt data using AES-256-ECB (Zalo's message encryption).
 pub fn encrypt_aes256(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
@@ -58,7 +58,7 @@ pub fn decrypt_aes256(data: &[u8], key: &[u8; 32]) -> Vec<u8> {
 
 /// Derive an encryption key from Zalo's zpw_enk.
 pub fn derive_key(zpw_enk: &str) -> [u8; 32] {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(zpw_enk.as_bytes());
     let result = hasher.finalize();

@@ -1,10 +1,10 @@
 //! # BizClaw Gateway
 //! HTTP/WebSocket gateway API with embedded web dashboard.
 
-pub mod server;
-pub mod routes;
-pub mod ws;
 pub mod dashboard;
+pub mod routes;
+pub mod server;
+pub mod ws;
 
 use bizclaw_core::config::GatewayConfig;
 

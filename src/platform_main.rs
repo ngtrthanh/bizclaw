@@ -76,7 +76,9 @@ async fn main() -> Result<()> {
         "bizclaw_platform=info"
     };
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter)))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter)),
+        )
         .with_target(false)
         .init();
 
@@ -106,7 +108,13 @@ async fn main() -> Result<()> {
                 let hash = bizclaw_platform::auth::hash_password(&cli.admin_password)
                     .map_err(|e| anyhow::anyhow!("{e}"))?;
                 let id = db.create_user(&cli.admin_email, &hash, "admin")?;
-                db.log_event("admin_created", "system", &id, Some(&format!("email={}", cli.admin_email))).ok();
+                db.log_event(
+                    "admin_created",
+                    "system",
+                    &id,
+                    Some(&format!("email={}", cli.admin_email)),
+                )
+                .ok();
                 println!("✅ Admin user created:");
                 println!("   Email:    {}", cli.admin_email);
                 println!("   Password: {}", cli.admin_password);
@@ -149,7 +157,10 @@ async fn main() -> Result<()> {
     // Start server
     println!("🏢 BizClaw Platform v{}", env!("CARGO_PKG_VERSION"));
     println!("   🌐 Admin Dashboard: http://0.0.0.0:{}", cli.port);
-    println!("   📡 API:             http://0.0.0.0:{}/api/admin/stats", cli.port);
+    println!(
+        "   📡 API:             http://0.0.0.0:{}/api/admin/stats",
+        cli.port
+    );
     println!("   🗄️  Database:        {db_path}");
     println!("   📂 Data Dir:        {data_dir}");
     println!("   🔧 BizClaw Binary:  {}", cli.bizclaw_bin);
@@ -161,9 +172,7 @@ async fn main() -> Result<()> {
         let db_lock = state.db.lock().unwrap();
         match db_lock.list_tenants() {
             Ok(tenants) => {
-                let running: Vec<_> = tenants.iter()
-                    .filter(|t| t.status == "running")
-                    .collect();
+                let running: Vec<_> = tenants.iter().filter(|t| t.status == "running").collect();
                 if !running.is_empty() {
                     println!("🔄 Auto-restarting {} tenant(s)...", running.len());
                     // We need to keep our own Vec since we're about to drop the lock
@@ -174,8 +183,12 @@ async fn main() -> Result<()> {
                         let mut mgr = state.manager.lock().unwrap();
                         match mgr.start_tenant(tenant, &state.bizclaw_bin, &db) {
                             Ok(pid) => {
-                                println!("   ✅ {} (port {}) → pid {}", tenant.name, tenant.port, pid);
-                                db.update_tenant_status(&tenant.id, "running", Some(pid)).ok();
+                                println!(
+                                    "   ✅ {} (port {}) → pid {}",
+                                    tenant.name, tenant.port, pid
+                                );
+                                db.update_tenant_status(&tenant.id, "running", Some(pid))
+                                    .ok();
                             }
                             Err(e) => {
                                 println!("   ❌ {} failed: {}", tenant.name, e);
@@ -189,7 +202,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    bizclaw_platform::AdminServer::start(state, cli.port).await
+    bizclaw_platform::AdminServer::start(state, cli.port)
+        .await
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
     Ok(())

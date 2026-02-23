@@ -85,7 +85,9 @@ impl SessionManager {
 }
 
 impl Default for SessionManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 fn current_timestamp() -> u64 {

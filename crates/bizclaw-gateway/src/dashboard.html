@@ -153,6 +153,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <a href="/tools" onclick="navigateTo(event,'tools')" id="nav-tools">🛠️ <span data-i18n="nav.tools">Công cụ</span></a>
       <a href="/mcp" onclick="navigateTo(event,'mcp')" id="nav-mcp">🔗 <span data-i18n="nav.mcp">Máy chủ MCP</span></a>
       <a href="/agents" onclick="navigateTo(event,'agents')" id="nav-agents">🤖 <span data-i18n="nav.agents">Đa tác tử</span></a>
+      <a href="/groups" onclick="navigateTo(event,'groups')" id="nav-groups">👥 <span data-i18n="nav.groups">Nhóm Agent</span></a>
       <a href="/knowledge" onclick="navigateTo(event,'knowledge')" id="nav-knowledge">📚 <span data-i18n="nav.knowledge">Kho tri thức</span></a>
       <div class="nav-sep"></div>
       <a href="/brain" onclick="navigateTo(event,'brain')" id="nav-brain">🧠 <span data-i18n="nav.brain">Brain Engine</span></a>
@@ -168,6 +169,61 @@ tr:hover td{background:rgba(255,255,255,.02)}
     </div>
   </aside>
   <main class="main">
+    <!-- ═══ ONBOARDING WIZARD (first visit) ═══ -->
+    <div id="onboard-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:9999;backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center">
+      <div class="card" style="max-width:560px;width:90%;padding:32px;animation:fadeIn 0.3s">
+        <div id="onboard-step-1">
+          <h2>🎉 Chào mừng đến với BizClaw!</h2>
+          <p style="color:var(--text-dim);margin:8px 0 20px" data-i18n="onboard.welcome_sub">Hãy để AI tạo một trợ lý phù hợp riêng cho bạn. Chỉ mất 30 giây.</p>
+          <div class="form-row"><span class="form-label" data-i18n="onboard.your_name">Tên bạn</span><input id="onboard-name" placeholder="VD: Hoài"></div>
+          <div class="form-row"><span class="form-label" data-i18n="onboard.about_you">Bạn là ai, làm gì?</span><textarea id="onboard-about" rows="3" placeholder="VD: Tôi là founder startup công nghệ, cần AI hỗ trợ quản lý dự án và code"></textarea></div>
+          <div class="form-row"><span class="form-label" data-i18n="onboard.agent_vibe">Phong cách Agent</span>
+            <select id="onboard-vibe">
+              <option value="helpful, professional, concise">🤝 Chuyên nghiệp & Ngắn gọn</option>
+              <option value="friendly, casual, uses emoji">😊 Thân thiện & Thoải mái</option>
+              <option value="creative, inspiring, out-of-the-box">🎨 Sáng tạo & Truyền cảm hứng</option>
+              <option value="strict, precise, technical expert">🔬 Nghiêm túc & Kỹ thuật cao</option>
+              <option value="humorous, witty, smart">😄 Dí dỏm & Thông minh</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="onboardNext()">Tiếp theo →</button>
+          <button class="btn" style="width:100%;margin-top:8px;background:transparent;color:var(--text-dim)" onclick="skipOnboard()">Bỏ qua</button>
+        </div>
+        <div id="onboard-step-2" style="display:none">
+          <h2>⚡ Chọn AI Provider</h2>
+          <p style="color:var(--text-dim);margin:8px 0 20px" data-i18n="onboard.provider_sub">Chọn nguồn AI. Không cần API key? Dùng Ollama hoặc Brain Engine.</p>
+          <div class="form-row"><span class="form-label">Provider</span>
+            <select id="onboard-provider" onchange="onboardProviderChange()">
+              <option value="ollama">🖥️ Ollama (Local, miễn phí)</option>
+              <option value="openai">☁️ OpenAI (GPT-4o)</option>
+              <option value="gemini">☁️ Google Gemini</option>
+              <option value="anthropic">☁️ Anthropic Claude</option>
+              <option value="deepseek">☁️ DeepSeek</option>
+            </select>
+          </div>
+          <div id="onboard-cloud-fields" style="display:none">
+            <div class="form-row"><span class="form-label">Model</span><input id="onboard-model" placeholder="gpt-4o-mini"></div>
+            <div class="form-row"><span class="form-label">API Key</span><input id="onboard-apikey" type="password" placeholder="sk-..."></div>
+            <div class="form-row"><span class="form-label">API Base URL <span style="color:var(--text-dim)">(optional)</span></span><input id="onboard-baseurl" placeholder="https://api.openai.com/v1 (custom proxy)"></div>
+          </div>
+          <div id="onboard-ollama-info" class="card" style="background:var(--bg);margin-top:12px;padding:12px">
+            <p>📥 <strong>Ollama</strong>: Chạy AI 100% local, không cần internet.</p>
+            <code style="font-size:12px">curl -fsSL https://ollama.ai/install.sh | sh && ollama pull qwen3:0.6b</code>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn" style="flex:1" onclick="document.getElementById('onboard-step-2').style.display='none';document.getElementById('onboard-step-1').style.display=''">← Quay lại</button>
+            <button class="btn btn-primary" style="flex:2" onclick="finishOnboard()">🚀 Hoàn tất & Bắt đầu</button>
+          </div>
+        </div>
+        <div id="onboard-step-done" style="display:none;text-align:center">
+          <div style="font-size:64px;margin:20px 0">🎉</div>
+          <h2 data-i18n="onboard.done_title">Agent đã sẵn sàng!</h2>
+          <p style="color:var(--text-dim)" data-i18n="onboard.done_sub">AI đang tạo tính cách riêng cho agent của bạn...</p>
+          <div id="onboard-progress" style="margin:20px 0;color:var(--accent)">⏳ Đang xử lý...</div>
+        </div>
+      </div>
+    </div>
+
     <!-- ═══ DASHBOARD (LobsterBoard-inspired) ═══ -->
     <div id="page-dashboard">
       <div class="page-header"><div><h1 data-i18n="dash.title">Bảng điều khiển</h1><div class="sub" data-i18n="dash.subtitle">Trung tâm quản lý Agent Gateway</div></div></div>
@@ -230,7 +286,16 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
     <!-- ═══ WEBCHAT ═══ -->
     <div id="page-chat" style="display:none">
-      <div class="page-header"><h1>💬 <span data-i18n="chat.title">Trò chuyện</span></h1></div>
+      <div class="page-header">
+        <h1>💬 <span data-i18n="chat.title">Trò chuyện</span></h1>
+        <div style="display:flex;align-items:center;gap:8px">
+          <select id="chat-agent-select" style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px" onchange="onChatAgentChange()">
+            <option value="">🤖 Default Agent</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="refreshChatAgents()" title="Refresh agents">🔄</button>
+        </div>
+      </div>
+      <div id="chat-agent-info" style="display:none;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:12px;font-size:12px;color:var(--accent2)"></div>
       <div class="chat-wrap">
         <div class="chat-messages" id="chat-messages">
           <div class="msg msg-system" data-i18n="chat.welcome">Đã kết nối BizClaw. Nhập tin nhắn để bắt đầu trò chuyện.</div>
@@ -260,6 +325,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div id="provider-cloud-fields">
           <div class="form-row"><span class="form-label" data-i18n="set.model">Mô hình</span><input id="set-model" placeholder="gpt-4o-mini"></div>
           <div class="form-row"><span class="form-label" data-i18n="set.apikey">Khóa API</span><input id="set-apikey" type="password" placeholder="sk-..."></div>
+          <div class="form-row"><span class="form-label" data-i18n="set.baseurl">API Base URL</span><input id="set-baseurl" placeholder="Custom API proxy URL (để trống = mặc định)"></div>
         </div>
         <!-- Ollama fields -->
         <div id="provider-ollama-fields" style="display:none">
@@ -313,8 +379,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
     <!-- ═══ PROVIDERS ═══ -->
     <div id="page-providers" style="display:none">
-      <div class="page-header"><h1>🔌 <span data-i18n="providers.title">Nhà cung cấp</span></h1></div>
-      <div class="card"><table><thead><tr><th data-i18n="set.provider">Nhà cung cấp</th><th data-i18n="th.type">Loại</th><th data-i18n="th.status">Trạng thái</th><th data-i18n="set.model">Mô hình</th></tr></thead><tbody id="providers-table"></tbody></table></div>
+      <div class="page-header"><div><h1>🔌 <span data-i18n="providers.title">Nhà cung cấp</span></h1><div class="sub" data-i18n="providers.subtitle">Cấu hình nhà cung cấp AI — chọn provider mặc định, API key, model</div></div></div>
+      <div class="stats">
+        <div class="card"><div class="card-label" data-i18n="providers.active_label">Provider đang dùng</div><div class="card-value green" id="prov-active-name" style="font-size:18px">—</div></div>
+        <div class="card"><div class="card-label" data-i18n="set.model">Mô hình</div><div class="card-value blue" id="prov-active-model" style="font-size:16px">—</div></div>
+        <div class="card"><div class="card-label" data-i18n="providers.total_label">Tổng providers</div><div class="card-value accent" id="prov-total">0</div></div>
+      </div>
+      <div class="ch-grid" id="providers-grid"></div>
     </div>
 
     <!-- ═══ CHANNELS ═══ -->
@@ -396,15 +467,50 @@ tr:hover td{background:rgba(255,255,255,.02)}
       </div>
     </div>
 
-    <!-- ═══ BRAIN ENGINE ═══ -->
+    <!-- ═══ BRAIN ENGINE + WORKSPACE + HEALTH ═══ -->
     <div id="page-brain" style="display:none">
-      <div class="page-header"><h1>🧠 <span data-i18n="brain.title">Brain Engine</span></h1></div>
+      <div class="page-header"><div><h1>🧠 <span data-i18n="brain.title">Brain Engine</span></h1><div class="sub" data-i18n="brain.ws_sub">Brain workspace, personality files, and system health check</div></div>
+        <button class="btn btn-primary" onclick="runHealthCheck()">🩺 <span data-i18n="brain.health_btn">Health Check</span></button>
+      </div>
       <div class="stats">
         <div class="card"><div class="card-label" data-i18n="brain.engine">Động cơ</div><div class="card-value green">GGUF v3</div></div>
         <div class="card"><div class="card-label">SIMD</div><div class="card-value accent" id="brain-simd">—</div></div>
         <div class="card"><div class="card-label" data-i18n="brain.quant">Lượng tử hóa</div><div class="card-value blue">Q4_0 / Q8_0 / F16</div></div>
-        <div class="card"><div class="card-label" data-i18n="brain.features">Tính năng</div><div class="card-value cyan">Flash Attn + KV Cache</div></div>
+        <div class="card"><div class="card-label" data-i18n="brain.files_count">Brain Files</div><div class="card-value cyan" id="brain-files-count">0</div></div>
       </div>
+
+      <!-- Health Check Results -->
+      <div id="health-results" class="card" style="display:none;margin-top:16px">
+        <h3>🩺 <span data-i18n="brain.health_title">System Health Check</span></h3>
+        <div id="health-summary" style="margin:8px 0"></div>
+        <table><thead><tr><th data-i18n="brain.check_name">Check</th><th data-i18n="brain.check_status">Status</th><th data-i18n="brain.check_detail">Detail</th></tr></thead>
+        <tbody id="health-checks-body"></tbody></table>
+      </div>
+
+      <!-- Brain Files Editor -->
+      <div class="form-section" style="margin-top:16px"><h2>📝 <span data-i18n="brain.ws_title">Brain Workspace</span></h2>
+        <div class="sub" id="brain-base-dir" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <input id="brain-new-filename" placeholder="CUSTOM.md" style="flex:1">
+          <button class="btn btn-primary" onclick="createBrainFile()">+ <span data-i18n="brain.new_file">New File</span></button>
+        </div>
+        <div id="brain-files-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px"></div>
+      </div>
+
+      <!-- File Editor (hidden until a file is clicked) -->
+      <div id="brain-editor" class="card" style="display:none;margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3 id="brain-editor-title">📄 SOUL.md</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="saveBrainFile()">💾 <span data-i18n="brain.save">Save</span></button>
+            <button class="btn" style="background:#dc3545" onclick="deleteBrainFile()">🗑️</button>
+            <button class="btn" onclick="closeBrainEditor()">✕</button>
+          </div>
+        </div>
+        <textarea id="brain-editor-content" style="width:100%;min-height:300px;font-family:monospace;font-size:13px;margin-top:8px;background:var(--bg-card);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:12px;resize:vertical"></textarea>
+      </div>
+
+      <!-- Models Table -->
       <div class="form-section"><h2 data-i18n="brain.models">Mô hình có sẵn</h2>
         <div class="card"><table><thead><tr><th data-i18n="set.model">Mô hình</th><th data-i18n="brain.size">Kích thước</th><th data-i18n="brain.download">Tải về</th></tr></thead><tbody>
           <tr><td><strong>TinyLlama 1.1B</strong></td><td>~638 MB</td><td><code>bizclaw brain download tinyllama-1.1b</code></td></tr>
@@ -441,6 +547,33 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <button class="btn btn-outline" onclick="document.getElementById('agent-create-form').style.display='none'" data-i18n="form.cancel">Hủy</button>
         </div>
       </div>
+      <!-- Edit Agent Modal -->
+      <div id="agent-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:500px;width:90%">
+          <h3>✏️ <span data-i18n="agents.edit">Sửa Agent</span>: <span id="edit-agent-title"></span></h3>
+          <input type="hidden" id="edit-agent-name-hidden">
+          <div class="form-row" style="margin-top:12px"><span class="form-label" data-i18n="form.role">Vai trò</span><select id="edit-agent-role">
+            <option value="assistant">Trợ lý</option><option value="researcher">Nhà nghiên cứu</option>
+            <option value="coder">Lập trình viên</option><option value="writer">Nhà văn</option>
+            <option value="analyst">Phân tích viên</option><option value="translator">Phiên dịch</option>
+          </select></div>
+          <div class="form-row"><span class="form-label" data-i18n="form.description">Mô tả</span><input id="edit-agent-desc"></div>
+          <!-- Telegram Bot Section -->
+          <div style="margin-top:16px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg)">
+            <div style="font-weight:600;margin-bottom:8px">🤖 Telegram Bot</div>
+            <div id="telegram-status" style="font-size:12px;color:var(--text2);margin-bottom:8px"></div>
+            <div class="form-row"><span class="form-label">Bot Token</span><input id="edit-agent-tg-token" type="password" placeholder="123456:ABC-DEF..." style="font-size:12px"></div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="btn btn-primary btn-sm" onclick="connectTelegramBot()" style="font-size:11px">🔗 Kết nối Telegram</button>
+              <button class="btn btn-outline btn-sm" onclick="disconnectTelegramBot()" style="font-size:11px;color:var(--red)">⛔ Ngắt kết nối</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn btn-primary" onclick="saveAgentEdit()">💾 Lưu</button>
+            <button class="btn btn-outline" onclick="document.getElementById('agent-edit-modal').style.display='none'">Hủy</button>
+          </div>
+        </div>
+      </div>
       <div id="agents-list" class="ch-grid" style="margin-top:16px"></div>
       <!-- Broadcast -->
       <div class="card" style="margin-top:16px">
@@ -448,6 +581,50 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div class="form-row"><span class="form-label" data-i18n="agents.msg">Tin nhắn</span><input id="broadcast-msg" placeholder="Gửi tới tất cả agent..."></div>
         <button class="btn btn-primary btn-sm" onclick="broadcastMessage()">📢 <span data-i18n="agents.send_all">Gửi tất cả</span></button>
         <div id="broadcast-results" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ═══ AGENT GROUP CHAT ═══ -->
+    <div id="page-groups" style="display:none">
+      <div class="page-header"><div><h1>👥 <span data-i18n="groups.title">Nhóm Agent</span></h1><div class="sub" data-i18n="groups.subtitle">Tạo nhóm các Agent AI cùng trao đổi và phối hợp — như OpenClaw</div></div>
+        <button class="btn btn-primary" onclick="showCreateGroupForm()">+ <span data-i18n="groups.create">Tạo nhóm</span></button>
+      </div>
+      <div class="stats">
+        <div class="card"><div class="card-label" data-i18n="groups.total">Tổng nhóm</div><div class="card-value accent" id="groups-total">0</div></div>
+        <div class="card"><div class="card-label" data-i18n="groups.agents_count">Agent trong nhóm</div><div class="card-value blue" id="groups-agents">0</div></div>
+        <div class="card"><div class="card-label" data-i18n="groups.conversations">Cuộc hội thoại</div><div class="card-value green" id="groups-convos">0</div></div>
+      </div>
+      <!-- Create Group Form -->
+      <div id="group-create-form" class="card" style="display:none;margin-top:16px">
+        <h3>➕ <span data-i18n="groups.create_new">Tạo nhóm mới</span></h3>
+        <div class="form-row"><span class="form-label" data-i18n="form.name">Tên</span><input id="new-group-name" placeholder="vd: Dev Team, Marketing Team"></div>
+        <div class="form-row"><span class="form-label" data-i18n="groups.topic">Chủ đề</span><input id="new-group-topic" placeholder="vd: Phân tích và phát triển mã nguồn"></div>
+        <div style="margin:12px 0">
+          <div class="form-label" style="margin-bottom:8px" data-i18n="groups.select_agents">Chọn Agent tham gia:</div>
+          <div id="group-agent-checkboxes" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          <div style="font-size:11px;color:var(--text2);margin-top:6px" data-i18n="groups.agent_hint">Chưa có agent? Vào trang Đa tác tử để tạo trước.</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary" onclick="createGroup()">👥 <span data-i18n="groups.create">Tạo nhóm</span></button>
+          <button class="btn btn-outline" onclick="document.getElementById('group-create-form').style.display='none'" data-i18n="form.cancel">Hủy</button>
+        </div>
+      </div>
+      <!-- Groups List -->
+      <div id="groups-list" class="ch-grid" style="margin-top:16px"></div>
+      <!-- Group Conversation Modal -->
+      <div id="group-chat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:700px;width:95%;max-height:85vh;display:flex;flex-direction:column">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h2 id="group-chat-title" style="font-size:16px">👥 Group Chat</h2>
+            <button class="btn btn-outline btn-sm" onclick="closeGroupChat()">✕ Đóng</button>
+          </div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:8px" id="group-chat-members"></div>
+          <div id="group-chat-messages" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;min-height:300px;max-height:55vh;padding:8px 0"></div>
+          <div style="display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+            <input id="group-chat-input" placeholder="Nhập tin nhắn gửi đến nhóm..." style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:13px;outline:none" onkeydown="if(event.key==='Enter')sendGroupMessage()">
+            <button class="btn btn-primary" onclick="sendGroupMessage()">Gửi ↑</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -562,13 +739,15 @@ function showPage(name, pushState) {
   const nav = document.getElementById('nav-' + name);
   if (page) page.style.display = '';
   if (nav) nav.classList.add('active');
-  if (name === 'chat') document.getElementById('chat-input').focus();
+  if (name === 'chat') { document.getElementById('chat-input').focus(); refreshChatAgents(); }
   if (name === 'settings') loadSettingsForm();
   if (name === 'channels') renderChannelCards();
   if (name === 'configfile') loadConfigToml();
   if (name === 'mcp') loadMcpServers();
   if (name === 'agents') loadAgents();
   if (name === 'knowledge') loadKnowledgeDocs();
+  if (name === 'brain') loadBrainFiles();
+  if (name === 'groups') renderGroups();
 }
 
 // Handle browser back/forward
@@ -581,7 +760,7 @@ window.addEventListener('popstate', (ev) => {
 function getPageFromPath() {
   const path = location.pathname.replace(/^\//, '').replace(/\/$/, '');
   // Map valid page names
-  const validPages = ['dashboard','chat','settings','providers','channels','tools','brain','configfile','mcp','agents','knowledge'];
+  const validPages = ['dashboard','chat','settings','providers','channels','tools','brain','configfile','mcp','agents','knowledge','groups'];
   if (!path || path === '' || !validPages.includes(path)) return 'dashboard';
   return path;
 }
@@ -631,15 +810,175 @@ async function loadDashboard() {
   } catch(e) {}
 }
 
-async function loadProviders() {
+const PROVIDERS_META = [
+  {name:'openai',label:'OpenAI',icon:'🤖',type:'cloud',models:['gpt-4o','gpt-4o-mini','gpt-3.5-turbo','o1-mini','o3-mini'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'sk-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'gpt-4o-mini'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:'https://api.openai.com/v1'},
+  ]},
+  {name:'anthropic',label:'Anthropic',icon:'🧠',type:'cloud',models:['claude-sonnet-4','claude-3.5-sonnet','claude-3-haiku'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'sk-ant-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'claude-sonnet-4-20250514'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'gemini',label:'Google Gemini',icon:'💎',type:'cloud',models:['gemini-2.5-pro','gemini-2.5-flash','gemini-2.0-flash'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'AIza...'},
+    {key:'model',label:'Model',type:'text',placeholder:'gemini-2.5-flash'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'deepseek',label:'DeepSeek',icon:'🌊',type:'cloud',models:['deepseek-chat','deepseek-reasoner'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'sk-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'deepseek-chat'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'groq',label:'Groq',icon:'⚡',type:'cloud',models:['llama-3.3-70b','mixtral-8x7b-32768'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'gsk_...'},
+    {key:'model',label:'Model',type:'text',placeholder:'llama-3.3-70b'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'ollama',label:'Ollama (Local)',icon:'🦙',type:'local',models:['auto-detect'],fields:[
+    {key:'model',label:'Model',type:'text',placeholder:'qwen3:0.6b'},
+  ]},
+  {name:'llamacpp',label:'llama.cpp',icon:'🔧',type:'local',models:['server endpoint'],fields:[
+    {key:'base_url',label:'Server URL',type:'text',placeholder:'http://localhost:8080'},
+    {key:'model',label:'Model',type:'text',placeholder:'(auto-detected)'},
+  ]},
+  {name:'brain',label:'Brain Engine',icon:'🧲',type:'local',models:['GGUF offline'],fields:[
+    {key:'model_path',label:'Model Path (.gguf)',type:'text',placeholder:'~/.bizclaw/models/tinyllama.gguf'},
+    {key:'threads',label:'Threads',type:'number',placeholder:'4'},
+  ]},
+  {name:'cliproxy',label:'CLIProxyAPI',icon:'🔌',type:'proxy',models:['OpenAI-compatible proxy'],fields:[
+    {key:'base_url',label:'Proxy URL (bắt buộc)',type:'text',placeholder:'http://localhost:8787/v1'},
+    {key:'api_key',label:'API Key (nếu proxy yêu cầu)',type:'password',placeholder:'proxy-key-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'gpt-4o-mini'},
+  ]},
+];
+// ═══ CLIProxy Persistence ═══
+// CLIProxyAPI proxies through openai provider. We persist 'cliproxy' state in localStorage
+// because Rust config only knows openai+base_url. This distinguishes CLIProxy from OpenAI+custom URL.
+function isClipProxyActive(c) {
+  if (!c) return false;
+  const flag = localStorage.getItem('bizclaw_cliproxy');
+  if (flag !== 'true') return false;
+  const provider = c.default_provider || 'openai';
+  const url = c.api_base_url || '';
+  return provider === 'openai' && url && !url.includes('api.openai.com');
+}
+function setClipProxyFlag(active) {
+  if (active) localStorage.setItem('bizclaw_cliproxy', 'true');
+  else localStorage.removeItem('bizclaw_cliproxy');
+}
+
+function renderProviderCards() {
+  const c = configData;
+  const activeProvider = c.default_provider || 'openai';
+  const activeModel = c.default_model || '';
+  const proxyUrl = c.api_base_url || '';
+  const isClipActive = isClipProxyActive(c);
+  document.getElementById('prov-active-name').textContent = isClipActive ? 'CLIProxyAPI' : activeProvider;
+  document.getElementById('prov-active-model').textContent = activeModel || '\u2014';
+  document.getElementById('prov-total').textContent = PROVIDERS_META.length;
+  const cloudLabel = t('providers.type_cloud');
+  const localLabel = t('providers.type_local');
+  const proxyLabel = t('providers.type_proxy') || 'Proxy';
+  const activeLabel = t('providers.badge_active');
+  const activateBtn = t('providers.btn_activate');
+  const activeBtn = t('providers.btn_active');
+  document.getElementById('providers-grid').innerHTML = PROVIDERS_META.map(p => {
+    const isActive = p.name === 'cliproxy' ? isClipActive : (p.name === activeProvider && !isClipActive);
+    const savedKey = c.api_key_set && isActive;
+    const typeLabel = p.type === 'cloud' ? cloudLabel : (p.type === 'proxy' ? proxyLabel : localLabel);
+    const fieldVals = {};
+    if (isActive) {
+      p.fields.forEach(f => {
+        if (f.key === 'api_key') fieldVals[f.key] = savedKey ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : '';
+        else if (f.key === 'model') fieldVals[f.key] = activeModel;
+        else if (f.key === 'base_url') fieldVals[f.key] = proxyUrl;
+        else if (f.key === 'model_path') fieldVals[f.key] = (c.brain||{}).model_path || '';
+        else if (f.key === 'threads') fieldVals[f.key] = (c.brain||{}).threads || 4;
+      });
+    }
+    return `<div class="ch-card" style="${isActive?'border-color:var(--accent);box-shadow:0 0 24px rgba(99,102,241,.15)':''}">
+      <div class="ch-header">
+        <span class="ch-name">${p.icon} ${p.label}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-${isActive?'green':p.type==='proxy'?'purple':'blue'}">${isActive?'\u25cf '+activeLabel:typeLabel}</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">${p.models.join(', ')}</div>
+      <div class="ch-fields">
+        ${p.fields.map(f => {
+          const val = fieldVals[f.key] || '';
+          return `<label>${f.label}</label><input type="${f.type||'text'}" id="prov-${p.name}-${f.key}" value="${val}" placeholder="${f.placeholder}">`;
+        }).join('')}
+      </div>
+      ${p.name === 'cliproxy' ? '<div style="font-size:11px;color:var(--cyan);margin-bottom:8px;padding:6px 8px;background:rgba(34,211,238,.06);border-radius:6px">\ud83d\udca1 Proxy OpenAI-compatible APIs: LiteLLM, LocalAI, vLLM, text-gen-webui, Claw, etc.</div>' : ''}
+      <div class="ch-actions">
+        <button class="btn ${isActive?'btn-green':'btn-primary'} btn-sm" onclick="setActiveProvider('${p.name}')">${isActive?activeBtn:activateBtn}</button>
+        ${isActive && p.name === 'cliproxy' ? '<button class="btn btn-outline btn-sm" onclick="testClipProxy()">\ud83e\uddea Test</button>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function testClipProxy() {
+  const url = configData.api_base_url;
+  if (!url) { toast('\u274c Ch\u01b0a c\u1ea5u h\u00ecnh Proxy URL'); return; }
+  toast('\ud83d\udd04 \u0110ang ki\u1ec3m tra k\u1ebft n\u1ed1i...');
   try {
-    const data = await (await authFetch(API + '/api/v1/providers')).json();
-    document.getElementById('providers-table').innerHTML = data.providers.map(p => `<tr>
-      <td><strong>${p.name}</strong></td><td>${p.type}</td>
-      <td><span class="badge badge-${p.status==='active'?'green':'blue'}">${p.status}</span></td>
-      <td style="font-size:12px;color:var(--text2)">${(p.models||[]).join(', ')}</td>
-    </tr>`).join('');
-  } catch(e) {}
+    const testUrl = url.replace(/\/v1\/?$/, '') + '/v1/models';
+    const res = await fetch(testUrl, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const data = await res.json();
+      const models = (data.data || []).map(m => m.id).slice(0, 5).join(', ');
+      toast('\u2705 Proxy ho\u1ea1t \u0111\u1ed9ng! Models: ' + (models || '(none listed)'));
+    } else {
+      toast('\u26a0\ufe0f Proxy tr\u1ea3 v\u1ec1 HTTP ' + res.status);
+    }
+  } catch(e) {
+    toast('\u274c Kh\u00f4ng k\u1ebft n\u1ed1i \u0111\u01b0\u1ee3c: ' + e.message);
+  }
+}
+
+async function setActiveProvider(name) {
+  const meta = PROVIDERS_META.find(p => p.name === name);
+  if (!meta) return;
+  const actualProvider = name === 'cliproxy' ? 'openai' : name;
+  const body = { default_provider: actualProvider };
+  meta.fields.forEach(f => {
+    const el = document.getElementById('prov-' + name + '-' + f.key);
+    if (!el) return;
+    const val = el.value.trim();
+    if (!val || val.startsWith('\u2022')) return;
+    if (f.key === 'api_key') body.api_key = val;
+    else if (f.key === 'model') body.default_model = val;
+    else if (f.key === 'base_url') body.api_base_url = val;
+    else if (f.key === 'model_path') { body.brain = body.brain || {}; body.brain.model_path = val; body.brain.enabled = true; body.default_model = 'brain-local'; }
+    else if (f.key === 'threads') { body.brain = body.brain || {}; body.brain.threads = parseInt(val) || 4; }
+  });
+  if (name === 'cliproxy' && !body.api_base_url) {
+    toast('\u274c CLIProxyAPI c\u1ea7n Proxy URL!'); return;
+  }
+  if (!body.default_model) {
+    if (name === 'brain') body.default_model = 'brain-local';
+    else body.default_model = meta.models[0] || '';
+  }
+  // Persist CLIProxy flag to localStorage (survives page reload)
+  setClipProxyFlag(name === 'cliproxy');
+  try {
+    const res = await authFetch(API + '/api/v1/config/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r = await res.json();
+    if (r.ok) {
+      toast('\u2705 Provider ' + (name === 'cliproxy' ? 'CLIProxyAPI' : name) + ' activated!');
+      await loadConfig();
+      renderProviderCards();
+      loadDashboard();
+    } else { toast('\u274c ' + r.error); }
+  } catch(e) { toast('\u274c ' + e.message); }
+}
+
+async function loadProviders() {
+  renderProviderCards();
 }
 
 // ═══ SETTINGS ═══
@@ -747,6 +1086,7 @@ function loadSettingsForm() {
   // Fill model & API key for cloud providers
   document.getElementById('set-model').value = c.default_model || '';
   document.getElementById('set-apikey').value = c.api_key_set ? '••••••••' : '';
+  document.getElementById('set-baseurl').value = c.api_base_url || '';
   // Fill Brain fields
   const brain = c.brain || {};
   document.getElementById('set-brain-path').value = brain.model_path || '';
@@ -818,6 +1158,8 @@ async function saveSettings() {
   if (apiKeyVal && !apiKeyVal.startsWith('•') && !['brain','ollama','llamacpp'].includes(provider)) {
     body.api_key = apiKeyVal;
   }
+  const baseUrlVal = document.getElementById('set-baseurl').value.trim();
+  body.api_base_url = baseUrlVal;
   try {
     const res = await authFetch(API + '/api/v1/config/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const r = await res.json();
@@ -843,6 +1185,10 @@ const CHANNELS = [
     {key:'cookie',label:'Zalo Cookie',type:'textarea',placeholder:'Paste cookie từ chat.zalo.me → F12 → Application → Cookies'},
     {key:'imei',label:'IMEI',type:'text',placeholder:'Tự động tạo nếu để trống'},
   ]},
+  {type:'zalo_oa',name:'Zalo OA Bot',icon:'🇻🇳',fields:[
+    {key:'bot_token',label:'Bot Token',type:'password',placeholder:'Token từ Zalo Bot Creator (bot.zapps.me)', masked:true},
+    {key:'webhook_url',label:'Webhook URL',type:'text',placeholder:'https://your-domain.com/api/v1/zalo-oa/webhook'},
+  ]},
   {type:'discord',name:'Discord Bot',icon:'🎮',fields:[
     {key:'bot_token',label:'Bot Token',type:'password',placeholder:'MTk...', masked:true},
     {key:'allowed_channel_ids',label:'Channel IDs',type:'text',placeholder:'123456789, 987654321'},
@@ -861,6 +1207,11 @@ const CHANNELS = [
   {type:'webhook',name:'Webhook API',icon:'🔗',fields:[
     {key:'webhook_url',label:'Inbound URL',type:'text',placeholder:'https://your-app.com/webhook'},
     {key:'webhook_secret',label:'Secret',type:'password',placeholder:'shared secret for HMAC'},
+  ]},
+  {type:'slack',name:'Slack Bot',icon:'💼',fields:[
+    {key:'bot_token',label:'Bot Token (xoxb-)',type:'password',placeholder:'xoxb-...', masked:true},
+    {key:'app_token',label:'App Token (xapp-)',type:'password',placeholder:'xapp-...', masked:true},
+    {key:'allowed_channel_ids',label:'Channel IDs',type:'text',placeholder:'C01ABCDEF, C02GHIJKL'},
   ]},
 ];
 
@@ -1066,6 +1417,178 @@ async function toggleMcp(index, enabled) {
   } catch(e) { toast('❌ ' + e.message, 'error'); }
 }
 
+// ═══ ONBOARDING WIZARD ═══
+function checkOnboarding() {
+  if (!localStorage.getItem('bizclaw_onboarded')) {
+    const overlay = document.getElementById('onboard-overlay');
+    overlay.style.display = 'flex';
+  }
+}
+function skipOnboard() {
+  localStorage.setItem('bizclaw_onboarded', '1');
+  document.getElementById('onboard-overlay').style.display = 'none';
+}
+function onboardNext() {
+  document.getElementById('onboard-step-1').style.display = 'none';
+  document.getElementById('onboard-step-2').style.display = '';
+}
+function onboardProviderChange() {
+  const p = document.getElementById('onboard-provider').value;
+  document.getElementById('onboard-cloud-fields').style.display = ['ollama','brain','llamacpp'].includes(p) ? 'none' : '';
+  document.getElementById('onboard-ollama-info').style.display = p === 'ollama' ? '' : 'none';
+}
+async function finishOnboard() {
+  const provider = document.getElementById('onboard-provider').value;
+  const model = document.getElementById('onboard-model')?.value || '';
+  const apiKey = document.getElementById('onboard-apikey')?.value || '';
+  const baseUrl = document.getElementById('onboard-baseurl')?.value || '';
+  const aboutUser = document.getElementById('onboard-about').value;
+  const agentVibe = document.getElementById('onboard-vibe').value;
+  const userName = document.getElementById('onboard-name').value;
+
+  // Show done step
+  document.getElementById('onboard-step-2').style.display = 'none';
+  document.getElementById('onboard-step-done').style.display = '';
+  const progress = document.getElementById('onboard-progress');
+
+  // Step 1: Save provider config
+  progress.innerHTML = '⚙️ Saving provider settings...';
+  const configBody = { default_provider: provider };
+  if (model) configBody.default_model = model;
+  if (apiKey) configBody.api_key = apiKey;
+  configBody.api_base_url = baseUrl;
+  if (provider === 'ollama') {
+    configBody.default_model = 'qwen3:0.6b';
+  }
+  try {
+    await authFetch(API + '/api/v1/config/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(configBody)});
+    progress.innerHTML = '✅ Provider configured!<br>🎨 Creating your agent personality...';
+  } catch(e) {
+    progress.innerHTML = '⚠️ Config save error, continuing...';
+  }
+
+  // Step 2: Brain personalization (if user entered about)
+  if (aboutUser.trim()) {
+    // Wait for agent to reload with new config
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      const res = await authFetch(API + '/api/v1/brain/personalize', {
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({about_user: aboutUser, agent_vibe: agentVibe, agent_name: userName || 'BizClaw Agent', language: currentLang})
+      });
+      const data = await res.json();
+      if (data.ok) {
+        progress.innerHTML = '✅ Agent personality created! (' + (data.saved||[]).join(', ') + ')<br><br><button class="btn btn-primary" onclick="skipOnboard();loadDashboard()">🚀 Start using BizClaw</button>';
+      } else {
+        progress.innerHTML = '⚠️ ' + (data.error||'AI not ready') + '<br><br><button class="btn btn-primary" onclick="skipOnboard();loadDashboard()">Continue anyway →</button>';
+      }
+    } catch(e) {
+      progress.innerHTML = '⚠️ Brain personalization skipped<br><br><button class="btn btn-primary" onclick="skipOnboard();loadDashboard()">Continue →</button>';
+    }
+  } else {
+    progress.innerHTML = '✅ All set!<br><br><button class="btn btn-primary" onclick="skipOnboard();loadDashboard()">🚀 Start using BizClaw</button>';
+  }
+
+  localStorage.setItem('bizclaw_onboarded', '1');
+}
+
+// Show onboarding on page load
+setTimeout(checkOnboarding, 1000);
+
+// ═══ BRAIN WORKSPACE EDITOR ═══
+let _brainEditFile = '';
+
+async function loadBrainFiles() {
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files');
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('brain-files-count').textContent = data.count || 0;
+    document.getElementById('brain-base-dir').textContent = '📁 ' + (data.base_dir || '~/.bizclaw');
+    const list = document.getElementById('brain-files-list');
+    list.innerHTML = '';
+    (data.files || []).forEach(f => {
+      const icon = f.is_custom ? '📎' : (f.exists ? '📄' : '⬜');
+      const badge = f.exists ? `<span style="color:var(--green);font-size:12px">● ${(f.size/1024).toFixed(1)}KB</span>` : '<span style="color:var(--orange);font-size:12px">○ empty</span>';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.cursor = 'pointer';
+      card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><strong>${icon} ${f.filename}</strong>${badge}</div><div class="card-sub" style="margin-top:4px">${f.section}</div>`;
+      card.onclick = () => openBrainEditor(f.filename, f.content);
+      list.appendChild(card);
+    });
+  } catch(e) { console.warn('Brain files load error:', e); }
+}
+
+function openBrainEditor(filename, content) {
+  _brainEditFile = filename;
+  document.getElementById('brain-editor-title').textContent = '📄 ' + filename;
+  document.getElementById('brain-editor-content').value = content || '';
+  document.getElementById('brain-editor').style.display = '';
+  document.getElementById('brain-editor-content').focus();
+}
+
+function closeBrainEditor() {
+  document.getElementById('brain-editor').style.display = 'none';
+  _brainEditFile = '';
+}
+
+async function saveBrainFile() {
+  if (!_brainEditFile) return;
+  const content = document.getElementById('brain-editor-content').value;
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files/' + encodeURIComponent(_brainEditFile), {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content})
+    });
+    const data = await res.json();
+    if (data.ok) { toast('💾 ' + _brainEditFile + ' saved'); loadBrainFiles(); }
+    else toast('❌ ' + (data.error||'Save failed'), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function deleteBrainFile() {
+  if (!_brainEditFile || !confirm('Delete ' + _brainEditFile + '?')) return;
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files/' + encodeURIComponent(_brainEditFile), {method:'DELETE'});
+    const data = await res.json();
+    if (data.ok) { toast('🗑️ Deleted'); closeBrainEditor(); loadBrainFiles(); }
+    else toast('❌ ' + (data.error||''), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+async function createBrainFile() {
+  const name = document.getElementById('brain-new-filename').value.trim();
+  if (!name) return toast('Enter a filename (e.g. CUSTOM.md)', 'error');
+  const filename = name.endsWith('.md') ? name : name + '.md';
+  try {
+    const res = await authFetch(API + '/api/v1/brain/files/' + encodeURIComponent(filename), {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content: '# ' + filename.replace('.md','') + '\n\n'})
+    });
+    const data = await res.json();
+    if (data.ok) { toast('✅ Created: ' + filename); document.getElementById('brain-new-filename').value = ''; loadBrainFiles(); }
+    else toast('❌ ' + (data.error||''), 'error');
+  } catch(e) { toast('❌ ' + e.message, 'error'); }
+}
+
+// ═══ HEALTH CHECK ═══
+async function runHealthCheck() {
+  try {
+    const res = await authFetch(API + '/api/v1/health');
+    const data = await res.json();
+    document.getElementById('health-results').style.display = '';
+    const badge = data.status === 'healthy' ? '🟢' : data.status === 'degraded' ? '🟡' : '🔴';
+    document.getElementById('health-summary').innerHTML = `<span style="font-size:18px">${badge} <strong>${data.status.toUpperCase()}</strong></span> — Score: <strong>${data.score}</strong> (${data.score_pct}%)`;
+    const body = document.getElementById('health-checks-body');
+    body.innerHTML = '';
+    (data.checks || []).forEach(c => {
+      const color = c.status === 'pass' ? 'var(--green)' : c.status === 'fail' ? '#dc3545' : c.status === 'warn' ? 'var(--orange)' : 'var(--text-dim)';
+      const icon = c.status === 'pass' ? '✅' : c.status === 'fail' ? '❌' : c.status === 'warn' ? '⚠️' : '⏭️';
+      body.innerHTML += `<tr><td>${c.name}</td><td style="color:${color}">${icon} ${c.status}</td><td>${c.detail}</td></tr>`;
+    });
+    toast(`🩺 Health: ${data.score} (${data.status})`);
+  } catch(e) { toast('❌ Health check failed: ' + e.message, 'error'); }
+}
+
 // ═══ MULTI-AGENT ORCHESTRATOR ═══
 function showCreateAgentForm() { document.getElementById('agent-create-form').style.display = ''; }
 
@@ -1086,25 +1609,42 @@ async function loadAgents() {
       return;
     }
     
-    list.innerHTML = data.agents.map(a => `
+    list.innerHTML = data.agents.map(a => {
+      const safeName = a.name.replace(/'/g, "\\'");
+      const icon = a.role === 'coder' ? '💻' : a.role === 'researcher' ? '🔬' : a.role === 'writer' ? '✍️' : a.role === 'analyst' ? '📊' : a.role === 'translator' ? '🌐' : '🤖';
+      return `
       <div class="card" style="position:relative">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <span style="font-size:24px">${a.role === 'coder' ? '💻' : a.role === 'researcher' ? '🔬' : a.role === 'writer' ? '✍️' : a.role === 'analyst' ? '📊' : a.role === 'translator' ? '🌐' : '🤖'}</span>
-          <div>
+          <span style="font-size:24px">${icon}</span>
+          <div style="flex:1">
             <div style="font-weight:600;color:var(--text)">${a.name} ${a.is_default ? '<span style="font-size:10px;background:var(--accent);color:#000;padding:2px 6px;border-radius:8px">DEFAULT</span>' : ''}</div>
             <div style="font-size:11px;color:var(--text2)">${a.role} • ${a.provider} • ${a.tools} tools</div>
           </div>
+          <button class="btn btn-outline btn-sm" onclick="editAgent('${safeName}','${a.role}','${a.description.replace(/'/g, "\\'").replace(/"/g,'&quot;')}')" style="font-size:11px" title="Sửa">✏️</button>
         </div>
         <div style="font-size:12px;color:var(--text2)">${a.description}</div>
         <div style="font-size:11px;color:var(--text2);margin-top:6px">💬 ${a.messages_processed} messages • 📝 ${a.conversation_length} in context</div>
+        <div id="agent-tg-badge-${a.name}" style="font-size:11px;margin-top:4px"></div>
         <div style="display:flex;gap:6px;margin-top:10px">
-          <input id="agent-msg-${a.name}" placeholder="Chat with ${a.name}..." style="flex:1;font-size:12px">
-          <button class="btn btn-primary btn-sm" onclick="chatWithAgent('${a.name}')" style="font-size:11px">Send</button>
-          <button class="btn btn-outline btn-sm" onclick="deleteAgent('${a.name}')" style="font-size:11px;color:var(--red)">🗑️</button>
+          <input id="agent-msg-${a.name}" placeholder="Chat with ${a.name}..." style="flex:1;font-size:12px" onkeydown="if(event.key==='Enter')chatWithAgent('${safeName}')">
+          <button class="btn btn-primary btn-sm" onclick="chatWithAgent('${safeName}')" style="font-size:11px">Send</button>
+          <button class="btn btn-outline btn-sm" onclick="deleteAgent('${safeName}')" style="font-size:11px;color:var(--red)">🗑️</button>
         </div>
         <div id="agent-response-${a.name}" style="margin-top:8px;font-size:12px;color:var(--cyan);display:none"></div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+    // Lazy-load telegram status badges
+    data.agents.forEach(a => {
+      authFetch(API + '/api/v1/agents/' + encodeURIComponent(a.name) + '/telegram')
+        .then(r => r.json())
+        .then(r => {
+          const badge = document.getElementById('agent-tg-badge-' + a.name);
+          if (badge && r.connected) {
+            badge.innerHTML = '🟢 Telegram: <strong>@' + r.bot_username + '</strong>';
+            badge.style.color = 'var(--green)';
+          }
+        }).catch(() => {});
+    });
   } catch(e) { console.error('Load agents:', e); }
 }
 
@@ -1150,7 +1690,7 @@ async function chatWithAgent(name) {
   respEl.innerHTML = '<span style="color:var(--text2)">Thinking...</span>';
   
   try {
-    const res = await authFetch(API + `/api/v1/agents/${name}/chat`, {
+    const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(name) + '/chat', {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ message: msg })
     });
@@ -1159,6 +1699,94 @@ async function chatWithAgent(name) {
       ? `<div style="background:var(--bg);padding:8px;border-radius:8px;border:1px solid var(--border)">${r.response.replace(/</g,'&lt;').replace(/\n/g,'<br>')}</div>`
       : `<span style="color:var(--red)">❌ ${r.error}</span>`;
   } catch(e) { respEl.innerHTML = `<span style="color:var(--red)">❌ ${e.message}</span>`; }
+}
+
+function editAgent(name, role, desc) {
+  document.getElementById('edit-agent-name-hidden').value = name;
+  document.getElementById('edit-agent-title').textContent = name;
+  document.getElementById('edit-agent-role').value = role;
+  document.getElementById('edit-agent-desc').value = desc.replace(/&quot;/g, '"');
+  document.getElementById('edit-agent-tg-token').value = '';
+  document.getElementById('agent-edit-modal').style.display = 'flex';
+  // Load telegram status
+  loadTelegramStatus(name);
+}
+
+async function loadTelegramStatus(name) {
+  const el = document.getElementById('telegram-status');
+  el.innerHTML = '<span style="color:var(--text2)">Đang kiểm tra...</span>';
+  try {
+    const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(name) + '/telegram');
+    const r = await res.json();
+    if (r.connected) {
+      el.innerHTML = '🟢 <strong>Đang kết nối:</strong> @' + r.bot_username + ' — tin nhắn Telegram sẽ tự động được gửi tới agent này';
+    } else {
+      el.innerHTML = '⚪ Chưa kết nối Telegram Bot. Nhập Bot Token và bấm Kết nối.';
+    }
+  } catch(e) { el.innerHTML = '⚠️ Không thể kiểm tra: ' + e.message; }
+}
+
+async function connectTelegramBot() {
+  const name = document.getElementById('edit-agent-name-hidden').value;
+  const token = document.getElementById('edit-agent-tg-token').value.trim();
+  if (!token) { toast('❌ Nhập Bot Token từ @BotFather'); return; }
+  
+  const el = document.getElementById('telegram-status');
+  el.innerHTML = '🔄 Đang kết nối...';
+  
+  try {
+    const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(name) + '/telegram', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ bot_token: token })
+    });
+    const r = await res.json();
+    if (r.ok) {
+      toast('✅ @' + r.bot_username + ' đã kết nối với agent "' + name + '"!');
+      el.innerHTML = '🟢 <strong>Đã kết nối:</strong> @' + r.bot_username + ' — tin nhắn Telegram sẽ tự động được gửi tới agent này';
+      document.getElementById('edit-agent-tg-token').value = '';
+      loadAgents(); // refresh cards
+    } else {
+      toast('❌ ' + r.error);
+      el.innerHTML = '❌ ' + r.error;
+    }
+  } catch(e) { toast('❌ ' + e.message); el.innerHTML = '❌ ' + e.message; }
+}
+
+async function disconnectTelegramBot() {
+  const name = document.getElementById('edit-agent-name-hidden').value;
+  const el = document.getElementById('telegram-status');
+  
+  try {
+    const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(name) + '/telegram', {
+      method: 'DELETE'
+    });
+    const r = await res.json();
+    if (r.ok) {
+      toast('⛔ Telegram bot đã ngắt kết nối');
+      el.innerHTML = '⚪ Chưa kết nối Telegram Bot.';
+      loadAgents();
+    } else {
+      toast('⚠️ ' + r.error);
+    }
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function saveAgentEdit() {
+  const name = document.getElementById('edit-agent-name-hidden').value;
+  const role = document.getElementById('edit-agent-role').value;
+  const desc = document.getElementById('edit-agent-desc').value.trim();
+  try {
+    const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(name), {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ role, description: desc })
+    });
+    const r = await res.json();
+    if (r.ok) {
+      toast('✅ Agent "' + name + '" đã cập nhật!');
+      document.getElementById('agent-edit-modal').style.display = 'none';
+      loadAgents();
+    } else toast('❌ ' + r.message);
+  } catch(e) { toast('❌ ' + e.message); }
 }
 
 async function broadcastMessage() {
@@ -1182,7 +1810,215 @@ async function broadcastMessage() {
         </div>
       `).join('');
     }
-  } catch(e) { el.innerHTML = `<span style="color:var(--red)">❌ ${e.message}</span>`; }
+  } catch(e) { el.innerHTML = `<span style="color:var(--red)">\u274c ${e.message}</span>`; }
+}
+
+// \u2550\u2550\u2550 AGENT GROUP CHAT \u2550\u2550\u2550
+let _groups = JSON.parse(localStorage.getItem('bizclaw_groups') || '[]');
+let _activeGroupIdx = -1;
+
+function saveGroups() {
+  localStorage.setItem('bizclaw_groups', JSON.stringify(_groups));
+}
+
+async function showCreateGroupForm() {
+  document.getElementById('group-create-form').style.display = '';
+  try {
+    const res = await authFetch(API + '/api/v1/agents');
+    const data = await res.json();
+    const container = document.getElementById('group-agent-checkboxes');
+    if (!data.ok || !data.agents || data.agents.length === 0) {
+      container.innerHTML = '<span style="color:var(--orange);font-size:12px">\u26a0\ufe0f Ch\u01b0a c\u00f3 agent n\u00e0o. V\u00e0o trang \u0110a t\u00e1c t\u1eed \u0111\u1ec3 t\u1ea1o.</span>';
+      return;
+    }
+    container.innerHTML = data.agents.map(a => {
+      const icon = a.role === 'coder' ? '\ud83d\udcbb' : a.role === 'researcher' ? '\ud83d\udd2c' : a.role === 'writer' ? '\u270d\ufe0f' : a.role === 'analyst' ? '\ud83d\udcca' : '\ud83e\udd16';
+      return `<label style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px">
+        <input type="checkbox" value="${a.name}" class="group-agent-cb"> ${icon} ${a.name} <span style="color:var(--text2);font-size:10px">(${a.role})</span>
+      </label>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('group-agent-checkboxes').innerHTML = '<span style="color:var(--red)">\u274c ' + e.message + '</span>';
+  }
+}
+
+function createGroup() {
+  const name = document.getElementById('new-group-name').value.trim();
+  const topic = document.getElementById('new-group-topic').value.trim();
+  if (!name) { toast('Nh\u1eadp t\u00ean nh\u00f3m'); return; }
+  const agents = [...document.querySelectorAll('.group-agent-cb:checked')].map(cb => cb.value);
+  if (agents.length < 2) { toast('Ch\u1ecdn \u00edt nh\u1ea5t 2 agent cho nh\u00f3m'); return; }
+  _groups.push({
+    name,
+    topic: topic || 'General discussion',
+    agents,
+    messages: [],
+    created: new Date().toISOString(),
+  });
+  saveGroups();
+  toast('\ud83d\udc65 Nh\u00f3m "' + name + '" \u0111\u00e3 t\u1ea1o v\u1edbi ' + agents.length + ' agents!');
+  document.getElementById('group-create-form').style.display = 'none';
+  ['new-group-name', 'new-group-topic'].forEach(id => document.getElementById(id).value = '');
+  renderGroups();
+}
+
+function renderGroups() {
+  document.getElementById('groups-total').textContent = _groups.length;
+  document.getElementById('groups-agents').textContent = _groups.reduce((s, g) => s + g.agents.length, 0);
+  document.getElementById('groups-convos').textContent = _groups.reduce((s, g) => s + g.messages.length, 0);
+  const list = document.getElementById('groups-list');
+  if (_groups.length === 0) {
+    list.innerHTML = '<div class="card" style="text-align:center;padding:40px;color:var(--text2)"><div style="font-size:48px;margin-bottom:12px">\ud83d\udc65</div><div>Ch\u01b0a c\u00f3 nh\u00f3m n\u00e0o. T\u1ea1o nh\u00f3m Agent \u0111\u1ec3 ch\u00fang c\u00f9ng trao \u0111\u1ed5i, ph\u00e2n t\u00edch v\u00e0 ph\u1ed1i h\u1ee3p.</div></div>';
+    return;
+  }
+  list.innerHTML = _groups.map((g, i) => {
+    const agentIcons = g.agents.map(a => '<span style="background:var(--bg2);padding:2px 8px;border-radius:4px;font-size:11px">\ud83e\udd16 ' + a + '</span>').join(' ');
+    return `<div class="ch-card">
+      <div class="ch-header">
+        <span class="ch-name">\ud83d\udc65 ${g.name}</span>
+        <span class="badge badge-blue">${g.agents.length} agents</span>
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">\ud83d\udccb ${g.topic}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${agentIcons}</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">\ud83d\udcac ${g.messages.length} tin nh\u1eafn \u2022 ${new Date(g.created).toLocaleDateString()}</div>
+      <div class="ch-actions">
+        <button class="btn btn-primary btn-sm" onclick="openGroupChat(${i})">\ud83d\udcac M\u1edf nh\u00f3m</button>
+        <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="deleteGroup(${i})">\ud83d\uddd1\ufe0f</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteGroup(idx) {
+  if (!confirm('X\u00f3a nh\u00f3m "' + _groups[idx].name + '"?')) return;
+  _groups.splice(idx, 1);
+  saveGroups();
+  renderGroups();
+  toast('\ud83d\uddd1\ufe0f \u0110\u00e3 x\u00f3a nh\u00f3m');
+}
+
+function openGroupChat(idx) {
+  _activeGroupIdx = idx;
+  const g = _groups[idx];
+  document.getElementById('group-chat-title').textContent = '\ud83d\udc65 ' + g.name;
+  document.getElementById('group-chat-members').textContent = '\ud83d\udc64 Th\u00e0nh vi\u00ean: ' + g.agents.join(', ') + ' \u2022 \ud83d\udccb ' + g.topic;
+  document.getElementById('group-chat-modal').style.display = 'flex';
+  renderGroupMessages();
+  document.getElementById('group-chat-input').focus();
+}
+
+function closeGroupChat() {
+  document.getElementById('group-chat-modal').style.display = 'none';
+  _activeGroupIdx = -1;
+}
+
+function renderGroupMessages() {
+  if (_activeGroupIdx < 0) return;
+  const g = _groups[_activeGroupIdx];
+  const el = document.getElementById('group-chat-messages');
+  if (g.messages.length === 0) {
+    el.innerHTML = '<div class="msg msg-system">Nh\u00f3m \u0111\u00e3 s\u1eb5n s\u00e0ng. G\u1eedi tin nh\u1eafn v\u00e0 c\u00e1c agent s\u1ebd c\u00f9ng th\u1ea3o lu\u1eadn!</div>';
+    return;
+  }
+  el.innerHTML = g.messages.map(m => {
+    if (m.role === 'user') return `<div class="msg msg-user">${escHtml(m.content)}</div>`;
+    if (m.role === 'system') return `<div class="msg msg-system">${escHtml(m.content)}</div>`;
+    const icon = m.agent_role === 'coder' ? '\ud83d\udcbb' : m.agent_role === 'researcher' ? '\ud83d\udd2c' : m.agent_role === 'writer' ? '\u270d\ufe0f' : '\ud83e\udd16';
+    return `<div class="msg msg-bot" style="border-left:3px solid var(--accent)">
+      <div style="font-size:10px;color:var(--accent2);font-weight:600;margin-bottom:4px">${icon} ${m.agent}</div>
+      <div>${escHtml(m.content)}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function escHtml(s) { return (s||'').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); }
+
+// ═══ WEBCHAT AGENT SELECTOR ═══
+let _chatAgentName = ''; // empty = default WS agent
+
+async function refreshChatAgents() {
+  try {
+    const res = await authFetch(API + '/api/v1/agents');
+    const data = await res.json();
+    const sel = document.getElementById('chat-agent-select');
+    sel.innerHTML = '<option value="">🤖 Default Agent (WS)</option>';
+    if (data.ok && data.agents && data.agents.length > 0) {
+      data.agents.forEach(a => {
+        const icon = a.role === 'coder' ? '💻' : a.role === 'researcher' ? '🔬' : a.role === 'writer' ? '✍️' : '🤖';
+        sel.innerHTML += `<option value="${a.name}">${icon} ${a.name} (${a.role})</option>`;
+      });
+    }
+  } catch(e) { console.log('refreshChatAgents:', e); }
+}
+
+function onChatAgentChange() {
+  _chatAgentName = document.getElementById('chat-agent-select').value;
+  const info = document.getElementById('chat-agent-info');
+  if (_chatAgentName) {
+    info.style.display = '';
+    info.innerHTML = `🤖 Chat trực tiếp với agent <strong>${_chatAgentName}</strong> qua REST API (không qua WS)`;
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+async function sendGroupMessage() {
+  if (_activeGroupIdx < 0) return;
+  const input = document.getElementById('group-chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  
+  const g = _groups[_activeGroupIdx];
+  g.messages.push({ role: 'user', content: text, time: new Date().toISOString() });
+  saveGroups();
+  renderGroupMessages();
+  
+  // Send to each agent sequentially
+  for (const agentName of g.agents) {
+    // Build context with previous agent responses from this round
+    const roundResponses = g.messages.filter(m => m.role === 'agent' && m.round === g.messages.length);
+    const agentContext = `[Group "${g.name}" - Topic: ${g.topic}]
+You are agent "${agentName}" in a group discussion. Here is the latest message:
+
+User: ${text}
+
+${roundResponses.map(m => m.agent + ': ' + m.content).join('\n')}
+
+Contribute your perspective briefly (2-3 sentences) based on your expertise.`;
+
+    // Show typing
+    g.messages.push({ role: 'system', content: `\ud83e\udd16 ${agentName} \u0111ang suy ngh\u0129...`, _temp: true });
+    saveGroups();
+    renderGroupMessages();
+    
+    try {
+      const res = await authFetch(API + `/api/v1/agents/${agentName}/chat`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ message: agentContext })
+      });
+      const r = await res.json();
+      // Remove typing indicator
+      const tempIdx = g.messages.findIndex(m => m._temp && m.content.includes(agentName));
+      if (tempIdx >= 0) g.messages.splice(tempIdx, 1);
+      if (r.ok) {
+        g.messages.push({ role: 'agent', agent: agentName, agent_role: r.role || 'assistant', content: r.response, time: new Date().toISOString(), round: g.messages.length });
+      } else {
+        g.messages.push({ role: 'agent', agent: agentName, agent_role: 'assistant', content: '\u274c ' + (r.error || 'Error'), time: new Date().toISOString() });
+      }
+    } catch(e) {
+      const tempIdx2 = g.messages.findIndex(m => m._temp && m.content.includes(agentName));
+      if (tempIdx2 >= 0) g.messages.splice(tempIdx2, 1);
+      g.messages.push({ role: 'agent', agent: agentName, agent_role: 'assistant', content: '\u274c ' + e.message, time: new Date().toISOString() });
+    }
+    saveGroups();
+    renderGroupMessages();
+  }
+  
+  g.messages.push({ role: 'system', content: '\u2014\u2014 T\u1ea5t c\u1ea3 agent \u0111\u00e3 tr\u1ea3 l\u1eddi \u2014\u2014' });
+  saveGroups();
+  renderGroupMessages();
 }
 
 // ═══ KNOWLEDGE BASE ═══
@@ -1370,13 +2206,12 @@ function handleWS(msg) {
 function sendChat() {
   const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text || !ws || ws.readyState !== 1) return;
+  if (!text) return;
   input.value = '';
 
-  // Slash commands
+  // Slash commands (always via WS)
   if (text === '/status') {
-    ws.send(JSON.stringify({type:'status'}));
-    addMsg('/status', 'user');
+    if (ws && ws.readyState === 1) { ws.send(JSON.stringify({type:'status'})); addMsg('/status', 'user'); }
     return;
   }
   if (text === '/reset') {
@@ -1390,7 +2225,40 @@ function sendChat() {
   }
 
   addMsg(text, 'user');
+
+  // If a specific agent is selected, use REST API (not WS)
+  if (_chatAgentName) {
+    sendChatToAgent(_chatAgentName, text);
+    return;
+  }
+
+  // Default: use WebSocket
+  if (!ws || ws.readyState !== 1) {
+    addMsg('\u274c WebSocket ch\u01b0a k\u1ebft n\u1ed1i. Ch\u1ecdn m\u1ed9t Agent t\u1eeb dropdown ho\u1eb7c \u0111\u1ee3i k\u1ebft n\u1ed1i WS.', 'system');
+    return;
+  }
   ws.send(JSON.stringify({type:'chat',content:text,stream:true}));
+}
+
+async function sendChatToAgent(agentName, text) {
+  const typing = document.getElementById('chat-typing');
+  typing.style.display = '';
+  try {
+    const res = await authFetch(API + '/api/v1/agents/' + encodeURIComponent(agentName) + '/chat', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ message: text })
+    });
+    typing.style.display = 'none';
+    const r = await res.json();
+    if (r.ok) {
+      addMsg('\ud83e\udd16 ' + agentName + ': ' + r.response, 'bot');
+    } else {
+      addMsg('\u274c ' + (r.error || 'Agent error'), 'system');
+    }
+  } catch(e) {
+    typing.style.display = 'none';
+    addMsg('\u274c ' + e.message, 'system');
+  }
 }
 
 function addMsg(text, role) {
@@ -1424,7 +2292,7 @@ const I18N = {
   vi: {
     // Navigation
     'nav.dashboard':'Bảng điều khiển','nav.webchat':'Trò chuyện','nav.settings':'Cài đặt',
-    'nav.providers':'Nhà cung cấp','nav.channels':'Kênh liên lạc','nav.tools':'Công cụ',
+    'nav.providers':'Nhà cung cấp','nav.channels':'Kênh liên lạc','nav.tools':'Công cụ','nav.groups':'Nhóm Agent',
     'nav.brain':'Brain Engine','nav.mcp':'Máy chủ MCP','nav.agents':'Đa tác tử',
     'nav.knowledge':'Kho tri thức','nav.config':'Tệp cấu hình',
     // Dashboard
@@ -1447,7 +2315,7 @@ const I18N = {
     'settings.title':'Cài đặt Agent','settings.subtitle':'Cấu hình AI agent — nhà cung cấp, mô hình, danh tính, bảo mật',
     'settings.save':'💾 Lưu cài đặt',
     'set.provider_section':'Nhà cung cấp AI','set.provider':'Nhà cung cấp','set.model':'Mô hình',
-    'set.apikey':'Khóa API','set.loading_models':'Đang tải mô hình...','set.model_path':'Đường dẫn mô hình',
+    'set.apikey':'Khóa API','set.baseurl':'URL API tùy chỉnh','set.loading_models':'Đang tải mô hình...','set.model_path':'Đường dẫn mô hình',
     'set.scan':'Quét','set.threads':'Luồng xử lý','set.temperature':'Nhiệt độ',
     'set.identity':'Danh tính','set.agent_name':'Tên Agent','set.persona':'Vai trò',
     'set.sysprompt':'Lời nhắc hệ thống','set.memory':'Bộ nhớ','set.backend':'Backend',
@@ -1455,7 +2323,10 @@ const I18N = {
     'set.autonomy':'Mức tự chủ','set.readonly':'Chỉ đọc','set.supervised':'Giám sát',
     'set.full':'Toàn quyền','set.workspace_only':'Chỉ Workspace',
     // Providers
-    'providers.title':'Nhà cung cấp',
+    'providers.title':'Nhà cung cấp','providers.subtitle':'Cấu hình nhà cung cấp AI — chọn provider mặc định, API key, model',
+    'providers.active_label':'Provider đang dùng','providers.total_label':'Tổng providers',
+    'providers.type_cloud':'Cloud','providers.type_local':'Nội bộ','providers.type_proxy':'Proxy',
+    'providers.badge_active':'Đang dùng','providers.btn_activate':'⚡ Kích hoạt','providers.btn_active':'✅ Đang sử dụng',
     // Channels
     'channels.title':'Cấu hình kênh liên lạc','channels.subtitle':'Kết nối agent với các nền tảng nhắn tin',
     // Tools
@@ -1485,7 +2356,13 @@ const I18N = {
     'agents.title':'Đa tác tử AI','agents.subtitle':'Tạo và quản lý nhiều agent AI với vai trò khác nhau',
     'agents.create':'Tạo Agent','agents.total':'Tổng Agent','agents.default':'Agent mặc định',
     'agents.messages':'Tin nhắn','agents.create_new':'Tạo Agent mới','agents.broadcast':'Phát tin nhắn',
-    'agents.msg':'Tin nhắn','agents.send_all':'Gửi tất cả',
+    'agents.msg':'Tin nhắn','agents.send_all':'Gửi tất cả','agents.edit':'Sửa Agent',
+    // Agent Groups
+    'groups.title':'Nhóm Agent','groups.subtitle':'Tạo nhóm các Agent AI cùng trao đổi và phối hợp — như OpenClaw',
+    'groups.create':'Tạo nhóm','groups.total':'Tổng nhóm','groups.agents_count':'Agent trong nhóm',
+    'groups.conversations':'Cuộc hội thoại','groups.create_new':'Tạo nhóm mới',
+    'groups.topic':'Chủ đề','groups.select_agents':'Chọn Agent tham gia:',
+    'groups.agent_hint':'Chưa có agent? Vào trang Đa tác tử để tạo trước.',
     // Knowledge Base
     'kb.title':'Kho tri thức','kb.subtitle':'RAG cá nhân — thêm tài liệu để AI trả lời chính xác hơn',
     'kb.add_doc':'Thêm tài liệu','kb.documents':'Tài liệu','kb.chunks':'Đoạn văn',
@@ -1495,13 +2372,24 @@ const I18N = {
     // Brain Engine
     'brain.title':'Brain Engine','brain.engine':'Động cơ','brain.quant':'Lượng tử hóa',
     'brain.features':'Tính năng','brain.models':'Mô hình có sẵn','brain.size':'Kích thước',
-    'brain.download':'Tải về',
+    'brain.download':'Tải về','brain.ws_sub':'Workspace não, tệp tính cách và kiểm tra sức khỏe hệ thống',
+    'brain.health_btn':'Kiểm tra sức khỏe','brain.health_title':'Kiểm tra sức khỏe hệ thống',
+    'brain.check_name':'Kiểm tra','brain.check_status':'Trạng thái','brain.check_detail':'Chi tiết',
+    'brain.ws_title':'Workspace Não','brain.new_file':'Tệp mới','brain.save':'Lưu',
+    'brain.files_count':'Brain Files',
     // Forms
     'form.name':'Tên','form.command':'Lệnh','form.args':'Tham số (phân cách bằng dấu phẩy)',
     'form.env':'Biến môi trường (KEY=VALUE, mỗi dòng một cặp)','form.save':'Lưu','form.cancel':'Hủy',
     'form.role':'Vai trò','form.description':'Mô tả',
     // Config page
     'config.title':'config.toml',
+    // Onboarding
+    'onboard.welcome_sub':'Hãy để AI tạo một trợ lý phù hợp riêng cho bạn. Chỉ mất 30 giây.',
+    'onboard.your_name':'Tên bạn','onboard.about_you':'Bạn là ai, làm gì?',
+    'onboard.agent_vibe':'Phong cách Agent',
+    'onboard.provider_sub':'Chọn nguồn AI. Không cần API key? Dùng Ollama hoặc Brain Engine.',
+    'onboard.done_title':'Agent đã sẵn sàng!',
+    'onboard.done_sub':'AI đang tạo tính cách riêng cho agent của bạn...',
     // Pairing
     'pairing.title':'BizClaw Agent','pairing.desc':'Nhập mã Pairing Code để truy cập Dashboard',
     'pairing.confirm':'🔓 Xác nhận','pairing.error':'Vui lòng nhập mã pairing',
@@ -1509,7 +2397,7 @@ const I18N = {
   en: {
     // Navigation
     'nav.dashboard':'Dashboard','nav.webchat':'WebChat','nav.settings':'Settings',
-    'nav.providers':'Providers','nav.channels':'Channels','nav.tools':'Tools',
+    'nav.providers':'Providers','nav.channels':'Channels','nav.tools':'Tools','nav.groups':'Agent Groups',
     'nav.brain':'Brain Engine','nav.mcp':'MCP Servers','nav.agents':'Multi-Agent',
     'nav.knowledge':'Knowledge','nav.config':'Config File',
     // Dashboard
@@ -1532,7 +2420,7 @@ const I18N = {
     'settings.title':'Agent Settings','settings.subtitle':'Configure your AI agent — provider, model, identity, security',
     'settings.save':'💾 Save Settings',
     'set.provider_section':'AI Provider','set.provider':'Provider','set.model':'Model',
-    'set.apikey':'API Key','set.loading_models':'Loading models...','set.model_path':'Model Path',
+    'set.apikey':'API Key','set.baseurl':'Custom API Base URL','set.loading_models':'Loading models...','set.model_path':'Model Path',
     'set.scan':'Scan','set.threads':'Threads','set.temperature':'Temperature',
     'set.identity':'Identity','set.agent_name':'Agent Name','set.persona':'Persona',
     'set.sysprompt':'System Prompt','set.memory':'Memory','set.backend':'Backend',
@@ -1540,7 +2428,10 @@ const I18N = {
     'set.autonomy':'Autonomy Level','set.readonly':'Read Only','set.supervised':'Supervised',
     'set.full':'Full','set.workspace_only':'Workspace Only',
     // Providers
-    'providers.title':'Providers',
+    'providers.title':'Providers','providers.subtitle':'Configure AI providers — set default provider, API key, model',
+    'providers.active_label':'Active Provider','providers.total_label':'Total Providers',
+    'providers.type_cloud':'Cloud','providers.type_local':'Local','providers.type_proxy':'Proxy',
+    'providers.badge_active':'Active','providers.btn_activate':'⚡ Activate','providers.btn_active':'✅ In Use',
     // Channels
     'channels.title':'Channel Configuration','channels.subtitle':'Connect your agent to messaging platforms',
     // Tools
@@ -1570,7 +2461,13 @@ const I18N = {
     'agents.title':'Multi-Agent AI','agents.subtitle':'Create and manage multiple AI agents with different roles',
     'agents.create':'Create Agent','agents.total':'Total Agents','agents.default':'Default Agent',
     'agents.messages':'Messages','agents.create_new':'Create New Agent','agents.broadcast':'Broadcast Message',
-    'agents.msg':'Message','agents.send_all':'Send to All',
+    'agents.msg':'Message','agents.send_all':'Send to All','agents.edit':'Edit Agent',
+    // Agent Groups
+    'groups.title':'Agent Groups','groups.subtitle':'Create groups of AI Agents to discuss and collaborate — like OpenClaw',
+    'groups.create':'Create Group','groups.total':'Total Groups','groups.agents_count':'Agents in Groups',
+    'groups.conversations':'Conversations','groups.create_new':'Create New Group',
+    'groups.topic':'Topic','groups.select_agents':'Select Agents:',
+    'groups.agent_hint':'No agents yet? Go to Multi-Agent page to create some first.',
     // Knowledge Base
     'kb.title':'Knowledge Base','kb.subtitle':'Personal RAG — add documents for context-aware AI responses',
     'kb.add_doc':'Add Document','kb.documents':'Documents','kb.chunks':'Chunks',
@@ -1580,13 +2477,24 @@ const I18N = {
     // Brain Engine
     'brain.title':'Brain Engine','brain.engine':'Engine','brain.quant':'Quantization',
     'brain.features':'Features','brain.models':'Available Models','brain.size':'Size',
-    'brain.download':'Download',
+    'brain.download':'Download','brain.ws_sub':'Brain workspace, personality files, and system health check',
+    'brain.health_btn':'Health Check','brain.health_title':'System Health Check',
+    'brain.check_name':'Check','brain.check_status':'Status','brain.check_detail':'Detail',
+    'brain.ws_title':'Brain Workspace','brain.new_file':'New File','brain.save':'Save',
+    'brain.files_count':'Brain Files',
     // Forms
     'form.name':'Name','form.command':'Command','form.args':'Arguments (comma-separated)',
     'form.env':'Environment Variables (KEY=VALUE, one per line)','form.save':'Save','form.cancel':'Cancel',
     'form.role':'Role','form.description':'Description',
     // Config page
     'config.title':'config.toml',
+    // Onboarding
+    'onboard.welcome_sub':'Let AI create a personalized assistant just for you. Only takes 30 seconds.',
+    'onboard.your_name':'Your Name','onboard.about_you':'Who are you, what do you do?',
+    'onboard.agent_vibe':'Agent Personality',
+    'onboard.provider_sub':'Choose your AI source. No API key? Use Ollama or Brain Engine.',
+    'onboard.done_title':'Agent is Ready!',
+    'onboard.done_sub':'AI is creating a unique personality for your agent...',
     // Pairing
     'pairing.title':'BizClaw Agent','pairing.desc':'Enter Pairing Code to access Dashboard',
     'pairing.confirm':'🔓 Confirm','pairing.error':'Please enter pairing code',
@@ -1607,6 +2515,8 @@ function setLang(lang){
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
   });
+  // Re-render dynamic cards with new language
+  if (configData && configData.default_provider) renderProviderCards();
   // Update WS status
   if(ws && ws.readyState === 1) {
     document.getElementById('ws-status').innerHTML = '🟢 ' + t('status.connected');

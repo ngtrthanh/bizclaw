@@ -3,19 +3,23 @@
 //! Uses DuckDuckGo Instant Answer API (no API key required).
 
 use async_trait::async_trait;
+use bizclaw_core::error::Result;
 use bizclaw_core::traits::Tool;
 use bizclaw_core::types::{ToolDefinition, ToolResult};
-use bizclaw_core::error::Result;
 
 pub struct WebSearchTool;
 
 impl WebSearchTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 #[async_trait]
 impl Tool for WebSearchTool {
-    fn name(&self) -> &str { "web_search" }
+    fn name(&self) -> &str {
+        "web_search"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -36,10 +40,10 @@ impl Tool for WebSearchTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .unwrap_or_else(|_| serde_json::json!({"query": arguments}));
 
-        let query = args["query"].as_str()
-            .unwrap_or(arguments);
+        let query = args["query"].as_str().unwrap_or(arguments);
 
-        let max_results: usize = args["max_results"].as_u64()
+        let max_results: usize = args["max_results"]
+            .as_u64()
             .map(|v| v as usize)
             .unwrap_or(5);
 
@@ -50,11 +54,18 @@ impl Tool for WebSearchTool {
             .build()
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("HTTP error: {e}")))?;
 
-        let url = format!("https://html.duckduckgo.com/html/?q={}", urlencoding::encode(query));
-        let response = client.get(&url).send().await
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Search failed: {e}")))?;
+        let url = format!(
+            "https://html.duckduckgo.com/html/?q={}",
+            urlencoding::encode(query)
+        );
+        let response =
+            client.get(&url).send().await.map_err(|e| {
+                bizclaw_core::error::BizClawError::Tool(format!("Search failed: {e}"))
+            })?;
 
-        let html = response.text().await
+        let html = response
+            .text()
+            .await
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Read failed: {e}")))?;
 
         let results = parse_ddg_results(&html, max_results);
@@ -83,21 +94,26 @@ fn parse_ddg_results(html: &str, max: usize) -> Vec<(String, String, String)> {
     for segment in html.split("class=\"result__a\"").skip(1).take(max) {
         let title = extract_between(segment, ">", "</a>")
             .unwrap_or_default()
-            .replace("<b>", "").replace("</b>", "");
+            .replace("<b>", "")
+            .replace("</b>", "");
 
-        let url = extract_between(segment, "href=\"", "\"")
-            .unwrap_or_default();
+        let url = extract_between(segment, "href=\"", "\"").unwrap_or_default();
 
         let snippet = if let Some(snip_seg) = segment.split("class=\"result__snippet\"").nth(1) {
             extract_between(snip_seg, ">", "</")
                 .unwrap_or_default()
-                .replace("<b>", "").replace("</b>", "")
+                .replace("<b>", "")
+                .replace("</b>", "")
         } else {
             String::new()
         };
 
         if !title.is_empty() {
-            results.push((title.trim().into(), snippet.trim().into(), url.trim().into()));
+            results.push((
+                title.trim().into(),
+                snippet.trim().into(),
+                url.trim().into(),
+            ));
         }
     }
     results

@@ -8,9 +8,9 @@
 //! - x86_64 + SSE2: 128-bit vectors (all x86_64 CPUs)
 //! - x86_64 + AVX2: 256-bit vectors (Intel Haswell+, AMD Zen+)
 
+pub mod avx2;
 pub mod neon;
 pub mod sse2;
-pub mod avx2;
 
 /// Accelerated dot product — dispatches to best SIMD available.
 pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {

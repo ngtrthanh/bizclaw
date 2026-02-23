@@ -1,0 +1,282 @@
+name: BizClaw CI/CD
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ══════════════════════════════════════════════
+  #  🧪 Build & Test (Linux)
+  # ══════════════════════════════════════════════
+  test:
+    name: 🧪 Build & Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: 🔨 Build
+        run: cargo build --workspace --all-targets
+
+      - name: 🧪 Run Tests
+        run: cargo test --workspace -- --nocapture
+
+      - name: 📊 Test Summary
+        if: always()
+        run: |
+          echo "## 📊 Test Results" >> $GITHUB_STEP_SUMMARY
+          cargo test --workspace 2>&1 | grep -E "test result|running" >> $GITHUB_STEP_SUMMARY || true
+
+  # ══════════════════════════════════════════════
+  #  🔍 Clippy + Format
+  # ══════════════════════════════════════════════
+  quality:
+    name: 🔍 Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-quality-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: 📐 Format Check
+        run: cargo fmt --all -- --check
+
+      - name: 🔍 Clippy
+        continue-on-error: true
+        run: cargo clippy --workspace --all-targets -- -A unused-imports -A dead-code -A private_interfaces -A private_bounds
+
+  # ══════════════════════════════════════════════
+  #  📦 Cross-Platform Release Builds
+  # ══════════════════════════════════════════════
+  build-release:
+    name: 📦 Build ${{ matrix.target }}
+    needs: [test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x86_64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: bizclaw-linux-x86_64
+            ext: ""
+          # Linux ARM64 (Raspberry Pi, ARM servers)
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: bizclaw-linux-arm64
+            ext: ""
+            cross: true
+          # macOS Apple Silicon
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: bizclaw-macos-arm64
+            ext: ""
+          # macOS Intel
+          - target: x86_64-apple-darwin
+            os: macos-14
+            artifact: bizclaw-macos-x86_64
+            ext: ""
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: bizclaw-windows-x86_64
+            ext: ".exe"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-${{ matrix.target }}-release-${{ hashFiles('**/Cargo.lock') }}
+
+      # Cross-compilation for Linux ARM64
+      - name: Install cross
+        if: matrix.cross == true
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: 🔨 Build Release (cross)
+        if: matrix.cross == true
+        run: cross build --release --bin bizclaw --bin bizclaw-platform --target ${{ matrix.target }}
+
+      - name: 🔨 Build Release (native)
+        if: matrix.cross != true
+        run: cargo build --release --bin bizclaw --bin bizclaw-platform --target ${{ matrix.target }}
+
+      # Package binaries
+      - name: 📦 Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist/${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/bizclaw${{ matrix.ext }} dist/${{ matrix.artifact }}/
+          cp target/${{ matrix.target }}/release/bizclaw-platform${{ matrix.ext }} dist/${{ matrix.artifact }}/
+          cp README.md dist/${{ matrix.artifact }}/ 2>/dev/null || true
+          cp GETTING_STARTED.md dist/${{ matrix.artifact }}/ 2>/dev/null || true
+          cp install.sh dist/${{ matrix.artifact }}/ 2>/dev/null || true
+          cd dist && tar czf ${{ matrix.artifact }}.tar.gz ${{ matrix.artifact }}
+
+      - name: 📦 Package (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/${{ matrix.artifact }}
+          Copy-Item target/${{ matrix.target }}/release/bizclaw${{ matrix.ext }} dist/${{ matrix.artifact }}/
+          Copy-Item target/${{ matrix.target }}/release/bizclaw-platform${{ matrix.ext }} dist/${{ matrix.artifact }}/
+          Copy-Item README.md dist/${{ matrix.artifact }}/ -ErrorAction SilentlyContinue
+          Copy-Item GETTING_STARTED.md dist/${{ matrix.artifact }}/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path dist/${{ matrix.artifact }} -DestinationPath dist/${{ matrix.artifact }}.zip
+
+      - name: 📤 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}.*
+
+  # ══════════════════════════════════════════════
+  #  🏷️ Create GitHub Release
+  # ══════════════════════════════════════════════
+  release:
+    name: 🏷️ GitHub Release
+    needs: [build-release]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 📋 Generate Release Notes
+        id: notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          cat > release_notes.md << 'EOF'
+          ## 🚀 BizClaw $VERSION
+          
+          AI Agent Infrastructure Platform — Multi-tenant, Multi-channel, Multi-provider.
+          
+          ### 📦 Downloads
+          
+          | Platform | Architecture | File |
+          |----------|-------------|------|
+          | 🐧 Linux | x86_64 | `bizclaw-linux-x86_64.tar.gz` |
+          | 🐧 Linux | ARM64 | `bizclaw-linux-arm64.tar.gz` |
+          | 🍎 macOS | Apple Silicon (M1+) | `bizclaw-macos-arm64.tar.gz` |
+          | 🍎 macOS | Intel | `bizclaw-macos-x86_64.tar.gz` |
+          | 🪟 Windows | x86_64 | `bizclaw-windows-x86_64.zip` |
+          
+          ### ⚡ Quick Start
+          ```bash
+          # Linux/macOS one-liner:
+          curl -sSL https://bizclaw.vn/install.sh | bash
+          
+          # Or manual:
+          tar xzf bizclaw-linux-x86_64.tar.gz
+          ./bizclaw-linux-x86_64/bizclaw --help
+          ```
+          
+          ### 🔑 Features
+          - 14 crates, 38 API routes, 15 built-in tools
+          - 8 AI providers (OpenAI, Anthropic, Gemini, DeepSeek, Groq, Ollama, Brain Engine, CLIProxy)
+          - 7 channels (Telegram, Zalo, WhatsApp, Discord, Email, Slack, Web)
+          - Multi-Agent Orchestrator with Telegram Bot integration
+          - Knowledge Base RAG with FTS5 search
+          - Auto-compaction, session management, Brain workspace
+          EOF
+          
+          sed -i "s/\$VERSION/$VERSION/g" release_notes.md
+
+      - name: 🏷️ Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
+
+  # ══════════════════════════════════════════════
+  #  🚀 Auto Deploy to VPS (master push)
+  # ══════════════════════════════════════════════
+  deploy:
+    name: 🚀 Deploy to VPS
+    needs: [test]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    timeout-minutes: 20
+    steps:
+      - name: 🚀 Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 600s
+          script: |
+            set -e
+            cd /root/bizclaw
+            echo "📥 Pulling latest code..."
+            git pull origin master
+            
+            echo "🔨 Building release..."
+            source "$HOME/.cargo/env"
+            cargo build --release --bin bizclaw --bin bizclaw-platform
+            
+            echo "🔄 Deploying binaries..."
+            systemctl stop bizclaw-platform
+            sleep 1
+            cp target/release/bizclaw /usr/local/bin/bizclaw
+            cp target/release/bizclaw-platform /usr/local/bin/bizclaw-platform
+            systemctl start bizclaw-platform
+            
+            echo "✅ Verifying..."
+            sleep 3
+            systemctl is-active bizclaw-platform
+            echo "✅ Deployed at $(date)"

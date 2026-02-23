@@ -1,10 +1,12 @@
-//! Zalo client sub-modules — auth, messaging, session, crypto, WebSocket listener.
+//! Zalo client sub-modules — auth, messaging, session, crypto, WebSocket listener, bot.
 pub mod auth;
-pub mod session;
-pub mod crypto;
-pub mod messaging;
-pub mod groups;
-pub mod friends;
+/// Zalo OA Bot Platform client (bot.zapps.me official API).
+pub mod bot;
 pub mod business;
+pub mod crypto;
+pub mod friends;
+pub mod groups;
 pub mod listener;
+pub mod messaging;
 pub mod models;
+pub mod session;

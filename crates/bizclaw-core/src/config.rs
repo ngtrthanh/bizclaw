@@ -43,6 +43,10 @@ impl Default for LlmConfig {
 pub struct BizClawConfig {
     #[serde(default = "default_api_key")]
     pub api_key: String,
+    /// Custom API base URL (e.g. CLIProxyAPI: http://localhost:8787/v1)
+    /// Leave empty to use provider default.
+    #[serde(default)]
+    pub api_base_url: String,
     #[serde(default = "default_provider")]
     pub default_provider: String,
     #[serde(default = "default_model")]
@@ -92,6 +96,7 @@ impl Default for BizClawConfig {
     fn default() -> Self {
         Self {
             api_key: default_api_key(),
+            api_base_url: String::new(),
             default_provider: default_provider(),
             default_model: default_model(),
             default_temperature: default_temperature(),

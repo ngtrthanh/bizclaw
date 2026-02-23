@@ -1,19 +1,24 @@
 //! JWT authentication for admin panel.
 
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 
 /// JWT claims.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,      // user ID
+    pub sub: String, // user ID
     pub email: String,
     pub role: String,
     pub exp: usize,
 }
 
 /// Generate a JWT token.
-pub fn create_token(user_id: &str, email: &str, role: &str, secret: &str) -> Result<String, String> {
+pub fn create_token(
+    user_id: &str,
+    email: &str,
+    role: &str,
+    secret: &str,
+) -> Result<String, String> {
     let expiration = chrono::Utc::now()
         .checked_add_signed(chrono::Duration::hours(24))
         .expect("valid timestamp")
@@ -26,16 +31,24 @@ pub fn create_token(user_id: &str, email: &str, role: &str, secret: &str) -> Res
         exp: expiration,
     };
 
-    encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes()))
-        .map_err(|e| format!("Token creation failed: {e}"))
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+    .map_err(|e| format!("Token creation failed: {e}"))
 }
 
 /// Validate and decode a JWT token.
 pub fn validate_token(token: &str, secret: &str) -> Result<Claims, String> {
     let validation = Validation::new(Algorithm::HS256);
-    decode::<Claims>(token, &DecodingKey::from_secret(secret.as_bytes()), &validation)
-        .map(|data| data.claims)
-        .map_err(|e| format!("Token validation failed: {e}"))
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &validation,
+    )
+    .map(|data| data.claims)
+    .map_err(|e| format!("Token validation failed: {e}"))
 }
 
 /// Hash a password using bcrypt.

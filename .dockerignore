@@ -1,0 +1,11 @@
+target/
+*.db
+*.log
+.git/
+.github/
+plans/
+docs/
+.gemini/
+.agent/
+*.md
+!README.md

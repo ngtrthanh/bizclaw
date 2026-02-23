@@ -1,10 +1,14 @@
 //! Admin HTTP server — REST API for the admin control plane.
 
-use axum::{Router, Json, routing::{get, post, delete}, extract::{State, Path}};
-use axum::middleware;
-use std::sync::{Arc, Mutex};
 use crate::db::PlatformDb;
 use crate::tenant::TenantManager;
+use axum::middleware;
+use axum::{
+    Json, Router,
+    extract::{Path, State},
+    routing::{delete, get, post},
+};
+use std::sync::{Arc, Mutex};
 
 /// Shared application state for the admin server.
 pub struct AdminState {
@@ -23,7 +27,8 @@ async fn require_auth(
     req: axum::http::Request<axum::body::Body>,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
-    let auth_header = req.headers()
+    let auth_header = req
+        .headers()
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
@@ -66,8 +71,14 @@ impl AdminServer {
             // Channel Configuration
             .route("/api/admin/tenants/{id}/channels", get(list_channels))
             .route("/api/admin/tenants/{id}/channels", post(upsert_channel))
-            .route("/api/admin/tenants/{id}/channels/{channel_id}", delete(delete_channel))
-            .route("/api/admin/tenants/{id}/channels/zalo/qr", post(zalo_get_qr))
+            .route(
+                "/api/admin/tenants/{id}/channels/{channel_id}",
+                delete(delete_channel),
+            )
+            .route(
+                "/api/admin/tenants/{id}/channels/zalo/qr",
+                post(zalo_get_qr),
+            )
             // Ollama / Brain Engine
             .route("/api/admin/ollama/models", get(ollama_list_models))
             .route("/api/admin/ollama/pull", post(ollama_pull_model))
@@ -85,10 +96,12 @@ impl AdminServer {
 
         // SPA fallback — serve dashboard HTML for all non-API paths
         // so that /tenants, /settings, /ollama etc. all work
-        let spa_fallback = Router::new()
-            .fallback(get(admin_dashboard_page));
+        let spa_fallback = Router::new().fallback(get(admin_dashboard_page));
 
-        protected.merge(public).merge(spa_fallback).with_state(state)
+        protected
+            .merge(public)
+            .merge(spa_fallback)
+            .with_state(state)
     }
 
     /// Start the admin server.
@@ -97,11 +110,13 @@ impl AdminServer {
         let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
         tracing::info!("🏢 Admin platform running at http://localhost:{port}");
 
-        let listener = tokio::net::TcpListener::bind(addr).await
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await
             .map_err(|e| bizclaw_core::error::BizClawError::Gateway(format!("Bind error: {e}")))?;
 
-        axum::serve(listener, app).await
-            .map_err(|e| bizclaw_core::error::BizClawError::Gateway(format!("Server error: {e}")))?;
+        axum::serve(listener, app).await.map_err(|e| {
+            bizclaw_core::error::BizClawError::Gateway(format!("Server error: {e}"))
+        })?;
 
         Ok(())
     }
@@ -110,8 +125,19 @@ impl AdminServer {
 // ── API Handlers ────────────────────────────────────
 
 async fn get_stats(State(state): State<Arc<AdminState>>) -> Json<serde_json::Value> {
-    let (total, running, stopped, error) = state.db.lock().unwrap().tenant_stats().unwrap_or((0,0,0,0));
-    let users = state.db.lock().unwrap().list_users().map(|u| u.len() as u32).unwrap_or(0);
+    let (total, running, stopped, error) = state
+        .db
+        .lock()
+        .unwrap()
+        .tenant_stats()
+        .unwrap_or((0, 0, 0, 0));
+    let users = state
+        .db
+        .lock()
+        .unwrap()
+        .list_users()
+        .map(|u| u.len() as u32)
+        .unwrap_or(0);
     Json(serde_json::json!({
         "total_tenants": total, "running": running, "stopped": stopped,
         "error": error, "users": users
@@ -119,7 +145,12 @@ async fn get_stats(State(state): State<Arc<AdminState>>) -> Json<serde_json::Val
 }
 
 async fn get_activity(State(state): State<Arc<AdminState>>) -> Json<serde_json::Value> {
-    let events = state.db.lock().unwrap().recent_events(20).unwrap_or_default();
+    let events = state
+        .db
+        .lock()
+        .unwrap()
+        .recent_events(20)
+        .unwrap_or_default();
     Json(serde_json::json!({ "events": events }))
 }
 
@@ -152,13 +183,25 @@ async fn create_tenant(
     };
 
     match state.db.lock().unwrap().create_tenant(
-        &req.name, &req.slug, port,
+        &req.name,
+        &req.slug,
+        port,
         req.provider.as_deref().unwrap_or("openai"),
         req.model.as_deref().unwrap_or("gpt-4o-mini"),
         req.plan.as_deref().unwrap_or("free"),
     ) {
         Ok(tenant) => {
-            state.db.lock().unwrap().log_event("tenant_created", "admin", &tenant.id, Some(&format!("slug={}", req.slug))).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event(
+                    "tenant_created",
+                    "admin",
+                    &tenant.id,
+                    Some(&format!("slug={}", req.slug)),
+                )
+                .ok();
             Json(serde_json::json!({"ok": true, "tenant": tenant}))
         }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -182,7 +225,12 @@ async fn delete_tenant(
     state.manager.lock().unwrap().stop_tenant(&id).ok();
     match state.db.lock().unwrap().delete_tenant(&id) {
         Ok(()) => {
-            state.db.lock().unwrap().log_event("tenant_deleted", "admin", &id, None).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event("tenant_deleted", "admin", &id, None)
+                .ok();
             Json(serde_json::json!({"ok": true}))
         }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -203,13 +251,28 @@ async fn start_tenant(
     match mgr.start_tenant(&tenant, &state.bizclaw_bin, &db) {
         Ok(pid) => {
             drop(db);
-            state.db.lock().unwrap().update_tenant_status(&id, "running", Some(pid)).ok();
-            state.db.lock().unwrap().log_event("tenant_started", "admin", &id, None).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .update_tenant_status(&id, "running", Some(pid))
+                .ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event("tenant_started", "admin", &id, None)
+                .ok();
             Json(serde_json::json!({"ok": true, "pid": pid}))
         }
         Err(e) => {
             drop(db);
-            state.db.lock().unwrap().update_tenant_status(&id, "error", None).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .update_tenant_status(&id, "error", None)
+                .ok();
             Json(serde_json::json!({"ok": false, "error": e.to_string()}))
         }
     }
@@ -220,8 +283,18 @@ async fn stop_tenant(
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
     state.manager.lock().unwrap().stop_tenant(&id).ok();
-    state.db.lock().unwrap().update_tenant_status(&id, "stopped", None).ok();
-    state.db.lock().unwrap().log_event("tenant_stopped", "admin", &id, None).ok();
+    state
+        .db
+        .lock()
+        .unwrap()
+        .update_tenant_status(&id, "stopped", None)
+        .ok();
+    state
+        .db
+        .lock()
+        .unwrap()
+        .log_event("tenant_stopped", "admin", &id, None)
+        .ok();
     Json(serde_json::json!({"ok": true}))
 }
 
@@ -248,7 +321,12 @@ async fn reset_pairing(
 ) -> Json<serde_json::Value> {
     match state.db.lock().unwrap().reset_pairing_code(&id) {
         Ok(code) => {
-            state.db.lock().unwrap().log_event("tenant_pairing_reset", "admin", &id, None).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event("tenant_pairing_reset", "admin", &id, None)
+                .ok();
             Json(serde_json::json!({"ok": true, "pairing_code": code}))
         }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -261,7 +339,10 @@ async fn list_users(State(state): State<Arc<AdminState>>) -> Json<serde_json::Va
 }
 
 #[derive(serde::Deserialize)]
-struct LoginReq { email: String, password: String }
+struct LoginReq {
+    email: String,
+    password: String,
+}
 
 async fn login(
     State(state): State<Arc<AdminState>>,
@@ -296,12 +377,19 @@ async fn login(
             let hash_clone = hash.clone();
             let ok = tokio::task::spawn_blocking(move || {
                 crate::auth::verify_password(&password, &hash_clone)
-            }).await.unwrap_or(false);
+            })
+            .await
+            .unwrap_or(false);
 
             if ok {
                 match crate::auth::create_token(&id, &req.email, &role, &state.jwt_secret) {
                     Ok(token) => {
-                        state.db.lock().unwrap().log_event("login_success", "user", &id, None).ok();
+                        state
+                            .db
+                            .lock()
+                            .unwrap()
+                            .log_event("login_success", "user", &id, None)
+                            .ok();
                         Json(serde_json::json!({"ok": true, "token": token, "role": role}))
                     }
                     Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
@@ -316,18 +404,31 @@ async fn login(
 }
 
 #[derive(serde::Deserialize)]
-struct PairingReq { slug: String, code: String }
+struct PairingReq {
+    slug: String,
+    code: String,
+}
 
 async fn validate_pairing(
     State(state): State<Arc<AdminState>>,
     Json(req): Json<PairingReq>,
 ) -> Json<serde_json::Value> {
-    match state.db.lock().unwrap().validate_pairing(&req.slug, &req.code) {
+    match state
+        .db
+        .lock()
+        .unwrap()
+        .validate_pairing(&req.slug, &req.code)
+    {
         Ok(Some(tenant)) => {
             // Generate a session token for this tenant
             match crate::auth::create_token(&tenant.id, &tenant.slug, "tenant", &state.jwt_secret) {
                 Ok(token) => {
-                    state.db.lock().unwrap().log_event("pairing_success", "tenant", &tenant.id, None).ok();
+                    state
+                        .db
+                        .lock()
+                        .unwrap()
+                        .log_event("pairing_success", "tenant", &tenant.id, None)
+                        .ok();
                     Json(serde_json::json!({"ok": true, "token": token, "tenant": tenant}))
                 }
                 Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
@@ -367,12 +468,27 @@ async fn upsert_channel(
     Json(req): Json<UpsertChannelReq>,
 ) -> Json<serde_json::Value> {
     let config_json = serde_json::to_string(&req.config).unwrap_or_default();
-    match state.db.lock().unwrap().upsert_channel(&id, &req.channel_type, req.enabled, &config_json) {
+    match state
+        .db
+        .lock()
+        .unwrap()
+        .upsert_channel(&id, &req.channel_type, req.enabled, &config_json)
+    {
         Ok(channel) => {
-            state.db.lock().unwrap().log_event(
-                "channel_configured", "admin", &id,
-                Some(&format!("type={}, enabled={}", req.channel_type, req.enabled)),
-            ).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event(
+                    "channel_configured",
+                    "admin",
+                    &id,
+                    Some(&format!(
+                        "type={}, enabled={}",
+                        req.channel_type, req.enabled
+                    )),
+                )
+                .ok();
             Json(serde_json::json!({"ok": true, "channel": channel}))
         }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -385,10 +501,17 @@ async fn delete_channel(
 ) -> Json<serde_json::Value> {
     match state.db.lock().unwrap().delete_channel(&channel_id) {
         Ok(()) => {
-            state.db.lock().unwrap().log_event(
-                "channel_deleted", "admin", &tenant_id,
-                Some(&format!("channel_id={}", channel_id)),
-            ).ok();
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event(
+                    "channel_deleted",
+                    "admin",
+                    &tenant_id,
+                    Some(&format!("channel_id={}", channel_id)),
+                )
+                .ok();
             Json(serde_json::json!({"ok": true}))
         }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -436,9 +559,7 @@ fn ollama_url() -> String {
 }
 
 /// Check if Ollama is running.
-async fn ollama_health(
-    State(_state): State<Arc<AdminState>>,
-) -> Json<serde_json::Value> {
+async fn ollama_health(State(_state): State<Arc<AdminState>>) -> Json<serde_json::Value> {
     let client = reqwest::Client::new();
     let url = ollama_url();
     match client.get(format!("{url}/api/tags")).send().await {
@@ -459,16 +580,16 @@ async fn ollama_health(
 }
 
 /// List installed Ollama models.
-async fn ollama_list_models(
-    State(_state): State<Arc<AdminState>>,
-) -> Json<serde_json::Value> {
+async fn ollama_list_models(State(_state): State<Arc<AdminState>>) -> Json<serde_json::Value> {
     let client = reqwest::Client::new();
     let url = ollama_url();
     match client.get(format!("{url}/api/tags")).send().await {
         Ok(r) if r.status().is_success() => {
             let body: serde_json::Value = r.json().await.unwrap_or_default();
-            let models: Vec<serde_json::Value> = body["models"].as_array()
-                .map(|arr| arr.iter().map(|m| {
+            let models: Vec<serde_json::Value> = body["models"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter().map(|m| {
                     let size_bytes = m["size"].as_u64().unwrap_or(0);
                     let size_mb = size_bytes as f64 / 1_048_576.0;
                     serde_json::json!({
@@ -480,7 +601,8 @@ async fn ollama_list_models(
                         "parameter_size": m["details"]["parameter_size"].as_str().unwrap_or(""),
                         "quantization": m["details"]["quantization_level"].as_str().unwrap_or(""),
                     })
-                }).collect())
+                }).collect()
+                })
                 .unwrap_or_default();
             Json(serde_json::json!({"ok": true, "models": models}))
         }

@@ -29,13 +29,13 @@ impl SqliteMemory {
                 embedding BLOB,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
-            );"
-        ).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+            );",
+        )
+        .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
         // Add session_id column if missing (migration from old schema)
-        conn.execute_batch(
-            "ALTER TABLE memories ADD COLUMN session_id TEXT DEFAULT 'default';"
-        ).ok(); // Silently ignore if column already exists
+        conn.execute_batch("ALTER TABLE memories ADD COLUMN session_id TEXT DEFAULT 'default';")
+            .ok(); // Silently ignore if column already exists
 
         // FTS5 virtual table for fast full-text search with BM25 ranking
         conn.execute_batch(
@@ -43,8 +43,9 @@ impl SqliteMemory {
                 id UNINDEXED,
                 content,
                 tokenize='unicode61'
-            );"
-        ).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+            );",
+        )
+        .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
         // Sessions table for tracking conversation threads
         conn.execute_batch(
@@ -55,16 +56,20 @@ impl SqliteMemory {
                 updated_at TEXT DEFAULT (datetime('now')),
                 message_count INTEGER DEFAULT 0,
                 summary TEXT DEFAULT ''
-            );"
-        ).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+            );",
+        )
+        .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
         // Ensure default session exists
         conn.execute(
             "INSERT OR IGNORE INTO sessions (id, name) VALUES ('default', 'Default')",
             [],
-        ).ok();
+        )
+        .ok();
 
-        Ok(Self { conn: Mutex::new(conn) })
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     /// Get conversation count across all sessions.
@@ -77,35 +82,45 @@ impl SqliteMemory {
     /// List sessions with their message counts.
     pub fn list_sessions(&self) -> Vec<(String, String, i64)> {
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT id, name, message_count FROM sessions ORDER BY updated_at DESC"
-        ).unwrap();
-        stmt.query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?))
-        }).map(|rows| rows.filter_map(|r| r.ok()).collect())
-        .unwrap_or_default()
+        let mut stmt = conn
+            .prepare("SELECT id, name, message_count FROM sessions ORDER BY updated_at DESC")
+            .unwrap();
+        stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .map(|rows| rows.filter_map(|r| r.ok()).collect())
+            .unwrap_or_default()
     }
 
     /// Create a new session.
     pub fn create_session(&self, id: &str, name: &str) -> Result<()> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
         conn.execute(
             "INSERT OR IGNORE INTO sessions (id, name) VALUES (?1, ?2)",
             rusqlite::params![id, name],
-        ).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        )
+        .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
         Ok(())
     }
 }
 
 #[async_trait]
 impl MemoryBackend for SqliteMemory {
-    fn name(&self) -> &str { "sqlite" }
+    fn name(&self) -> &str {
+        "sqlite"
+    }
 
     async fn save(&self, entry: MemoryEntry) -> Result<()> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
-        
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+
         // Extract session_id from metadata or use default
-        let session_id = entry.metadata.get("session_id")
+        let session_id = entry
+            .metadata
+            .get("session_id")
             .and_then(|v| v.as_str())
             .unwrap_or("default")
             .to_string();
@@ -126,7 +141,8 @@ impl MemoryBackend for SqliteMemory {
         conn.execute(
             "INSERT OR REPLACE INTO memories_fts (id, content) VALUES (?1, ?2)",
             rusqlite::params![entry.id, entry.content],
-        ).ok(); // Don't fail on FTS insert error
+        )
+        .ok(); // Don't fail on FTS insert error
 
         // Update session message count
         conn.execute(
@@ -138,10 +154,14 @@ impl MemoryBackend for SqliteMemory {
     }
 
     async fn search(&self, query: &str, limit: usize) -> Result<Vec<MemorySearchResult>> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
-        
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+
         // Clean query for FTS5
-        let clean_query: String = query.chars()
+        let clean_query: String = query
+            .chars()
             .filter(|c| c.is_alphanumeric() || c.is_whitespace() || *c == '_')
             .collect();
 
@@ -166,15 +186,26 @@ impl MemoryBackend for SqliteMemory {
                             entry: MemoryEntry {
                                 id: row.get(0)?,
                                 content: row.get(1)?,
-                                metadata: row.get::<_, String>(2)
+                                metadata: row
+                                    .get::<_, String>(2)
                                     .map(|s| serde_json::from_str(&s).unwrap_or_default())
                                     .unwrap_or_default(),
                                 embedding: None,
-                                created_at: row.get::<_, String>(3)
-                                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&chrono::Utc)).unwrap_or_default())
+                                created_at: row
+                                    .get::<_, String>(3)
+                                    .map(|s| {
+                                        chrono::DateTime::parse_from_rfc3339(&s)
+                                            .map(|d| d.with_timezone(&chrono::Utc))
+                                            .unwrap_or_default()
+                                    })
                                     .unwrap_or_default(),
-                                updated_at: row.get::<_, String>(4)
-                                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&chrono::Utc)).unwrap_or_default())
+                                updated_at: row
+                                    .get::<_, String>(4)
+                                    .map(|s| {
+                                        chrono::DateTime::parse_from_rfc3339(&s)
+                                            .map(|d| d.with_timezone(&chrono::Utc))
+                                            .unwrap_or_default()
+                                    })
                                     .unwrap_or_default(),
                             },
                             score: row.get::<_, f32>(5).unwrap_or(0.0).abs(), // BM25 returns negative scores
@@ -201,22 +232,35 @@ impl MemoryBackend for SqliteMemory {
 
         let pattern = format!("%{}%", query.to_lowercase());
         let query_lower = query.to_lowercase();
-        let rows = stmt.query_map(rusqlite::params![pattern, limit], |row| {
-            Ok(MemoryEntry {
-                id: row.get(0)?,
-                content: row.get(1)?,
-                metadata: row.get::<_, String>(2)
-                    .map(|s| serde_json::from_str(&s).unwrap_or_default())
-                    .unwrap_or_default(),
-                embedding: None,
-                created_at: row.get::<_, String>(3)
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&chrono::Utc)).unwrap_or_default())
-                    .unwrap_or_default(),
-                updated_at: row.get::<_, String>(4)
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&chrono::Utc)).unwrap_or_default())
-                    .unwrap_or_default(),
+        let rows = stmt
+            .query_map(rusqlite::params![pattern, limit], |row| {
+                Ok(MemoryEntry {
+                    id: row.get(0)?,
+                    content: row.get(1)?,
+                    metadata: row
+                        .get::<_, String>(2)
+                        .map(|s| serde_json::from_str(&s).unwrap_or_default())
+                        .unwrap_or_default(),
+                    embedding: None,
+                    created_at: row
+                        .get::<_, String>(3)
+                        .map(|s| {
+                            chrono::DateTime::parse_from_rfc3339(&s)
+                                .map(|d| d.with_timezone(&chrono::Utc))
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default(),
+                    updated_at: row
+                        .get::<_, String>(4)
+                        .map(|s| {
+                            chrono::DateTime::parse_from_rfc3339(&s)
+                                .map(|d| d.with_timezone(&chrono::Utc))
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default(),
+                })
             })
-        }).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
         let results: Vec<MemorySearchResult> = rows
             .filter_map(|r| r.ok())
@@ -224,70 +268,107 @@ impl MemoryBackend for SqliteMemory {
                 let content_lower = entry.content.to_lowercase();
                 let matches = content_lower.matches(&query_lower).count();
                 let score = (matches as f32).min(5.0) / 5.0;
-                MemorySearchResult { entry, score: score.max(0.1) }
+                MemorySearchResult {
+                    entry,
+                    score: score.max(0.1),
+                }
             })
             .collect();
         Ok(results)
     }
 
     async fn get(&self, id: &str) -> Result<Option<MemoryEntry>> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
-        let mut stmt = conn.prepare(
-            "SELECT id, content, metadata, created_at, updated_at FROM memories WHERE id = ?1"
-        ).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, content, metadata, created_at, updated_at FROM memories WHERE id = ?1",
+            )
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
-        let result = stmt.query_row(rusqlite::params![id], |row| {
-            Ok(MemoryEntry {
-                id: row.get(0)?,
-                content: row.get(1)?,
-                metadata: row.get::<_, String>(2)
-                    .map(|s| serde_json::from_str(&s).unwrap_or_default())
-                    .unwrap_or_default(),
-                embedding: None,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+        let result = stmt
+            .query_row(rusqlite::params![id], |row| {
+                Ok(MemoryEntry {
+                    id: row.get(0)?,
+                    content: row.get(1)?,
+                    metadata: row
+                        .get::<_, String>(2)
+                        .map(|s| serde_json::from_str(&s).unwrap_or_default())
+                        .unwrap_or_default(),
+                    embedding: None,
+                    created_at: chrono::Utc::now(),
+                    updated_at: chrono::Utc::now(),
+                })
             })
-        }).ok();
+            .ok();
         Ok(result)
     }
 
     async fn delete(&self, id: &str) -> Result<()> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
         conn.execute("DELETE FROM memories WHERE id = ?1", rusqlite::params![id])
             .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
-        conn.execute("DELETE FROM memories_fts WHERE id = ?1", rusqlite::params![id]).ok();
+        conn.execute(
+            "DELETE FROM memories_fts WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .ok();
         Ok(())
     }
 
     async fn list(&self, limit: Option<usize>) -> Result<Vec<MemoryEntry>> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
         let lim = limit.unwrap_or(100) as i64;
         let mut stmt = conn.prepare(
             "SELECT id, content, metadata, created_at, updated_at FROM memories ORDER BY created_at DESC LIMIT ?1"
         ).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
-        let results = stmt.query_map(rusqlite::params![lim], |row| {
-            Ok(MemoryEntry {
-                id: row.get(0)?,
-                content: row.get(1)?,
-                metadata: row.get::<_, String>(2)
-                    .map(|s| serde_json::from_str(&s).unwrap_or_default())
-                    .unwrap_or_default(),
-                embedding: None,
-                created_at: row.get::<_, String>(3)
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&chrono::Utc)).unwrap_or_default())
-                    .unwrap_or_default(),
-                updated_at: row.get::<_, String>(4)
-                    .map(|s| chrono::DateTime::parse_from_rfc3339(&s).map(|d| d.with_timezone(&chrono::Utc)).unwrap_or_default())
-                    .unwrap_or_default(),
+        let results = stmt
+            .query_map(rusqlite::params![lim], |row| {
+                Ok(MemoryEntry {
+                    id: row.get(0)?,
+                    content: row.get(1)?,
+                    metadata: row
+                        .get::<_, String>(2)
+                        .map(|s| serde_json::from_str(&s).unwrap_or_default())
+                        .unwrap_or_default(),
+                    embedding: None,
+                    created_at: row
+                        .get::<_, String>(3)
+                        .map(|s| {
+                            chrono::DateTime::parse_from_rfc3339(&s)
+                                .map(|d| d.with_timezone(&chrono::Utc))
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default(),
+                    updated_at: row
+                        .get::<_, String>(4)
+                        .map(|s| {
+                            chrono::DateTime::parse_from_rfc3339(&s)
+                                .map(|d| d.with_timezone(&chrono::Utc))
+                                .unwrap_or_default()
+                        })
+                        .unwrap_or_default(),
+                })
             })
-        }).map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
 
         Ok(results.filter_map(|r| r.ok()).collect())
     }
 
     async fn clear(&self) -> Result<()> {
-        let conn = self.conn.lock().map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
         conn.execute("DELETE FROM memories", [])
             .map_err(|e| bizclaw_core::error::BizClawError::Memory(e.to_string()))?;
         conn.execute("DELETE FROM memories_fts", []).ok();

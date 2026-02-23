@@ -10,11 +10,15 @@ use bizclaw_core::types::{ToolDefinition, ToolResult};
 pub struct ExecuteCodeTool;
 
 impl ExecuteCodeTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for ExecuteCodeTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 struct LangConfig {
@@ -86,7 +90,9 @@ fn get_lang_config(language: &str) -> Option<LangConfig> {
 
 #[async_trait]
 impl Tool for ExecuteCodeTool {
-    fn name(&self) -> &str { "execute_code" }
+    fn name(&self) -> &str {
+        "execute_code"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -118,9 +124,11 @@ impl Tool for ExecuteCodeTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let language = args["language"].as_str()
+        let language = args["language"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'language'".into()))?;
-        let code = args["code"].as_str()
+        let code = args["code"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'code'".into()))?;
         let timeout = args["timeout_secs"].as_u64().unwrap_or(30).min(120);
 
@@ -131,19 +139,28 @@ impl Tool for ExecuteCodeTool {
 
         // Write code to temp file
         let temp_dir = std::env::temp_dir().join("bizclaw_exec");
-        tokio::fs::create_dir_all(&temp_dir).await
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Create temp dir: {e}")))?;
+        tokio::fs::create_dir_all(&temp_dir).await.map_err(|e| {
+            bizclaw_core::error::BizClawError::Tool(format!("Create temp dir: {e}"))
+        })?;
 
-        let file_name = format!("exec_{}.{}", uuid::Uuid::new_v4().to_string()[..8].to_string(), config.extension);
+        let file_name = format!(
+            "exec_{}.{}",
+            uuid::Uuid::new_v4().to_string()[..8].to_string(),
+            config.extension
+        );
         let file_path = temp_dir.join(&file_name);
-        tokio::fs::write(&file_path, code).await
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Write temp file: {e}")))?;
+        tokio::fs::write(&file_path, code).await.map_err(|e| {
+            bizclaw_core::error::BizClawError::Tool(format!("Write temp file: {e}"))
+        })?;
 
         let start = std::time::Instant::now();
 
         let output = if config.needs_compile {
             // Compile then run
-            let out_path = temp_dir.join(format!("exec_{}", uuid::Uuid::new_v4().to_string()[..8].to_string()));
+            let out_path = temp_dir.join(format!(
+                "exec_{}",
+                uuid::Uuid::new_v4().to_string()[..8].to_string()
+            ));
 
             let compile_output = if config.command == "rustc" {
                 tokio::process::Command::new(config.command)
@@ -185,9 +202,9 @@ impl Tool for ExecuteCodeTool {
 
             let run = tokio::time::timeout(
                 std::time::Duration::from_secs(timeout),
-                tokio::process::Command::new(out_path.to_str().unwrap())
-                    .output()
-            ).await;
+                tokio::process::Command::new(out_path.to_str().unwrap()).output(),
+            )
+            .await;
 
             let _ = tokio::fs::remove_file(&file_path).await;
             let _ = tokio::fs::remove_file(&out_path).await;
@@ -201,8 +218,9 @@ impl Tool for ExecuteCodeTool {
                 std::time::Duration::from_secs(timeout),
                 tokio::process::Command::new(config.command)
                     .args(&cmd_args)
-                    .output()
-            ).await;
+                    .output(),
+            )
+            .await;
 
             let _ = tokio::fs::remove_file(&file_path).await;
             run
@@ -215,12 +233,20 @@ impl Tool for ExecuteCodeTool {
                 let stdout = String::from_utf8_lossy(&o.stdout);
                 let stderr = String::from_utf8_lossy(&o.stderr);
 
-                let mut result = format!("Language: {} | Exit: {} | Time: {:.1}s\n",
-                    language, o.status.code().unwrap_or(-1), elapsed.as_secs_f64());
+                let mut result = format!(
+                    "Language: {} | Exit: {} | Time: {:.1}s\n",
+                    language,
+                    o.status.code().unwrap_or(-1),
+                    elapsed.as_secs_f64()
+                );
 
                 if !stdout.is_empty() {
                     let stdout_display = if stdout.len() > 5000 {
-                        format!("{}...\n[truncated, {} bytes total]", &stdout[..5000], stdout.len())
+                        format!(
+                            "{}...\n[truncated, {} bytes total]",
+                            &stdout[..5000],
+                            stdout.len()
+                        )
                     } else {
                         stdout.to_string()
                     };
@@ -244,20 +270,19 @@ impl Tool for ExecuteCodeTool {
                     success: o.status.success(),
                 })
             }
-            Ok(Err(e)) => {
-                Ok(ToolResult {
-                    tool_call_id: String::new(),
-                    output: format!("Execution failed — '{}' not found or not executable: {}", config.command, e),
-                    success: false,
-                })
-            }
-            Err(_) => {
-                Ok(ToolResult {
-                    tool_call_id: String::new(),
-                    output: format!("⏰ Execution timed out after {}s", timeout),
-                    success: false,
-                })
-            }
+            Ok(Err(e)) => Ok(ToolResult {
+                tool_call_id: String::new(),
+                output: format!(
+                    "Execution failed — '{}' not found or not executable: {}",
+                    config.command, e
+                ),
+                success: false,
+            }),
+            Err(_) => Ok(ToolResult {
+                tool_call_id: String::new(),
+                output: format!("⏰ Execution timed out after {}s", timeout),
+                success: false,
+            }),
         }
     }
 }

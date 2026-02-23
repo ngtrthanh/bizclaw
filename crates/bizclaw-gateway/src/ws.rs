@@ -11,12 +11,15 @@
 //! ← Server sends: {"type":"chat_chunk","request_id":"...","content":"token","index":0}
 //! ← Server sends: {"type":"chat_done","request_id":"...","total_tokens":42}
 
+use super::server::AppState;
 use axum::{
-    extract::{State, ws::{Message, WebSocket, WebSocketUpgrade}},
+    extract::{
+        State,
+        ws::{Message, WebSocket, WebSocketUpgrade},
+    },
     response::IntoResponse,
 };
 use std::sync::Arc;
-use super::server::AppState;
 
 /// WebSocket upgrade handler.
 pub async fn ws_handler(
@@ -38,14 +41,22 @@ fn ollama_url(_state: &AppState) -> String {
 fn active_model(state: &AppState) -> String {
     let config = state.full_config.lock().unwrap();
     let model = config.default_model.clone();
-    if model.is_empty() { "tinyllama".to_string() } else { model }
+    if model.is_empty() {
+        "tinyllama".to_string()
+    } else {
+        model
+    }
 }
 
 /// Get the active provider from config.
 fn active_provider(state: &AppState) -> String {
     let config = state.full_config.lock().unwrap();
     let provider = config.default_provider.clone();
-    if provider.is_empty() { "openai".to_string() } else { provider }
+    if provider.is_empty() {
+        "openai".to_string()
+    } else {
+        provider
+    }
 }
 
 /// Handle a WebSocket connection.
@@ -88,7 +99,7 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
     let mut request_counter: u64 = 0;
     // Fallback history for direct mode (when Agent engine is not available)
     let mut fallback_history: Vec<serde_json::Value> = vec![
-        serde_json::json!({"role": "system", "content": "Bạn là BizClaw AI Assistant. Trả lời ngắn gọn, hữu ích bằng tiếng Việt. Nếu user nói tiếng Anh thì trả lời tiếng Anh."})
+        serde_json::json!({"role": "system", "content": "Bạn là BizClaw AI Assistant. Trả lời ngắn gọn, hữu ích bằng tiếng Việt. Nếu user nói tiếng Anh thì trả lời tiếng Anh."}),
     ];
 
     // Message loop
@@ -117,21 +128,27 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                             continue;
                         }
 
-                        tracing::info!("Chat req={request_id}: provider={provider}, model={model}, stream={stream}, len={}, agent={has_agent}",
-                            content.len());
+                        tracing::info!(
+                            "Chat req={request_id}: provider={provider}, model={model}, stream={stream}, len={}, agent={has_agent}",
+                            content.len()
+                        );
 
                         if has_agent {
                             // ═══════════════════════════════════════════
                             // AGENT ENGINE MODE (tools + memory + all providers)
                             // Works for BOTH stream and non-stream requests
                             // ═══════════════════════════════════════════
-                            let _ = send_json(&mut socket, &serde_json::json!({
-                                "type": "chat_start",
-                                "request_id": &request_id,
-                                "provider": &provider,
-                                "model": &model,
-                                "mode": "agent",
-                            })).await;
+                            let _ = send_json(
+                                &mut socket,
+                                &serde_json::json!({
+                                    "type": "chat_start",
+                                    "request_id": &request_id,
+                                    "provider": &provider,
+                                    "model": &model,
+                                    "mode": "agent",
+                                }),
+                            )
+                            .await;
 
                             let result = {
                                 let mut agent = state.agent.lock().await;
@@ -159,45 +176,65 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                                         let mut idx: u64 = 0;
                                         for chunk in chars.chunks(chunk_size) {
                                             let text: String = chunk.iter().collect();
-                                            let _ = send_json(&mut socket, &serde_json::json!({
-                                                "type": "chat_chunk",
-                                                "request_id": &request_id,
-                                                "content": &text,
-                                                "index": idx,
-                                            })).await;
+                                            let _ = send_json(
+                                                &mut socket,
+                                                &serde_json::json!({
+                                                    "type": "chat_chunk",
+                                                    "request_id": &request_id,
+                                                    "content": &text,
+                                                    "index": idx,
+                                                }),
+                                            )
+                                            .await;
                                             idx += 1;
                                         }
-                                        let _ = send_json(&mut socket, &serde_json::json!({
-                                            "type": "chat_done",
-                                            "request_id": &request_id,
-                                            "total_tokens": idx,
-                                            "full_content": &response,
-                                            "mode": "agent",
-                                            "context": ctx_stats,
-                                        })).await;
+                                        let _ = send_json(
+                                            &mut socket,
+                                            &serde_json::json!({
+                                                "type": "chat_done",
+                                                "request_id": &request_id,
+                                                "total_tokens": idx,
+                                                "full_content": &response,
+                                                "mode": "agent",
+                                                "context": ctx_stats,
+                                            }),
+                                        )
+                                        .await;
                                     } else {
-                                        let _ = send_json(&mut socket, &serde_json::json!({
-                                            "type": "chat_response",
-                                            "request_id": &request_id,
-                                            "content": &response,
-                                            "provider": &provider,
-                                            "model": &model,
-                                            "mode": "agent",
-                                        })).await;
-                                        let _ = send_json(&mut socket, &serde_json::json!({
-                                            "type": "chat_done",
-                                            "request_id": &request_id,
-                                            "full_content": &response,
-                                            "mode": "agent",
-                                        })).await;
+                                        let _ = send_json(
+                                            &mut socket,
+                                            &serde_json::json!({
+                                                "type": "chat_response",
+                                                "request_id": &request_id,
+                                                "content": &response,
+                                                "provider": &provider,
+                                                "model": &model,
+                                                "mode": "agent",
+                                            }),
+                                        )
+                                        .await;
+                                        let _ = send_json(
+                                            &mut socket,
+                                            &serde_json::json!({
+                                                "type": "chat_done",
+                                                "request_id": &request_id,
+                                                "full_content": &response,
+                                                "mode": "agent",
+                                            }),
+                                        )
+                                        .await;
                                     }
                                 }
                                 Some(Err(e)) => {
-                                    let _ = send_json(&mut socket, &serde_json::json!({
-                                        "type": "chat_error",
-                                        "request_id": &request_id,
-                                        "error": e.to_string(),
-                                    })).await;
+                                    let _ = send_json(
+                                        &mut socket,
+                                        &serde_json::json!({
+                                            "type": "chat_error",
+                                            "request_id": &request_id,
+                                            "error": e.to_string(),
+                                        }),
+                                    )
+                                    .await;
                                 }
                                 None => {
                                     send_error(&mut socket, "Agent engine not available").await;
@@ -208,7 +245,8 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                             // STREAMING / DIRECT MODE
                             // ═══════════════════════════════════════════
                             // Add user message to fallback history
-                            fallback_history.push(serde_json::json!({"role": "user", "content": &content}));
+                            fallback_history
+                                .push(serde_json::json!({"role": "user", "content": &content}));
 
                             // Keep history manageable (last 20 messages + system)
                             if fallback_history.len() > 21 {
@@ -223,16 +261,48 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                             // Route to provider
                             let result = match provider.as_str() {
                                 "ollama" | "brain" => {
-                                    chat_ollama(&mut socket, &state, &request_id, &fallback_history, &model, stream).await
+                                    chat_ollama(
+                                        &mut socket,
+                                        &state,
+                                        &request_id,
+                                        &fallback_history,
+                                        &model,
+                                        stream,
+                                    )
+                                    .await
                                 }
                                 "openai" => {
-                                    chat_openai(&mut socket, &state, &request_id, &fallback_history, &model, stream).await
+                                    chat_openai(
+                                        &mut socket,
+                                        &state,
+                                        &request_id,
+                                        &fallback_history,
+                                        &model,
+                                        stream,
+                                    )
+                                    .await
                                 }
                                 _ => {
                                     // Fallback: try Ollama first, then OpenAI
-                                    let r = chat_ollama(&mut socket, &state, &request_id, &fallback_history, &model, stream).await;
+                                    let r = chat_ollama(
+                                        &mut socket,
+                                        &state,
+                                        &request_id,
+                                        &fallback_history,
+                                        &model,
+                                        stream,
+                                    )
+                                    .await;
                                     if r.is_err() {
-                                        chat_openai(&mut socket, &state, &request_id, &fallback_history, "gpt-4o-mini", stream).await
+                                        chat_openai(
+                                            &mut socket,
+                                            &state,
+                                            &request_id,
+                                            &fallback_history,
+                                            "gpt-4o-mini",
+                                            stream,
+                                        )
+                                        .await
                                     } else {
                                         r
                                     }
@@ -255,11 +325,15 @@ async fn handle_socket(mut socket: WebSocket, state: Arc<AppState>) {
                                     }
                                 }
                                 Err(e) => {
-                                    let _ = send_json(&mut socket, &serde_json::json!({
-                                        "type": "chat_error",
-                                        "request_id": &request_id,
-                                        "error": e,
-                                    })).await;
+                                    let _ = send_json(
+                                        &mut socket,
+                                        &serde_json::json!({
+                                            "type": "chat_error",
+                                            "request_id": &request_id,
+                                            "error": e,
+                                        }),
+                                    )
+                                    .await;
                                 }
                             }
                         }
@@ -342,12 +416,16 @@ async fn chat_ollama(
 
     if stream {
         // Streaming response
-        let _ = send_json(socket, &serde_json::json!({
-            "type": "chat_start",
-            "request_id": request_id,
-            "provider": "ollama",
-            "model": model,
-        })).await;
+        let _ = send_json(
+            socket,
+            &serde_json::json!({
+                "type": "chat_start",
+                "request_id": request_id,
+                "provider": "ollama",
+                "model": model,
+            }),
+        )
+        .await;
 
         let body = serde_json::json!({
             "model": model,
@@ -376,29 +454,39 @@ async fn chat_ollama(
         let text = String::from_utf8_lossy(&bytes);
 
         for line in text.lines() {
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(line) {
                 if let Some(content) = json["message"]["content"].as_str() {
                     if !content.is_empty() {
                         full_content.push_str(content);
-                        let _ = send_json(socket, &serde_json::json!({
-                            "type": "chat_chunk",
-                            "request_id": request_id,
-                            "content": content,
-                            "index": chunk_idx,
-                        })).await;
+                        let _ = send_json(
+                            socket,
+                            &serde_json::json!({
+                                "type": "chat_chunk",
+                                "request_id": request_id,
+                                "content": content,
+                                "index": chunk_idx,
+                            }),
+                        )
+                        .await;
                         chunk_idx += 1;
                     }
                 }
             }
         }
 
-        let _ = send_json(socket, &serde_json::json!({
-            "type": "chat_done",
-            "request_id": request_id,
-            "total_tokens": chunk_idx,
-            "full_content": &full_content,
-        })).await;
+        let _ = send_json(
+            socket,
+            &serde_json::json!({
+                "type": "chat_done",
+                "request_id": request_id,
+                "total_tokens": chunk_idx,
+                "full_content": &full_content,
+            }),
+        )
+        .await;
 
         Ok(full_content)
     } else {
@@ -417,15 +505,22 @@ async fn chat_ollama(
             .map_err(|e| format!("Ollama connection failed: {e}"))?;
 
         let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        let content = json["message"]["content"].as_str().unwrap_or("").to_string();
+        let content = json["message"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
 
-        let _ = send_json(socket, &serde_json::json!({
-            "type": "chat_response",
-            "request_id": request_id,
-            "content": &content,
-            "provider": "ollama",
-            "model": model,
-        })).await;
+        let _ = send_json(
+            socket,
+            &serde_json::json!({
+                "type": "chat_response",
+                "request_id": request_id,
+                "content": &content,
+                "provider": "ollama",
+                "model": model,
+            }),
+        )
+        .await;
 
         Ok(content)
     }
@@ -448,8 +543,10 @@ async fn chat_openai(
         config.api_key.clone()
     };
     let api_key = if api_key.is_empty() {
-        std::env::var("OPENAI_API_KEY")
-            .map_err(|_| "OpenAI API key not configured. Set in Settings → API Key or OPENAI_API_KEY env var".to_string())?
+        std::env::var("OPENAI_API_KEY").map_err(|_| {
+            "OpenAI API key not configured. Set in Settings → API Key or OPENAI_API_KEY env var"
+                .to_string()
+        })?
     } else {
         api_key
     };
@@ -458,12 +555,16 @@ async fn chat_openai(
 
     if stream {
         // Streaming SSE mode
-        let _ = send_json(socket, &serde_json::json!({
-            "type": "chat_start",
-            "request_id": request_id,
-            "provider": "openai",
-            "model": model,
-        })).await;
+        let _ = send_json(
+            socket,
+            &serde_json::json!({
+                "type": "chat_start",
+                "request_id": request_id,
+                "provider": "openai",
+                "model": model,
+            }),
+        )
+        .await;
 
         let body = serde_json::json!({
             "model": model,
@@ -492,18 +593,24 @@ async fn chat_openai(
 
         for line in text.lines() {
             let line = line.trim();
-            if line.is_empty() || line == "data: [DONE]" { continue; }
+            if line.is_empty() || line == "data: [DONE]" {
+                continue;
+            }
             if let Some(data) = line.strip_prefix("data: ") {
                 if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
                     if let Some(content) = json["choices"][0]["delta"]["content"].as_str() {
                         if !content.is_empty() {
                             full_content.push_str(content);
-                            let _ = send_json(socket, &serde_json::json!({
-                                "type": "chat_chunk",
-                                "request_id": request_id,
-                                "content": content,
-                                "index": chunk_idx,
-                            })).await;
+                            let _ = send_json(
+                                socket,
+                                &serde_json::json!({
+                                    "type": "chat_chunk",
+                                    "request_id": request_id,
+                                    "content": content,
+                                    "index": chunk_idx,
+                                }),
+                            )
+                            .await;
                             chunk_idx += 1;
                         }
                     }
@@ -511,12 +618,16 @@ async fn chat_openai(
             }
         }
 
-        let _ = send_json(socket, &serde_json::json!({
-            "type": "chat_done",
-            "request_id": request_id,
-            "total_tokens": chunk_idx,
-            "full_content": &full_content,
-        })).await;
+        let _ = send_json(
+            socket,
+            &serde_json::json!({
+                "type": "chat_done",
+                "request_id": request_id,
+                "total_tokens": chunk_idx,
+                "full_content": &full_content,
+            }),
+        )
+        .await;
 
         Ok(full_content)
     } else {
@@ -540,15 +651,22 @@ async fn chat_openai(
         }
 
         let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        let content = json["choices"][0]["message"]["content"].as_str().unwrap_or("").to_string();
+        let content = json["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
 
-        let _ = send_json(socket, &serde_json::json!({
-            "type": "chat_response",
-            "request_id": request_id,
-            "content": &content,
-            "provider": "openai",
-            "model": model,
-        })).await;
+        let _ = send_json(
+            socket,
+            &serde_json::json!({
+                "type": "chat_response",
+                "request_id": request_id,
+                "content": &content,
+                "provider": "openai",
+                "model": model,
+            }),
+        )
+        .await;
 
         Ok(content)
     }
@@ -559,7 +677,8 @@ async fn chat_openai(
 // ═══════════════════════════════════════════════════════════
 
 async fn send_json(socket: &mut WebSocket, value: &serde_json::Value) -> Result<(), ()> {
-    socket.send(Message::Text(value.to_string().into()))
+    socket
+        .send(Message::Text(value.to_string().into()))
         .await
         .map_err(|e| {
             tracing::error!("WS send failed: {e}");

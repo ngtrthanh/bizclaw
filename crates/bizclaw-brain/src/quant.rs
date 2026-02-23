@@ -49,8 +49,10 @@ pub fn dequantize_row(
                 let offset = i * 4;
                 if offset + 4 <= data.len() {
                     output[i] = f32::from_le_bytes([
-                        data[offset], data[offset + 1],
-                        data[offset + 2], data[offset + 3],
+                        data[offset],
+                        data[offset + 1],
+                        data[offset + 2],
+                        data[offset + 3],
                     ]);
                 }
             }
@@ -83,7 +85,10 @@ pub fn dequantize_row(
         }
         _ => {
             // For unsupported types, fill with zeros
-            tracing::warn!("Unsupported quantization type: {:?}, filling with zeros", ggml_type);
+            tracing::warn!(
+                "Unsupported quantization type: {:?}, filling with zeros",
+                ggml_type
+            );
             for v in output.iter_mut().take(n_elements) {
                 *v = 0.0;
             }

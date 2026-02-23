@@ -26,15 +26,20 @@ impl StdioTransport {
             .envs(env)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())  // Suppress stderr to avoid polluting our output
+            .stderr(Stdio::null()) // Suppress stderr to avoid polluting our output
             .kill_on_drop(true);
 
-        let mut child = cmd.spawn()
+        let mut child = cmd
+            .spawn()
             .map_err(|e| format!("Failed to spawn MCP server '{}': {}", command, e))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| "Failed to take stdin".to_string())?;
-        let stdout = child.stdout.take()
+        let stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| "Failed to take stdout".to_string())?;
 
         Ok(Self {
@@ -47,14 +52,17 @@ impl StdioTransport {
     /// Send a JSON-RPC request and read the response.
     pub async fn request(&mut self, req: &JsonRpcRequest) -> Result<JsonRpcResponse, String> {
         // Serialize request + newline
-        let mut json = serde_json::to_string(req)
-            .map_err(|e| format!("Serialize error: {e}"))?;
+        let mut json = serde_json::to_string(req).map_err(|e| format!("Serialize error: {e}"))?;
         json.push('\n');
 
         // Write to stdin
-        self.stdin.write_all(json.as_bytes()).await
+        self.stdin
+            .write_all(json.as_bytes())
+            .await
             .map_err(|e| format!("Write error: {e}"))?;
-        self.stdin.flush().await
+        self.stdin
+            .flush()
+            .await
             .map_err(|e| format!("Flush error: {e}"))?;
 
         // Read response line from stdout (with timeout)
@@ -62,14 +70,13 @@ impl StdioTransport {
         let read_result = tokio::time::timeout(
             std::time::Duration::from_secs(30),
             self.reader.read_line(&mut line),
-        ).await;
+        )
+        .await;
 
         match read_result {
             Ok(Ok(0)) => Err("MCP server closed stdout (EOF)".into()),
-            Ok(Ok(_)) => {
-                serde_json::from_str::<JsonRpcResponse>(&line)
-                    .map_err(|e| format!("Parse response error: {e} — raw: {}", line.trim()))
-            }
+            Ok(Ok(_)) => serde_json::from_str::<JsonRpcResponse>(&line)
+                .map_err(|e| format!("Parse response error: {e} — raw: {}", line.trim())),
             Ok(Err(e)) => Err(format!("Read error: {e}")),
             Err(_) => Err("MCP server response timeout (30s)".into()),
         }

@@ -65,10 +65,8 @@ impl Sampler {
         }
 
         // Create sorted indices
-        let mut indices: Vec<(usize, f32)> = logits.iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        let mut indices: Vec<(usize, f32)> =
+            logits.iter().enumerate().map(|(i, &v)| (i, v)).collect();
         indices.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Top-K filtering
@@ -81,7 +79,8 @@ impl Sampler {
 
         // Softmax
         let max_logit = indices[0].1;
-        let mut probs: Vec<(usize, f32)> = indices.iter()
+        let mut probs: Vec<(usize, f32)> = indices
+            .iter()
             .map(|&(i, v)| (i, (v - max_logit).exp()))
             .collect();
         let sum: f32 = probs.iter().map(|&(_, p)| p).sum();
@@ -127,7 +126,8 @@ impl Sampler {
 
 /// Return the index of the maximum value (greedy decoding).
 fn argmax(values: &[f32]) -> u32 {
-    values.iter()
+    values
+        .iter()
         .enumerate()
         .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(i, _)| i as u32)

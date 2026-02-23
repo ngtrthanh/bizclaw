@@ -38,7 +38,11 @@ pub enum TaskAction {
     /// Send a fixed notification message.
     Notify(String),
     /// Execute a webhook URL.
-    Webhook { url: String, method: String, body: Option<String> },
+    Webhook {
+        url: String,
+        method: String,
+        body: Option<String>,
+    },
 }
 
 /// How/when the task triggers.
@@ -104,7 +108,9 @@ impl Task {
             id: uuid_v4(),
             name: name.to_string(),
             action,
-            task_type: TaskType::Cron { expression: expression.to_string() },
+            task_type: TaskType::Cron {
+                expression: expression.to_string(),
+            },
             status: TaskStatus::Pending,
             notify_via: None,
             created_at: Utc::now(),
@@ -130,6 +136,8 @@ impl Task {
 /// Simple UUID v4 generator (no external crate needed for Pi).
 fn uuid_v4() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let t = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let t = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     format!("task-{:x}-{:x}", t.as_secs(), t.subsec_nanos())
 }

@@ -24,8 +24,8 @@
 //! ```
 
 pub mod chunker;
-pub mod store;
 pub mod search;
+pub mod store;
 
-pub use store::KnowledgeStore;
 pub use search::SearchResult;
+pub use store::KnowledgeStore;

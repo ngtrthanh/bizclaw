@@ -7,7 +7,9 @@ pub fn format_response(response: &ProviderResponse) -> String {
     if let Some(content) = &response.content {
         content.clone()
     } else if !response.tool_calls.is_empty() {
-        let tool_names: Vec<&str> = response.tool_calls.iter()
+        let tool_names: Vec<&str> = response
+            .tool_calls
+            .iter()
             .map(|tc| tc.function.name.as_str())
             .collect();
         format!("[Calling tools: {}]", tool_names.join(", "))
@@ -18,7 +20,8 @@ pub fn format_response(response: &ProviderResponse) -> String {
 
 /// Estimate token count for a message list (rough: 4 chars ≈ 1 token).
 pub fn estimate_tokens(messages: &[Message]) -> usize {
-    messages.iter()
+    messages
+        .iter()
         .map(|m| m.content.len() / 4 + 5) // content + overhead per message
         .sum()
 }

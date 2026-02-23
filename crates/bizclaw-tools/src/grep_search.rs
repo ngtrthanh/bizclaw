@@ -9,16 +9,22 @@ use std::path::Path;
 pub struct GrepTool;
 
 impl GrepTool {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 }
 
 impl Default for GrepTool {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[async_trait]
 impl Tool for GrepTool {
-    fn name(&self) -> &str { "grep" }
+    fn name(&self) -> &str {
+        "grep"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
@@ -57,7 +63,8 @@ impl Tool for GrepTool {
         let args: serde_json::Value = serde_json::from_str(arguments)
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
-        let pattern_str = args["pattern"].as_str()
+        let pattern_str = args["pattern"]
+            .as_str()
             .ok_or_else(|| bizclaw_core::error::BizClawError::Tool("Missing 'pattern'".into()))?;
         let path = args["path"].as_str().unwrap_or(".");
         let case_insensitive = args["case_insensitive"].as_bool().unwrap_or(true);
@@ -70,8 +77,9 @@ impl Tool for GrepTool {
         } else {
             regex::escape(pattern_str)
         };
-        let re = regex::Regex::new(&pattern)
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Invalid pattern: {e}")))?;
+        let re = regex::Regex::new(&pattern).map_err(|e| {
+            bizclaw_core::error::BizClawError::Tool(format!("Invalid pattern: {e}"))
+        })?;
 
         let root = Path::new(path);
         let mut matches = Vec::new();
@@ -91,7 +99,11 @@ impl Tool for GrepTool {
         let output = if matches.is_empty() {
             format!("No matches for '{}' in {}", pattern_str, path)
         } else {
-            let mut out = format!("Found {} match(es) for '{}':\n\n", matches.len(), pattern_str);
+            let mut out = format!(
+                "Found {} match(es) for '{}':\n\n",
+                matches.len(),
+                pattern_str
+            );
             for m in &matches {
                 out.push_str(m);
                 out.push('\n');
@@ -111,7 +123,9 @@ impl Tool for GrepTool {
 }
 
 fn search_file(path: &Path, re: &regex::Regex, matches: &mut Vec<String>, max: usize) {
-    if matches.len() >= max { return; }
+    if matches.len() >= max {
+        return;
+    }
 
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
@@ -121,7 +135,9 @@ fn search_file(path: &Path, re: &regex::Regex, matches: &mut Vec<String>, max: u
     let path_str = path.to_string_lossy();
 
     for (line_num, line) in content.lines().enumerate() {
-        if matches.len() >= max { break; }
+        if matches.len() >= max {
+            break;
+        }
         if re.is_match(line) {
             let display_line = if line.len() > 200 {
                 format!("{}...", &line[..200])
@@ -142,7 +158,9 @@ fn search_dir(
     depth: usize,
     max_depth: usize,
 ) {
-    if depth > max_depth || matches.len() >= max { return; }
+    if depth > max_depth || matches.len() >= max {
+        return;
+    }
 
     let entries = match std::fs::read_dir(dir) {
         Ok(e) => e,
@@ -150,7 +168,9 @@ fn search_dir(
     };
 
     for entry in entries.flatten() {
-        if matches.len() >= max { break; }
+        if matches.len() >= max {
+            break;
+        }
 
         let path = entry.path();
 
@@ -159,7 +179,10 @@ fn search_dir(
             if name.starts_with('.') {
                 continue;
             }
-            if matches!(name, "node_modules" | "target" | "__pycache__" | "dist" | "build" | ".git") {
+            if matches!(
+                name,
+                "node_modules" | "target" | "__pycache__" | "dist" | "build" | ".git"
+            ) {
                 continue;
             }
         }

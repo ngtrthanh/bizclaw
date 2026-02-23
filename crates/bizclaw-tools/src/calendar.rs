@@ -4,9 +4,9 @@
 //! Uses Google Calendar REST API with API key or OAuth2 service account.
 
 use async_trait::async_trait;
+use bizclaw_core::error::{BizClawError, Result};
 use bizclaw_core::traits::Tool;
 use bizclaw_core::types::{ToolDefinition, ToolResult};
-use bizclaw_core::error::{BizClawError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Calendar event representation.
@@ -16,8 +16,8 @@ pub struct CalendarEvent {
     pub summary: String,
     pub description: Option<String>,
     pub location: Option<String>,
-    pub start: String,   // ISO 8601
-    pub end: String,     // ISO 8601
+    pub start: String, // ISO 8601
+    pub end: String,   // ISO 8601
     pub all_day: bool,
     pub attendees: Vec<String>,
 }
@@ -37,8 +37,12 @@ pub struct CalendarConfig {
     pub timezone: String,
 }
 
-fn default_calendar_id() -> String { "primary".into() }
-fn default_timezone() -> String { "Asia/Ho_Chi_Minh".into() }
+fn default_calendar_id() -> String {
+    "primary".into()
+}
+fn default_timezone() -> String {
+    "Asia/Ho_Chi_Minh".into()
+}
 
 impl Default for CalendarConfig {
     fn default() -> Self {
@@ -99,7 +103,9 @@ impl CalendarTool {
             req = req.header("Authorization", format!("Bearer {token}"));
         }
 
-        let response = req.send().await
+        let response = req
+            .send()
+            .await
             .map_err(|e| BizClawError::Tool(format!("Calendar API request failed: {e}")))?;
 
         if !response.status().is_success() {
@@ -110,42 +116,46 @@ impl CalendarTool {
             )));
         }
 
-        let body: serde_json::Value = response.json().await
+        let body: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Tool(format!("Parse response failed: {e}")))?;
 
         let events = body["items"]
             .as_array()
             .map(|arr| {
-                arr.iter().filter_map(|item| {
-                    let summary = item["summary"].as_str()?.to_string();
-                    let start = item["start"]["dateTime"]
-                        .as_str()
-                        .or_else(|| item["start"]["date"].as_str())?
-                        .to_string();
-                    let end = item["end"]["dateTime"]
-                        .as_str()
-                        .or_else(|| item["end"]["date"].as_str())?
-                        .to_string();
-                    let all_day = item["start"]["date"].is_string();
+                arr.iter()
+                    .filter_map(|item| {
+                        let summary = item["summary"].as_str()?.to_string();
+                        let start = item["start"]["dateTime"]
+                            .as_str()
+                            .or_else(|| item["start"]["date"].as_str())?
+                            .to_string();
+                        let end = item["end"]["dateTime"]
+                            .as_str()
+                            .or_else(|| item["end"]["date"].as_str())?
+                            .to_string();
+                        let all_day = item["start"]["date"].is_string();
 
-                    Some(CalendarEvent {
-                        id: item["id"].as_str().map(String::from),
-                        summary,
-                        description: item["description"].as_str().map(String::from),
-                        location: item["location"].as_str().map(String::from),
-                        start,
-                        end,
-                        all_day,
-                        attendees: item["attendees"]
-                            .as_array()
-                            .map(|a| {
-                                a.iter()
-                                    .filter_map(|att| att["email"].as_str().map(String::from))
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
+                        Some(CalendarEvent {
+                            id: item["id"].as_str().map(String::from),
+                            summary,
+                            description: item["description"].as_str().map(String::from),
+                            location: item["location"].as_str().map(String::from),
+                            start,
+                            end,
+                            all_day,
+                            attendees: item["attendees"]
+                                .as_array()
+                                .map(|a| {
+                                    a.iter()
+                                        .filter_map(|att| att["email"].as_str().map(String::from))
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
+                        })
                     })
-                }).collect()
+                    .collect()
             })
             .unwrap_or_default();
 
@@ -154,8 +164,9 @@ impl CalendarTool {
 
     /// Create a new calendar event.
     async fn create_event(&self, event: &CalendarEvent) -> Result<String> {
-        let token = self.config.access_token.as_ref()
-            .ok_or_else(|| BizClawError::Tool("OAuth2 access_token required to create events".into()))?;
+        let token = self.config.access_token.as_ref().ok_or_else(|| {
+            BizClawError::Tool("OAuth2 access_token required to create events".into())
+        })?;
 
         let url = format!(
             "https://www.googleapis.com/calendar/v3/calendars/{}/events",
@@ -181,7 +192,9 @@ impl CalendarTool {
             })
         };
 
-        let response = self.client.post(&url)
+        let response = self
+            .client
+            .post(&url)
             .header("Authorization", format!("Bearer {token}"))
             .json(&body)
             .send()
@@ -191,10 +204,14 @@ impl CalendarTool {
         if !response.status().is_success() {
             let status = response.status();
             let err_body = response.text().await.unwrap_or_default();
-            return Err(BizClawError::Tool(format!("Create event error {status}: {err_body}")));
+            return Err(BizClawError::Tool(format!(
+                "Create event error {status}: {err_body}"
+            )));
         }
 
-        let result: serde_json::Value = response.json().await
+        let result: serde_json::Value = response
+            .json()
+            .await
             .map_err(|e| BizClawError::Tool(format!("Parse create response: {e}")))?;
 
         let event_id = result["id"].as_str().unwrap_or("unknown").to_string();
@@ -216,19 +233,26 @@ impl CalendarTool {
                 "Cả ngày".to_string()
             } else {
                 // Extract time part from ISO 8601
-                let start_time = event.start.split('T').nth(1)
+                let start_time = event
+                    .start
+                    .split('T')
+                    .nth(1)
                     .and_then(|t| t.split('+').next())
                     .unwrap_or(&event.start);
-                let end_time = event.end.split('T').nth(1)
+                let end_time = event
+                    .end
+                    .split('T')
+                    .nth(1)
                     .and_then(|t| t.split('+').next())
                     .unwrap_or(&event.end);
-                format!("{} - {}", &start_time[..5], &end_time[..5.min(end_time.len())])
+                format!(
+                    "{} - {}",
+                    &start_time[..5],
+                    &end_time[..5.min(end_time.len())]
+                )
             };
 
-            output.push_str(&format!(
-                "{}. ⏰ {} | {}\n",
-                i + 1, time, event.summary
-            ));
+            output.push_str(&format!("{}. ⏰ {} | {}\n", i + 1, time, event.summary));
 
             if let Some(ref loc) = event.location {
                 output.push_str(&format!("   📍 {loc}\n"));
@@ -245,12 +269,15 @@ impl CalendarTool {
 
 #[async_trait]
 impl Tool for CalendarTool {
-    fn name(&self) -> &str { "calendar" }
+    fn name(&self) -> &str {
+        "calendar"
+    }
 
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "calendar".into(),
-            description: "Quản lý Google Calendar — xem lịch, tạo sự kiện, kiểm tra lịch rảnh.".into(),
+            description: "Quản lý Google Calendar — xem lịch, tạo sự kiện, kiểm tra lịch rảnh."
+                .into(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -306,7 +333,8 @@ impl Tool for CalendarTool {
                 self.format_events(&events, &today)
             }
             "list" => {
-                let date = args["date"].as_str()
+                let date = args["date"]
+                    .as_str()
                     .unwrap_or(&chrono::Utc::now().format("%Y-%m-%d").to_string())
                     .to_string();
                 let days = args["days"].as_u64().unwrap_or(1) as u32;
@@ -314,11 +342,14 @@ impl Tool for CalendarTool {
                 self.format_events(&events, &date)
             }
             "create" => {
-                let summary = args["summary"].as_str()
+                let summary = args["summary"]
+                    .as_str()
                     .ok_or_else(|| BizClawError::Tool("Missing 'summary' for create".into()))?;
-                let start = args["start"].as_str()
+                let start = args["start"]
+                    .as_str()
                     .ok_or_else(|| BizClawError::Tool("Missing 'start' for create".into()))?;
-                let end = args["end"].as_str()
+                let end = args["end"]
+                    .as_str()
                     .ok_or_else(|| BizClawError::Tool("Missing 'end' for create".into()))?;
 
                 let event = CalendarEvent {

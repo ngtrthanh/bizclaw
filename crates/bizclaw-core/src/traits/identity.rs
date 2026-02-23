@@ -14,7 +14,8 @@ impl Default for Identity {
         Self {
             name: "BizClaw".into(),
             persona: "A helpful AI assistant".into(),
-            system_prompt: "You are BizClaw, a fast and capable AI assistant. Be concise and helpful.".into(),
+            system_prompt:
+                "You are BizClaw, a fast and capable AI assistant. Be concise and helpful.".into(),
         }
     }
 }

@@ -3,8 +3,8 @@
 //! Controls which shell commands can be executed and which filesystem paths
 //! can be accessed by the agent.
 
-use std::collections::HashSet;
 use bizclaw_core::config::AutonomyConfig;
+use std::collections::HashSet;
 
 /// Manages command and path allowlists for security enforcement.
 pub struct Allowlist {

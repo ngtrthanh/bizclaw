@@ -1,7 +1,7 @@
 //! Native runtime module — process management utilities.
 
-use std::process::Stdio;
 use bizclaw_core::error::Result;
+use std::process::Stdio;
 
 /// Runtime environment information.
 pub struct RuntimeInfo {

@@ -3,25 +3,25 @@
 //! Local LLM inference engine — PicoLM rewrite in pure Rust.
 //! Runs LLaMA-architecture models in GGUF format with mmap, SIMD, and quantization.
 
+pub mod attention;
+pub mod forward;
 pub mod gguf;
+pub mod grammar;
+pub mod kv_cache;
+pub mod llamacpp;
 pub mod mmap;
 pub mod model;
-pub mod forward;
-pub mod tensor;
 pub mod quant;
-pub mod simd;
-pub mod tokenizer;
-pub mod sampler;
-pub mod attention;
-pub mod kv_cache;
-pub mod grammar;
 pub mod rope;
+pub mod sampler;
+pub mod simd;
+pub mod tensor;
 pub mod thread_pool;
-pub mod llamacpp;
+pub mod tokenizer;
 
-use std::path::{Path, PathBuf};
 use bizclaw_core::error::{BizClawError, Result};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// Brain engine configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,13 +75,19 @@ struct LoadedModel {
 impl BrainEngine {
     /// Create a new brain engine (model not yet loaded).
     pub fn new(config: BrainConfig) -> Self {
-        Self { config, model: None }
+        Self {
+            config,
+            model: None,
+        }
     }
 
     /// Load a model from a GGUF file.
     pub fn load(model_path: &Path) -> Result<Self> {
         let config = BrainConfig::default();
-        let mut engine = Self { config, model: None };
+        let mut engine = Self {
+            config,
+            model: None,
+        };
         engine.load_model(model_path)?;
         Ok(engine)
     }
@@ -95,7 +101,11 @@ impl BrainEngine {
 
         tracing::info!(
             "Model params: dim={}, layers={}, heads={}, kv_heads={}, vocab={}",
-            params.dim, params.n_layers, params.n_heads, params.n_kv_heads, params.vocab_size
+            params.dim,
+            params.n_layers,
+            params.n_heads,
+            params.n_kv_heads,
+            params.vocab_size
         );
 
         // Build weight index
@@ -123,7 +133,10 @@ impl BrainEngine {
             params.n_kv_heads as usize,
             params.head_dim as usize,
         );
-        tracing::info!("KV cache: {:.1} MB", kv_cache.memory_usage() as f64 / 1024.0 / 1024.0);
+        tracing::info!(
+            "KV cache: {:.1} MB",
+            kv_cache.memory_usage() as f64 / 1024.0 / 1024.0
+        );
 
         // Create sampler
         let sampler = sampler::Sampler::new(sampler::SamplerConfig {
@@ -155,7 +168,9 @@ impl BrainEngine {
 
     /// Generate text completion using the loaded model.
     pub fn generate(&mut self, prompt: &str, max_tokens: u32) -> Result<String> {
-        let model = self.model.as_mut()
+        let model = self
+            .model
+            .as_mut()
             .ok_or_else(|| BizClawError::Brain("Model not loaded".into()))?;
 
         // Tokenize prompt
@@ -163,7 +178,11 @@ impl BrainEngine {
         input_tokens.extend(model.tokenizer.encode(prompt));
 
         let total_len = input_tokens.len();
-        tracing::debug!("Generate: prompt_len={}, input_tokens={}", prompt.len(), total_len);
+        tracing::debug!(
+            "Generate: prompt_len={}, input_tokens={}",
+            prompt.len(),
+            total_len
+        );
 
         let mut output_tokens = Vec::new();
         let max_gen = max_tokens.min(self.config.max_tokens) as usize;
@@ -192,7 +211,8 @@ impl BrainEngine {
 
             // Only sample after processing all input tokens
             if step >= total_len - 1 {
-                let all_tokens: Vec<u32> = input_tokens.iter()
+                let all_tokens: Vec<u32> = input_tokens
+                    .iter()
                     .chain(output_tokens.iter())
                     .copied()
                     .collect();

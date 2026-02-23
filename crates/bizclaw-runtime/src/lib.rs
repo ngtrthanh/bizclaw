@@ -12,7 +12,9 @@ pub struct NativeRuntime;
 
 #[async_trait]
 impl RuntimeAdapter for NativeRuntime {
-    fn name(&self) -> &str { "native" }
+    fn name(&self) -> &str {
+        "native"
+    }
 
     async fn execute_command(&self, command: &str, workdir: Option<&str>) -> Result<String> {
         let mut cmd = tokio::process::Command::new("sh");

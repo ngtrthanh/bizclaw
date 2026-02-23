@@ -21,7 +21,9 @@ pub struct McpServerConfig {
     pub enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 /// Tool information discovered from an MCP server.
 #[derive(Debug, Clone, Serialize, Deserialize)]

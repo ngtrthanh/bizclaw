@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════
+# BizClaw AI Agent Platform — Docker Compose
+# Usage: docker-compose up -d
+# Dashboard: http://localhost:3001
+# ═══════════════════════════════════════════════════════════════
+
+version: '3.8'
+
+services:
+  bizclaw:
+    build: .
+    # Or use pre-built image:
+    # image: bizclaw/bizclaw:latest
+    container_name: bizclaw
+    restart: unless-stopped
+    ports:
+      - "3001:3001"     # Admin dashboard
+      - "10001:10001"   # Tenant 1 gateway
+      - "10002:10002"   # Tenant 2 gateway
+      - "10003:10003"   # Tenant 3 gateway
+    volumes:
+      - bizclaw_data:/root/.bizclaw
+    environment:
+      - RUST_LOG=info
+      - BIZCLAW_CONFIG=/root/.bizclaw/config.toml
+      # Optional: set JWT secret for admin API
+      # - BIZCLAW_JWT_SECRET=your-secret-here
+      # Optional: pair CORS origins
+      # - BIZCLAW_CORS_ORIGINS=https://yourdomain.com
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Ollama for local AI (no API key needed)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: bizclaw-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: [gpu]
+
+volumes:
+  bizclaw_data:
+    driver: local
+  ollama_data:
+    driver: local

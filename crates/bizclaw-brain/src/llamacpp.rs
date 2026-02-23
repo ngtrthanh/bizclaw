@@ -276,5 +276,6 @@ pub fn install_instructions() -> String {
   cmake --build . --config Release -j$(nproc)
 
 💡 Sau khi cài, BizClaw sẽ tự động phát hiện và sử dụng llama.cpp.
-"#.into()
+"#
+    .into()
 }
