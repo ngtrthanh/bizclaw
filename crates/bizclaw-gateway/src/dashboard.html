@@ -369,8 +369,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 
     <!-- ═══ PROVIDERS ═══ -->
     <div id="page-providers" style="display:none">
-      <div class="page-header"><h1>🔌 <span data-i18n="providers.title">Nhà cung cấp</span></h1></div>
-      <div class="card"><table><thead><tr><th data-i18n="set.provider">Nhà cung cấp</th><th data-i18n="th.type">Loại</th><th data-i18n="th.status">Trạng thái</th><th data-i18n="set.model">Mô hình</th></tr></thead><tbody id="providers-table"></tbody></table></div>
+      <div class="page-header"><div><h1>🔌 <span data-i18n="providers.title">Nhà cung cấp</span></h1><div class="sub" data-i18n="providers.subtitle">Cấu hình nhà cung cấp AI — chọn provider mặc định, API key, model</div></div></div>
+      <div class="stats">
+        <div class="card"><div class="card-label" data-i18n="providers.active_label">Provider đang dùng</div><div class="card-value green" id="prov-active-name" style="font-size:18px">—</div></div>
+        <div class="card"><div class="card-label" data-i18n="set.model">Mô hình</div><div class="card-value blue" id="prov-active-model" style="font-size:16px">—</div></div>
+        <div class="card"><div class="card-label" data-i18n="providers.total_label">Tổng providers</div><div class="card-value accent" id="prov-total">0</div></div>
+      </div>
+      <div class="ch-grid" id="providers-grid"></div>
     </div>
 
     <!-- ═══ CHANNELS ═══ -->
@@ -723,15 +728,124 @@ async function loadDashboard() {
   } catch(e) {}
 }
 
-async function loadProviders() {
+const PROVIDERS_META = [
+  {name:'openai',label:'OpenAI',icon:'🤖',type:'cloud',models:['gpt-4o','gpt-4o-mini','gpt-3.5-turbo','o1-mini','o3-mini'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'sk-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'gpt-4o-mini'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:'https://api.openai.com/v1'},
+  ]},
+  {name:'anthropic',label:'Anthropic',icon:'🧠',type:'cloud',models:['claude-sonnet-4','claude-3.5-sonnet','claude-3-haiku'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'sk-ant-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'claude-sonnet-4-20250514'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'gemini',label:'Google Gemini',icon:'💎',type:'cloud',models:['gemini-2.5-pro','gemini-2.5-flash','gemini-2.0-flash'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'AIza...'},
+    {key:'model',label:'Model',type:'text',placeholder:'gemini-2.5-flash'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'deepseek',label:'DeepSeek',icon:'🌊',type:'cloud',models:['deepseek-chat','deepseek-reasoner'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'sk-...'},
+    {key:'model',label:'Model',type:'text',placeholder:'deepseek-chat'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'groq',label:'Groq',icon:'⚡',type:'cloud',models:['llama-3.3-70b','mixtral-8x7b-32768'],fields:[
+    {key:'api_key',label:'API Key',type:'password',placeholder:'gsk_...'},
+    {key:'model',label:'Model',type:'text',placeholder:'llama-3.3-70b'},
+    {key:'base_url',label:'Base URL (optional)',type:'text',placeholder:''},
+  ]},
+  {name:'ollama',label:'Ollama (Local)',icon:'🦙',type:'local',models:['auto-detect'],fields:[
+    {key:'model',label:'Model',type:'text',placeholder:'qwen3:0.6b'},
+  ]},
+  {name:'llamacpp',label:'llama.cpp',icon:'🔧',type:'local',models:['server endpoint'],fields:[
+    {key:'base_url',label:'Server URL',type:'text',placeholder:'http://localhost:8080'},
+    {key:'model',label:'Model',type:'text',placeholder:'(auto-detected)'},
+  ]},
+  {name:'brain',label:'Brain Engine',icon:'🧲',type:'local',models:['GGUF offline'],fields:[
+    {key:'model_path',label:'Model Path (.gguf)',type:'text',placeholder:'~/.bizclaw/models/tinyllama.gguf'},
+    {key:'threads',label:'Threads',type:'number',placeholder:'4'},
+  ]},
+];
+
+function renderProviderCards() {
+  const c = configData;
+  const activeProvider = c.default_provider || 'openai';
+  const activeModel = c.default_model || '';
+  document.getElementById('prov-active-name').textContent = activeProvider;
+  document.getElementById('prov-active-model').textContent = activeModel || '—';
+  document.getElementById('prov-total').textContent = PROVIDERS_META.length;
+  const cloudLabel = t('providers.type_cloud');
+  const localLabel = t('providers.type_local');
+  const activeLabel = t('providers.badge_active');
+  const activateBtn = t('providers.btn_activate');
+  const activeBtn = t('providers.btn_active');
+  document.getElementById('providers-grid').innerHTML = PROVIDERS_META.map(p => {
+    const isActive = p.name === activeProvider;
+    const savedKey = c.api_key_set && isActive;
+    const typeLabel = p.type === 'cloud' ? cloudLabel : localLabel;
+    return `<div class="ch-card" style="${isActive?'border-color:var(--accent);box-shadow:0 0 24px rgba(99,102,241,.15)':''}"> 
+      <div class="ch-header">
+        <span class="ch-name">${p.icon} ${p.label}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-${isActive?'green':'blue'}">${isActive?'● '+activeLabel:typeLabel}</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">${p.models.join(', ')}</div>
+      <div class="ch-fields">
+        ${p.fields.map(f => {
+          let val = '';
+          if (isActive) {
+            if (f.key === 'api_key') val = savedKey ? '••••••••' : '';
+            else if (f.key === 'model') val = activeModel;
+            else if (f.key === 'base_url') val = c.api_base_url || '';
+            else if (f.key === 'model_path') val = (c.brain||{}).model_path || '';
+            else if (f.key === 'threads') val = (c.brain||{}).threads || 4;
+          }
+          return `<label>${f.label}</label><input type="${f.type||'text'}" id="prov-${p.name}-${f.key}" value="${val}" placeholder="${f.placeholder}">`;
+        }).join('')}
+      </div>
+      <div class="ch-actions">
+        <button class="btn ${isActive?'btn-green':'btn-primary'} btn-sm" onclick="setActiveProvider('${p.name}')">${isActive?activeBtn:activateBtn}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function setActiveProvider(name) {
+  const meta = PROVIDERS_META.find(p => p.name === name);
+  if (!meta) return;
+  const body = { default_provider: name };
+  // Collect field values
+  meta.fields.forEach(f => {
+    const el = document.getElementById('prov-' + name + '-' + f.key);
+    if (!el) return;
+    const val = el.value.trim();
+    if (!val || val.startsWith('••')) return;
+    if (f.key === 'api_key') body.api_key = val;
+    else if (f.key === 'model') body.default_model = val;
+    else if (f.key === 'base_url') body.api_base_url = val;
+    else if (f.key === 'model_path') { body.brain = body.brain || {}; body.brain.model_path = val; body.brain.enabled = true; body.default_model = 'brain-local'; }
+    else if (f.key === 'threads') { body.brain = body.brain || {}; body.brain.threads = parseInt(val) || 4; }
+  });
+  // If model not set, use first default
+  if (!body.default_model) {
+    if (name === 'brain') body.default_model = 'brain-local';
+    else body.default_model = meta.models[0] || '';
+  }
   try {
-    const data = await (await authFetch(API + '/api/v1/providers')).json();
-    document.getElementById('providers-table').innerHTML = data.providers.map(p => `<tr>
-      <td><strong>${p.name}</strong></td><td>${p.type}</td>
-      <td><span class="badge badge-${p.status==='active'?'green':'blue'}">${p.status}</span></td>
-      <td style="font-size:12px;color:var(--text2)">${(p.models||[]).join(', ')}</td>
-    </tr>`).join('');
-  } catch(e) {}
+    const res = await authFetch(API + '/api/v1/config/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r = await res.json();
+    if (r.ok) {
+      toast('✅ Provider ' + name + ' activated!');
+      await loadConfig();
+      renderProviderCards();
+      loadDashboard();
+    } else { toast('❌ ' + r.error); }
+  } catch(e) { toast('❌ ' + e.message); }
+}
+
+async function loadProviders() {
+  renderProviderCards();
 }
 
 // ═══ SETTINGS ═══
@@ -1731,7 +1845,10 @@ const I18N = {
     'set.autonomy':'Mức tự chủ','set.readonly':'Chỉ đọc','set.supervised':'Giám sát',
     'set.full':'Toàn quyền','set.workspace_only':'Chỉ Workspace',
     // Providers
-    'providers.title':'Nhà cung cấp',
+    'providers.title':'Nhà cung cấp','providers.subtitle':'Cấu hình nhà cung cấp AI — chọn provider mặc định, API key, model',
+    'providers.active_label':'Provider đang dùng','providers.total_label':'Tổng providers',
+    'providers.type_cloud':'Cloud','providers.type_local':'Nội bộ',
+    'providers.badge_active':'Đang dùng','providers.btn_activate':'⚡ Kích hoạt','providers.btn_active':'✅ Đang sử dụng',
     // Channels
     'channels.title':'Cấu hình kênh liên lạc','channels.subtitle':'Kết nối agent với các nền tảng nhắn tin',
     // Tools
@@ -1827,7 +1944,10 @@ const I18N = {
     'set.autonomy':'Autonomy Level','set.readonly':'Read Only','set.supervised':'Supervised',
     'set.full':'Full','set.workspace_only':'Workspace Only',
     // Providers
-    'providers.title':'Providers',
+    'providers.title':'Providers','providers.subtitle':'Configure AI providers — set default provider, API key, model',
+    'providers.active_label':'Active Provider','providers.total_label':'Total Providers',
+    'providers.type_cloud':'Cloud','providers.type_local':'Local',
+    'providers.badge_active':'Active','providers.btn_activate':'⚡ Activate','providers.btn_active':'✅ In Use',
     // Channels
     'channels.title':'Channel Configuration','channels.subtitle':'Connect your agent to messaging platforms',
     // Tools
@@ -1905,6 +2025,8 @@ function setLang(lang){
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
   });
+  // Re-render dynamic cards with new language
+  if (configData && configData.default_provider) renderProviderCards();
   // Update WS status
   if(ws && ws.readyState === 1) {
     document.getElementById('ws-status').innerHTML = '🟢 ' + t('status.connected');
