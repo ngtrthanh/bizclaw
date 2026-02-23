@@ -1485,19 +1485,30 @@ pub async fn update_agent(
     let model = body["model"].as_str();
     let system_prompt = body["system_prompt"].as_str();
 
-    // Phase 1: Update basic metadata (uses orchestrator lock briefly)
+    // Phase 1: Update basic metadata + check if re-creation needed
+    let mut needs_recreate = false;
     {
         let mut orch = state.orchestrator.lock().await;
         let updated = orch.update_agent(&name, role, description);
         if !updated {
             return Json(serde_json::json!({"ok": false, "message": format!("Agent '{}' not found", name)}));
         }
+        // Only re-create if provider or model ACTUALLY CHANGED (not just present)
+        if let Some(agent) = orch.get_agent_mut(&name) {
+            let cur_provider = agent.provider_name().to_string();
+            let cur_model = agent.model_name().to_string();
+            if let Some(p) = provider {
+                if !p.is_empty() && p != cur_provider { needs_recreate = true; }
+            }
+            if let Some(m) = model {
+                if !m.is_empty() && m != cur_model { needs_recreate = true; }
+            }
+            // System prompt can be updated in DB without re-creating the agent
+        }
     } // lock released here
 
-    // Phase 2: Re-create agent if provider/model/prompt changed
-    let needs_recreate = provider.is_some() || model.is_some() || system_prompt.is_some();
+    // Phase 2: Re-create agent ONLY if provider/model actually changed
     if needs_recreate {
-        // Build config from current agent + overrides
         let mut agent_config = state.full_config.lock().unwrap().clone();
         {
             let mut orch = state.orchestrator.lock().await;
@@ -1541,7 +1552,7 @@ pub async fn update_agent(
                 };
                 orch.remove_agent(&name);
                 orch.add_agent(&name, &final_role, &final_desc, new_agent);
-                tracing::info!("🔄 Agent '{}' re-created with new config", name);
+                tracing::info!("🔄 Agent '{}' re-created with new provider/model", name);
             }
             Ok(Err(e)) => {
                 tracing::warn!("⚠️ Agent '{}' re-create failed: {}", name, e);
@@ -1552,26 +1563,35 @@ pub async fn update_agent(
         }
     }
 
-    // Phase 3: Persist to DB (final lock acquisition)
-    let mut orch = state.orchestrator.lock().await;
-    if let Some(agent) = orch.get_agent_mut(&name) {
-        let provider = agent.provider_name().to_string();
-        let model = agent.model_name().to_string();
-        let sys_prompt = agent.system_prompt().to_string();
+    // Phase 3: Persist to DB — always save metadata/prompt even without re-creation
+    {
+        let orch = state.orchestrator.lock().await;
         let agents_list = orch.list_agents();
         let current = agents_list.iter().find(|a| a["name"].as_str() == Some(&name));
         let final_role = current.and_then(|a| a["role"].as_str()).unwrap_or("assistant");
         let final_desc = current.and_then(|a| a["description"].as_str()).unwrap_or("");
-        if let Err(e) = state.db.upsert_agent(&name, final_role, final_desc, &provider, &model, &sys_prompt) {
+        let final_provider = provider.unwrap_or(
+            current.and_then(|a| a["provider"].as_str()).unwrap_or("openai")
+        );
+        let final_model = model.unwrap_or(
+            current.and_then(|a| a["model"].as_str()).unwrap_or("")
+        );
+        let final_prompt = system_prompt.unwrap_or(
+            current.and_then(|a| a["system_prompt"].as_str()).unwrap_or("")
+        );
+        if let Err(e) = state.db.upsert_agent(&name, final_role, final_desc, final_provider, final_model, final_prompt) {
             tracing::warn!("DB persist failed for agent '{}': {}", name, e);
         }
     }
 
-    // Also persist to legacy agents.json for backward compatibility
-    let agents_path = state.config_path.parent()
-        .unwrap_or(std::path::Path::new("."))
-        .join("agents.json");
-    orch.save_agents_metadata(&agents_path);
+    // Persist to legacy agents.json
+    {
+        let orch = state.orchestrator.lock().await;
+        let agents_path = state.config_path.parent()
+            .unwrap_or(std::path::Path::new("."))
+            .join("agents.json");
+        orch.save_agents_metadata(&agents_path);
+    }
 
     Json(serde_json::json!({
         "ok": true,
