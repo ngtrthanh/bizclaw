@@ -1615,7 +1615,7 @@ async function showCreateAgentForm() {
     try {
       const res = await authFetch(API + '/api/v1/providers');
       const data = await res.json();
-      if (data.ok && data.providers) {
+      if (data.providers) {
         _providersCache = data.providers;
         data.providers.forEach(p => {
           const opt = document.createElement('option');
