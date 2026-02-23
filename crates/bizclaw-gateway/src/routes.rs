@@ -140,6 +140,12 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::
                 "access_token": mask_secret(&w.access_token),
                 "business_id": w.business_id,
             })),
+            "webhook": cfg.channel.webhook.as_ref().map(|wh| serde_json::json!({
+                "enabled": wh.enabled,
+                "secret": mask_secret(&wh.secret),
+                "secret_set": !wh.secret.is_empty(),
+                "outbound_url": wh.outbound_url,
+            })),
         },
     }))
 }
