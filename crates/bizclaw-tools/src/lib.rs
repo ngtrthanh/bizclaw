@@ -32,6 +32,7 @@ pub mod grep_search;
 pub mod group_summarizer;
 pub mod http_request;
 pub mod memory_search;
+pub mod plan_store;
 pub mod plan_tool;
 pub mod registry;
 pub mod session_context;

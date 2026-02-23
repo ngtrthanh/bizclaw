@@ -42,6 +42,8 @@ pub enum TaskAction {
         url: String,
         method: String,
         body: Option<String>,
+        #[serde(default)]
+        headers: Vec<(String, String)>,
     },
 }
 
