@@ -3183,46 +3183,51 @@ async function sendGroupMessage(messageText) {
   saveGroups();
   renderGroupMessagesInChat();
   
-  // Send to each agent sequentially
+  // Show typing indicators for ALL agents at once
+  const typingIds = {};
   for (const agentName of g.agents) {
-    // Build context with previous agent responses from this round
-    const roundResponses = g.messages.filter(m => m.role === 'agent' && m.round === g.messages.length);
+    const typingMsg = { role: 'system', content: `\ud83e\udd16 ${agentName} \u0111ang suy ngh\u0129...`, _temp: true, _agent: agentName };
+    g.messages.push(typingMsg);
+    typingIds[agentName] = typingMsg;
+  }
+  saveGroups();
+  renderGroupMessagesInChat();
+
+  // Send to ALL agents in PARALLEL — much faster!
+  const promises = g.agents.map(async (agentName) => {
     const agentContext = `[Group "${g.name}" - Topic: ${g.topic}]
 You are agent "${agentName}" in a group discussion. Here is the latest message:
 
 User: ${text}
 
-${roundResponses.map(m => m.agent + ': ' + m.content).join('\n')}
-
 Contribute your perspective briefly (2-3 sentences) based on your expertise.`;
 
-    // Show typing
-    g.messages.push({ role: 'system', content: `\ud83e\udd16 ${agentName} \u0111ang suy ngh\u0129...`, _temp: true });
-    saveGroups();
-    renderGroupMessagesInChat();
-    
     try {
       const res = await authFetch(API + `/api/v1/agents/${encodeURIComponent(agentName)}/chat`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ message: agentContext })
       });
       const r = await res.json();
-      // Remove typing indicator
-      const tempIdx = g.messages.findIndex(m => m._temp && m.content.includes(agentName));
+      // Remove this agent's typing indicator
+      const tempIdx = g.messages.findIndex(m => m._temp && m._agent === agentName);
       if (tempIdx >= 0) g.messages.splice(tempIdx, 1);
       if (r.ok) {
-        g.messages.push({ role: 'agent', agent: agentName, agent_role: r.role || 'assistant', content: r.response, time: new Date().toISOString(), round: g.messages.length });
+        g.messages.push({ role: 'agent', agent: agentName, agent_role: r.role || 'assistant', content: r.response, time: new Date().toISOString() });
       } else {
         g.messages.push({ role: 'agent', agent: agentName, agent_role: 'assistant', content: '\u274c ' + (r.error || 'Error'), time: new Date().toISOString() });
       }
     } catch(e) {
-      const tempIdx2 = g.messages.findIndex(m => m._temp && m.content.includes(agentName));
-      if (tempIdx2 >= 0) g.messages.splice(tempIdx2, 1);
+      const tempIdx = g.messages.findIndex(m => m._temp && m._agent === agentName);
+      if (tempIdx >= 0) g.messages.splice(tempIdx, 1);
       g.messages.push({ role: 'agent', agent: agentName, agent_role: 'assistant', content: '\u274c ' + e.message, time: new Date().toISOString() });
     }
+    // Render after EACH agent finishes — progressive display
     saveGroups();
     renderGroupMessagesInChat();
-  }
+  });
+
+  // Wait for all agents to finish
+  await Promise.all(promises);
   
   g.messages.push({ role: 'system', content: '\u2014\u2014 T\u1ea5t c\u1ea3 agent \u0111\u00e3 tr\u1ea3 l\u1eddi \u2014\u2014' });
   saveGroups();
