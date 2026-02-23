@@ -1,103 +1,254 @@
-name: CI
+name: Release
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+push:
+tags: [“v*”]
 
 env:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
+CARGO_TERM_COLOR: always
+
+permissions:
+contents: write
+packages: write
 
 jobs:
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-test-
-      
-      - name: Run tests
-        run: cargo test --workspace --all-features
 
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+# Linux builds (x86_64, aarch64, armv7, armv6)
 
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-clippy-
-      
-      - name: Run clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+build-linux:
+name: Build Linux (${{ matrix.target }})
+runs-on: ubuntu-latest
+strategy:
+matrix:
+include:
+- target: x86_64-unknown-linux-gnu
+artifact: bizclaw-linux-amd64
+platform: linux/amd64
+- target: aarch64-unknown-linux-gnu
+artifact: bizclaw-linux-arm64
+platform: linux/arm64
+- target: armv7-unknown-linux-gnueabihf
+artifact: bizclaw-linux-armv7
+platform: linux/arm/v7
+- target: arm-unknown-linux-gnueabihf
+artifact: bizclaw-linux-armv6
+platform: linux/arm/v6
+steps:
+- uses: actions/checkout@v4
 
-  build:
-    name: Build Check
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-build-
-      
-      - name: Build
-        run: cargo build --workspace --all-features
+```
+  - name: Install Rust
+    uses: dtolnay/rust-toolchain@stable
+
+  - name: Install cross
+    run: cargo install cross --git https://github.com/cross-rs/cross
+
+  - name: Cache cargo
+    uses: actions/cache@v4
+    with:
+      path: |
+        ~/.cargo/bin/
+        ~/.cargo/registry/index/
+        ~/.cargo/registry/cache/
+        ~/.cargo/git/db/
+        target/
+      key: ${{ runner.os }}-${{ matrix.target }}-release-${{ hashFiles('**/Cargo.lock') }}
+      restore-keys: ${{ runner.os }}-${{ matrix.target }}-release-
+
+  - name: Build release
+    run: cross build --release --target ${{ matrix.target }}
+    env:
+      OPENSSL_STATIC: "1"
+      OPENSSL_VENDORED: "1"
+      CROSS_NO_WARNINGS: "0"
+
+  - name: Package binary
+    run: |
+      mkdir -p dist
+      cp target/${{ matrix.target }}/release/bizclaw dist/${{ matrix.artifact }}
+      chmod +x dist/${{ matrix.artifact }}
+      tar czf dist/${{ matrix.artifact }}.tar.gz -C dist ${{ matrix.artifact }}
+
+  - name: Upload artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.artifact }}
+      path: dist/${{ matrix.artifact }}.tar.gz
+```
+
+# macOS build (Apple Silicon only)
+
+build-macos:
+name: Build macOS (${{ matrix.target }})
+runs-on: ${{ matrix.runner }}
+strategy:
+matrix:
+include:
+- target: aarch64-apple-darwin
+runner: macos-14
+artifact: bizclaw-darwin-arm64
+steps:
+- uses: actions/checkout@v4
+
+```
+  - name: Install Rust
+    uses: dtolnay/rust-toolchain@stable
+    with:
+      targets: ${{ matrix.target }}
+
+  - name: Cache cargo
+    uses: actions/cache@v4
+    with:
+      path: |
+        ~/.cargo/bin/
+        ~/.cargo/registry/index/
+        ~/.cargo/registry/cache/
+        ~/.cargo/git/db/
+        target/
+      key: ${{ runner.os }}-${{ matrix.target }}-release-${{ hashFiles('**/Cargo.lock') }}
+      restore-keys: ${{ runner.os }}-${{ matrix.target }}-release-
+
+  - name: Build release
+    run: cargo build --release --target ${{ matrix.target }}
+
+  - name: Package binary
+    run: |
+      mkdir -p dist
+      cp target/${{ matrix.target }}/release/bizclaw dist/${{ matrix.artifact }}
+      chmod +x dist/${{ matrix.artifact }}
+      tar czf dist/${{ matrix.artifact }}.tar.gz -C dist ${{ matrix.artifact }}
+
+  - name: Upload artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: ${{ matrix.artifact }}
+      path: dist/${{ matrix.artifact }}.tar.gz
+```
+
+# Windows build
+
+build-windows:
+name: Build Windows (x86_64)
+runs-on: windows-latest
+steps:
+- uses: actions/checkout@v4
+
+```
+  - name: Install Rust
+    uses: dtolnay/rust-toolchain@stable
+
+  - name: Cache cargo
+    uses: actions/cache@v4
+    with:
+      path: |
+        ~/.cargo/bin/
+        ~/.cargo/registry/index/
+        ~/.cargo/registry/cache/
+        ~/.cargo/git/db/
+        target/
+      key: ${{ runner.os }}-x86_64-pc-windows-msvc-release-${{ hashFiles('**/Cargo.lock') }}
+      restore-keys: ${{ runner.os }}-x86_64-pc-windows-msvc-release-
+
+  - name: Build release
+    run: cargo build --release
+
+  - name: Package binary
+    run: |
+      New-Item -ItemType Directory -Force -Path dist
+      Copy-Item target/release/bizclaw.exe dist/bizclaw-windows-amd64.exe
+      Compress-Archive -Path dist/bizclaw-windows-amd64.exe -DestinationPath dist/bizclaw-windows-amd64.zip
+
+  - name: Upload artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: bizclaw-windows-amd64
+      path: dist/bizclaw-windows-amd64.zip
+```
+
+# Create GitHub Release
+
+release:
+name: Create Release
+needs: [build-linux, build-macos, build-windows]
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v4
+
+```
+  - name: Download all artifacts
+    uses: actions/download-artifact@v4
+    with:
+      path: artifacts
+
+  - name: Create Release
+    uses: softprops/action-gh-release@v2
+    with:
+      generate_release_notes: true
+      files: |
+        artifacts/**/*.tar.gz
+        artifacts/**/*.zip
+```
+
+# Docker multi-arch image
+
+docker:
+name: Build & Push Docker Image
+needs: [build-linux]
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v4
+
+```
+  - name: Download Linux artifacts
+    uses: actions/download-artifact@v4
+    with:
+      path: artifacts
+
+  - name: Set up QEMU
+    uses: docker/setup-qemu-action@v3
+
+  - name: Set up Docker Buildx
+    uses: docker/setup-buildx-action@v3
+
+  - name: Login to GHCR
+    uses: docker/login-action@v3
+    with:
+      registry: ghcr.io
+      username: ${{ github.actor }}
+      password: ${{ secrets.GITHUB_TOKEN }}
+
+  - name: Extract version
+    id: version
+    run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+  - name: Prepare binaries for Docker
+    run: |
+      mkdir -p docker-bin/linux/amd64 docker-bin/linux/arm64 docker-bin/linux/arm/v7 docker-bin/linux/arm/v6
+
+      tar xzf artifacts/bizclaw-linux-amd64/bizclaw-linux-amd64.tar.gz \
+        -C docker-bin/linux/amd64
+      tar xzf artifacts/bizclaw-linux-arm64/bizclaw-linux-arm64.tar.gz \
+        -C docker-bin/linux/arm64
+      tar xzf artifacts/bizclaw-linux-armv7/bizclaw-linux-armv7.tar.gz \
+        -C docker-bin/linux/arm/v7
+      tar xzf artifacts/bizclaw-linux-armv6/bizclaw-linux-armv6.tar.gz \
+        -C docker-bin/linux/arm/v6
+
+      # Rename all platform-specific binaries to just "bizclaw".
+      # find is used instead of a glob so that nested dirs (arm/v7) are reached.
+      find docker-bin -mindepth 2 -name 'bizclaw-*' -exec sh -c \
+        'mv "$1" "$(dirname "$1")/bizclaw"' _ {} \;
+
+  - name: Build and push multi-arch image
+    uses: docker/build-push-action@v6
+    with:
+      context: .
+      file: Dockerfile
+      platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
+      push: true
+      tags: |
+        ghcr.io/${{ github.repository }}:latest
+        ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
+      cache-from: type=gha
+      cache-to: type=gha,mode=max
+```
