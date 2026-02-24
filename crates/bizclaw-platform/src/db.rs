@@ -157,7 +157,7 @@ impl PlatformDb {
                 actor_id TEXT NOT NULL,
                 details TEXT,
                 ip_address TEXT,
-                created_at TEXT DEFAULT (datetime('now'))
+                created_at TEXT DEFAULT (datetime('now', '+7 hours'))
             );
 
             CREATE TABLE IF NOT EXISTS tenant_members (
@@ -594,7 +594,7 @@ impl PlatformDb {
         details: Option<&str>,
     ) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO audit_log (event_type, actor_type, actor_id, details) VALUES (?1,?2,?3,?4)",
+            "INSERT INTO audit_log (event_type, actor_type, actor_id, details, created_at) VALUES (?1,?2,?3,?4,datetime('now','+7 hours'))",
             params![event_type, actor_type, actor_id, details],
         ).map_err(|e| BizClawError::Memory(format!("Log event: {e}")))?;
         Ok(())
@@ -909,11 +909,10 @@ impl PlatformDb {
 }
 
 fn rand_code() -> u32 {
-    use std::time::SystemTime;
-    let seed = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default()
-        .subsec_nanos();
+    // Use UUID v4 (cryptographic RNG) for unpredictable pairing codes
+    let uuid = uuid::Uuid::new_v4();
+    let bytes = uuid.as_bytes();
+    let seed = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     (seed % 900_000) + 100_000
 }
 

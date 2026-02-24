@@ -60,6 +60,14 @@ pub async fn register_handler(
     if req.email.is_empty() || req.password.is_empty() || req.company_name.is_empty() {
         return Json(serde_json::json!({"ok": false, "error": "Email, password, and company name are required"}));
     }
+    // Email format validation
+    if !req.email.contains('@') || !req.email.contains('.') || req.email.len() < 5 {
+        return Json(serde_json::json!({"ok": false, "error": "Email không hợp lệ"}));
+    }
+    // Password strength validation
+    if req.password.len() < 8 {
+        return Json(serde_json::json!({"ok": false, "error": "Mật khẩu phải có ít nhất 8 ký tự"}));
+    }
 
     let password = req.password.clone();
     let hash = match tokio::task::spawn_blocking(move || crate::auth::hash_password(&password)).await.unwrap_or_else(|e| Err(e.to_string())) {
@@ -174,12 +182,23 @@ pub async fn forgot_password_handler(
                     use lettre::{Message, SmtpTransport, Transport};
                     use lettre::transport::smtp::authentication::Credentials;
                     
-                    let email = Message::builder()
-                        .from(smtp_user.parse().unwrap())
-                        .to(req.email.parse().unwrap())
+                    let from_addr = match smtp_user.parse() {
+                        Ok(a) => a,
+                        Err(e) => { tracing::warn!("SMTP from address invalid: {e}"); return; }
+                    };
+                    let to_addr = match req.email.parse() {
+                        Ok(a) => a,
+                        Err(e) => { tracing::warn!("SMTP to address invalid: {e}"); return; }
+                    };
+                    let email = match Message::builder()
+                        .from(from_addr)
+                        .to(to_addr)
                         .subject("BizClaw Password Reset")
                         .body(format!("Reset your password here: https://apps.bizclaw.vn/#/reset-password?token={}", token))
-                        .unwrap();
+                    {
+                        Ok(e) => e,
+                        Err(e) => { tracing::warn!("Failed to build email: {e}"); return; }
+                    };
 
                     let creds = Credentials::new(smtp_user, smtp_pass);
                     let mailer = SmtpTransport::relay(&smtp_host)
@@ -190,7 +209,7 @@ pub async fn forgot_password_handler(
                     let _ = mailer.send(&email);
                 });
             } else {
-                tracing::warn!("SMTP is not configured! Token generated: {}", token);
+                tracing::warn!("SMTP is not configured — password reset token generated but cannot be sent. Configure SMTP in platform settings.");
             }
             
             // Note: Even if user is not found, we return OK to prevent email enumeration

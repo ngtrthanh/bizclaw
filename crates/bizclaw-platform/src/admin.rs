@@ -795,7 +795,7 @@ async fn upsert_channel(
     Path(id): Path<String>,
     Json(req): Json<UpsertChannelReq>,
 ) -> Json<serde_json::Value> {
-    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
     }
     let config_json = serde_json::to_string(&req.config).unwrap_or_default();
@@ -831,7 +831,7 @@ async fn delete_channel(
     Extension(claims): Extension<crate::auth::Claims>,
     Path((tenant_id, channel_id)): Path<(String, String)>,
 ) -> Json<serde_json::Value> {
-    if !can_access_tenant(&claims, &tenant_id, &state.db.lock().unwrap()) {
+    if !can_write_tenant(&claims, &tenant_id, &state.db.lock().unwrap()) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền xóa channel."}));
     }
     match state.db.lock().unwrap().delete_channel(&channel_id) {
@@ -1052,7 +1052,7 @@ async fn set_tenant_configs(
     Path(id): Path<String>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
-    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
     }
     let configs = match body.get("configs").and_then(|c| c.as_object()) {
@@ -1126,7 +1126,7 @@ async fn upsert_tenant_agent(
     Path(id): Path<String>,
     Json(req): Json<UpsertAgentReq>,
 ) -> Json<serde_json::Value> {
-    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
     }
     let db = state.db.lock().unwrap();
@@ -1165,7 +1165,7 @@ async fn delete_tenant_agent(
     Extension(claims): Extension<crate::auth::Claims>,
     Path((id, name)): Path<(String, String)>,
 ) -> Json<serde_json::Value> {
-    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
         return Json(serde_json::json!({"ok": false, "error": "Không có quyền xóa agent."}));
     }
     match state.db.lock().unwrap().delete_agent_by_name(&id, &name) {
@@ -1301,9 +1301,13 @@ struct AssignTenantReq {
 /// Assign or remove tenant for a user
 async fn assign_tenant_handler(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
     Json(req): Json<AssignTenantReq>,
 ) -> Json<serde_json::Value> {
+    if !is_super_admin(&claims) {
+        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền gán tenant."}));
+    }
     let tenant_id_str = req.tenant_id.as_deref().filter(|s| !s.is_empty());
     let db_res = state.db.lock().unwrap().update_user_tenant(&id, tenant_id_str);
     
@@ -1334,9 +1338,13 @@ struct AdminResetPasswordReq {
 /// Super Admin force-resets a user's password (no old password required).
 async fn admin_reset_user_password(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
     Json(req): Json<AdminResetPasswordReq>,
 ) -> Json<serde_json::Value> {
+    if !is_super_admin(&claims) {
+        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền reset mật khẩu."}));
+    }
     if req.new_password.len() < 6 {
         return Json(serde_json::json!({"ok": false, "error": "Password must be at least 6 characters"}));
     }
