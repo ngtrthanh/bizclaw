@@ -171,6 +171,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -193,6 +197,9 @@ jobs:
         with:
           path: artifacts
 
+      - name: Display downloaded artifacts
+        run: ls -R artifacts
+
       - name: Extract version
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
@@ -205,13 +212,25 @@ jobs:
             docker-bin/linux/arm/v7 \
             docker-bin/linux/arm/v6
 
+          # Extract artifacts - they're in subdirectories by artifact name
           tar xzf artifacts/bizclaw-linux-amd64/bizclaw-linux-amd64.tar.gz \
+            -C docker-bin/linux/amd64 || \
+          tar xzf artifacts/bizclaw-linux-amd64.tar.gz \
             -C docker-bin/linux/amd64
+
           tar xzf artifacts/bizclaw-linux-arm64/bizclaw-linux-arm64.tar.gz \
+            -C docker-bin/linux/arm64 || \
+          tar xzf artifacts/bizclaw-linux-arm64.tar.gz \
             -C docker-bin/linux/arm64
+
           tar xzf artifacts/bizclaw-linux-armv7/bizclaw-linux-armv7.tar.gz \
+            -C docker-bin/linux/arm/v7 || \
+          tar xzf artifacts/bizclaw-linux-armv7.tar.gz \
             -C docker-bin/linux/arm/v7
+
           tar xzf artifacts/bizclaw-linux-armv6/bizclaw-linux-armv6.tar.gz \
+            -C docker-bin/linux/arm/v6 || \
+          tar xzf artifacts/bizclaw-linux-armv6.tar.gz \
             -C docker-bin/linux/arm/v6
 
           # Rename all platform-specific binaries to just "bizclaw".
