@@ -369,12 +369,15 @@ async fn login(
         entry.0 += 1;
     }
 
+    tracing::info!("login: Locking DB to get_user_by_email for {}", req.email);
     let user = state.db.lock().unwrap().get_user_by_email(&req.email);
+    tracing::info!("login: DB unlocked. Found user: {}", user.as_ref().map(|x| x.is_some()).unwrap_or(false));
     match user {
         Ok(Some((id, hash, role))) => {
             // Run bcrypt in blocking thread to avoid stalling the async runtime
             let password = req.password.clone();
             let hash_clone = hash.clone();
+            tracing::info!("login: Hashing password to verify");
             let ok = tokio::task::spawn_blocking(move || {
                 crate::auth::verify_password(&password, &hash_clone)
             })
@@ -382,24 +385,34 @@ async fn login(
             .unwrap_or(false);
 
             if ok {
+                tracing::info!("login: Password verified, generating token");
                 match crate::auth::create_token(&id, &req.email, &role, &state.jwt_secret) {
                     Ok(token) => {
+                        tracing::info!("login: Locking DB to log_event");
                         state
                             .db
                             .lock()
                             .unwrap()
                             .log_event("login_success", "user", &id, None)
                             .ok();
+                        tracing::info!("login: DB unlocked after log_event");
                         Json(serde_json::json!({"ok": true, "token": token, "role": role}))
                     }
-                    Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
+                    Err(e) => {
+                        tracing::error!("login: Token error: {e}");
+                        Json(serde_json::json!({"ok": false, "error": e}))
+                    }
                 }
             } else {
+                tracing::warn!("login: Invalid credentials for {}", req.email);
                 Json(serde_json::json!({"ok": false, "error": "Invalid credentials"}))
             }
         }
         Ok(None) => Json(serde_json::json!({"ok": false, "error": "User not found"})),
-        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("login: DB error: {e}");
+            Json(serde_json::json!({"ok": false, "error": e.to_string()}))
+        }
     }
 }
 
