@@ -326,16 +326,27 @@ impl PlatformDb {
 
     // ── Users ────────────────────────────────────
 
-    /// Create admin user.
-    pub fn create_user(&self, email: &str, password_hash: &str, role: &str) -> Result<String> {
+    /// Create user with optional tenant affiliation.
+    pub fn create_user(&self, email: &str, password_hash: &str, role: &str, tenant_id: Option<&str>) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO users (id, email, password_hash, role) VALUES (?1,?2,?3,?4)",
-                params![id, email, password_hash, role],
+                "INSERT INTO users (id, email, password_hash, role, tenant_id) VALUES (?1,?2,?3,?4,?5)",
+                params![id, email, password_hash, role, tenant_id],
             )
             .map_err(|e| BizClawError::Memory(format!("Create user: {e}")))?;
         Ok(id)
+    }
+
+    /// Assign user to a tenant
+    pub fn update_user_tenant(&self, id: &str, tenant_id: Option<&str>) -> Result<()> {
+        self.conn
+            .execute(
+                "UPDATE users SET tenant_id=?1 WHERE id=?2",
+                params![tenant_id, id],
+            )
+            .map_err(|e| BizClawError::Memory(format!("Update user tenant: {e}")))?;
+        Ok(())
     }
 
     /// Authenticate user by email, return password_hash for verification.

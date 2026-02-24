@@ -481,9 +481,30 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       <option value="admin">Admin</option>
       <option value="viewer">Viewer</option>
     </select>
+    <label>Assign to Tenant (Optional)</label>
+    <select id="fu-tenant">
+      <option value="">-- No Tenant (All Access for Admins) --</option>
+    </select>
     <div class="actions">
       <button class="btn btn-outline" onclick="hideModal('modal-create-user')">Cancel</button>
       <button class="btn btn-primary" onclick="createUser()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Tenant Modal -->
+<div id="modal-assign-tenant" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>🏢 Assign Tenant</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:10px">User: <strong id="at-email" style="color:var(--accent)"></strong></p>
+    <input type="hidden" id="at-id">
+    <label>Select Tenant</label>
+    <select id="at-tenant">
+      <option value="">-- No Tenant (Remove Access) --</option>
+    </select>
+    <div class="actions">
+      <button class="btn btn-outline" onclick="hideModal('modal-assign-tenant')">Cancel</button>
+      <button class="btn btn-primary" onclick="assignUserTenant()">Save</button>
     </div>
   </div>
 </div>
@@ -741,17 +762,26 @@ async function loadUsers(){
         </div>`;
       return;
     }
+    
+    // Attempt to match tenant IDs with names if we have loaded tenants
+    const tenantMap = {};
+    if (allTenants && allTenants.length) {
+      allTenants.forEach(t => { tenantMap[t.id] = t.name; });
+    }
+
     document.getElementById('users-list').innerHTML=users.map(u => `
       <div class="card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <strong style="color:var(--accent)">${escapeHtml(u.email)}</strong>
             <span class="badge ${u.role==='admin'?'running':'stopped'}" style="margin-left:8px">${escapeHtml(u.role)}</span>
+            ${u.tenant_id ? `<span class="badge" style="margin-left:8px;background:var(--subtle);color:var(--text)">Tenant: ${escapeHtml(tenantMap[u.tenant_id] || u.tenant_id.slice(0,8))}</span>` : ''}
             <div style="font-size:11px;color:var(--muted);margin-top:4px">
               Created: ${timeAgo(u.created_at)} · ID: <code style="font-size:10px">${(u.id||'').slice(0,8)}…</code>
             </div>
           </div>
           <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="showAssignTenantModal('${esc(u.id)}','${esc(u.email)}')">🏢 Assign Tenant</button>
             <button class="btn btn-danger btn-sm" onclick="deleteUser('${esc(u.id)}','${esc(u.email)}')" title="Delete User">✕</button>
           </div>
         </div>
@@ -761,15 +791,53 @@ async function loadUsers(){
     document.getElementById('users-list').innerHTML='<p style="color:var(--red);font-size:13px">❌ Failed to load users</p>';
   }
 }
-function showCreateUserModal(){ document.getElementById('modal-create-user').classList.remove('hidden'); }
+
+async function fetchTenantsForSelect(selectId) {
+  try {
+    const res = await authFetch(API+'/tenants');
+    const d = await res.json();
+    const tenants = d.tenants || [];
+    const select = document.getElementById(selectId);
+    select.innerHTML = '<option value="">-- No Tenant (Remove Access/All Access) --</option>' + 
+      tenants.map(t => `<option value="${t.id}">${escapeHtml(t.name)} (${t.slug})</option>`).join('');
+  } catch(e) {
+    console.error("Failed to load tenants for select", e);
+  }
+}
+
+function showCreateUserModal(){ 
+  fetchTenantsForSelect('fu-tenant');
+  document.getElementById('modal-create-user').classList.remove('hidden'); 
+}
+
+function showAssignTenantModal(id, email) {
+  document.getElementById('at-id').value = id;
+  document.getElementById('at-email').textContent = email;
+  fetchTenantsForSelect('at-tenant');
+  document.getElementById('modal-assign-tenant').classList.remove('hidden');
+}
+
+async function assignUserTenant() {
+  const id = document.getElementById('at-id').value;
+  const tenant_id = document.getElementById('at-tenant').value;
+  try {
+    const r = await(await authFetch(API+'/users/'+id+'/tenant',{method:'PUT',body:JSON.stringify({tenant_id})})).json();
+    if(r.ok) { hideModal('modal-assign-tenant'); toast('✅ Tenant assigned'); loadUsers(); }
+    else { toast('❌ '+r.error,'error'); }
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
 async function createUser(){
   const email=document.getElementById('fu-email').value.trim();
   const password=document.getElementById('fu-password').value;
   const role=document.getElementById('fu-role').value;
+  const tenant_id=document.getElementById('fu-tenant').value;
   if(!email||!password){toast('Email and password required','error');return;}
   if(password.length<8){toast('Password must be at least 8 characters','error');return;}
   try{
-    const r=await(await authFetch(API+'/users',{method:'POST',body:JSON.stringify({email,password,role})})).json();
+    const reqBody = { email, password, role };
+    if (tenant_id) reqBody.tenant_id = tenant_id;
+    const r=await(await authFetch(API+'/users',{method:'POST',body:JSON.stringify(reqBody)})).json();
     if(r.ok){hideModal('modal-create-user');toast('✅ User created');document.getElementById('fu-email').value='';document.getElementById('fu-password').value='';loadUsers();}
     else{toast('❌ '+r.error,'error');}
   }catch(e){toast('❌ '+e.message,'error');}

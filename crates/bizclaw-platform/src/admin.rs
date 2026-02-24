@@ -6,7 +6,7 @@ use axum::middleware;
 use axum::{
     Json, Router,
     extract::{Path, State},
-    routing::{delete, get, post},
+    routing::{delete, get, post, put},
 };
 use std::sync::{Arc, Mutex};
 
@@ -98,6 +98,7 @@ impl AdminServer {
             .route("/api/admin/users", get(list_users))
             .route("/api/admin/users", post(create_user_handler))
             .route("/api/admin/users/{id}", delete(delete_user_handler))
+            .route("/api/admin/users/{id}/tenant", put(assign_tenant_handler))
             .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
         // Public routes — no auth required
@@ -849,6 +850,7 @@ struct CreateUserReq {
     email: String,
     password: String,
     role: Option<String>,
+    tenant_id: Option<String>,
 }
 
 /// Create a new admin user.
@@ -873,7 +875,11 @@ async fn create_user_handler(
     };
 
     let role = req.role.as_deref().unwrap_or("admin");
-    match state.db.lock().unwrap().create_user(&req.email, &hash, role) {
+    
+    // Extracted lock to avoid deadlock with subsequent log_event lock
+    let db_res = state.db.lock().unwrap().create_user(&req.email, &hash, role, req.tenant_id.as_deref().filter(|s| !s.is_empty()));
+    
+    match db_res {
         Ok(id) => {
             state
                 .db
@@ -892,13 +898,45 @@ async fn delete_user_handler(
     State(state): State<Arc<AdminState>>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
-    match state.db.lock().unwrap().delete_user(&id) {
+    // Extracted lock to avoid deadlock
+    let db_res = state.db.lock().unwrap().delete_user(&id);
+    
+    match db_res {
         Ok(()) => {
             state
                 .db
                 .lock()
                 .unwrap()
                 .log_event("user_deleted", "admin", &id, None)
+                .ok();
+            Json(serde_json::json!({"ok": true}))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct AssignTenantReq {
+    tenant_id: Option<String>,
+}
+
+/// Assign or remove tenant for a user
+async fn assign_tenant_handler(
+    State(state): State<Arc<AdminState>>,
+    Path(id): Path<String>,
+    Json(req): Json<AssignTenantReq>,
+) -> Json<serde_json::Value> {
+    let tenant_id_str = req.tenant_id.as_deref().filter(|s| !s.is_empty());
+    let db_res = state.db.lock().unwrap().update_user_tenant(&id, tenant_id_str);
+    
+    match db_res {
+        Ok(()) => {
+            let details = format!("tenant_id={}", tenant_id_str.unwrap_or("none"));
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event("user_assigned", "admin", &id, Some(&details))
                 .ok();
             Json(serde_json::json!({"ok": true}))
         }
