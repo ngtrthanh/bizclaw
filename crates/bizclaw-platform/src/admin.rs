@@ -9,6 +9,8 @@ use axum::{
     routing::{delete, get, post, put},
 };
 use std::sync::{Arc, Mutex};
+use tower_http::cors::{Any, CorsLayer};
+use axum::extract::DefaultBodyLimit;
 
 /// Shared application state for the admin server.
 pub struct AdminState {
@@ -125,16 +127,42 @@ impl AdminServer {
         // so that /tenants, /settings, /ollama etc. all work
         let spa_fallback = Router::new().fallback(get(admin_dashboard_page));
 
+        // CORS — configurable via BIZCLAW_CORS_ORIGINS env var
+        let cors = match std::env::var("BIZCLAW_CORS_ORIGINS") {
+            Ok(origins) if !origins.is_empty() => {
+                let allowed: Vec<_> = origins.split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+                CorsLayer::new()
+                    .allow_origin(allowed)
+                    .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE, axum::http::Method::OPTIONS])
+                    .allow_headers(Any)
+            }
+            _ => CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods([axum::http::Method::GET, axum::http::Method::POST, axum::http::Method::PUT, axum::http::Method::DELETE, axum::http::Method::OPTIONS])
+                .allow_headers(Any),
+        };
+
         protected
             .merge(public)
             .merge(spa_fallback)
+            .layer(cors)
+            .layer(DefaultBodyLimit::max(1_048_576)) // 1MB max request body
             .with_state(state)
     }
 
     /// Start the admin server.
     pub async fn start(state: Arc<AdminState>, port: u16) -> bizclaw_core::error::Result<()> {
         let app = Self::router(state);
-        let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
+        // Bind to 127.0.0.1 — only accessible via reverse proxy (Nginx)
+        // Set BIZCLAW_BIND_ALL=1 to allow direct external access (dev only)
+        let bind_addr = if std::env::var("BIZCLAW_BIND_ALL").unwrap_or_default() == "1" {
+            [0, 0, 0, 0]
+        } else {
+            [127, 0, 0, 1]
+        };
+        let addr = std::net::SocketAddr::from((bind_addr, port));
         tracing::info!("🏢 Admin platform running at http://localhost:{port}");
 
         let listener = tokio::net::TcpListener::bind(addr)
@@ -170,7 +198,15 @@ fn sync_nginx_routing(state: &AdminState) {
         let domain_slug = domain.replace('.', "_");
         let mut map_entries = String::new();
         for t in &tenants {
-            map_entries.push_str(&format!("    {}      {};\n", t.slug, t.port));
+            // M5 FIX: Validate slug contains only safe chars before injecting into nginx config
+            let safe_slug: String = t.slug.chars()
+                .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+                .collect();
+            if safe_slug.is_empty() || safe_slug != t.slug {
+                tracing::warn!("nginx-sync[{domain}]: skipping tenant '{}' — slug contains unsafe chars", t.slug);
+                continue;
+            }
+            map_entries.push_str(&format!("    {}      {};\n", safe_slug, t.port));
         }
 
         // Escape dots in domain for nginx regex
@@ -714,10 +750,10 @@ async fn login(
                 Json(serde_json::json!({"ok": false, "error": "Invalid credentials"}))
             }
         }
-        Ok(None) => Json(serde_json::json!({"ok": false, "error": "User not found"})),
+        Ok(None) => Json(serde_json::json!({"ok": false, "error": "Invalid credentials"})),
         Err(e) => {
             tracing::error!("login: DB error: {e}");
-            Json(serde_json::json!({"ok": false, "error": e.to_string()}))
+            Json(serde_json::json!({"ok": false, "error": "An internal error occurred. Please try again."}))
         }
     }
 }
@@ -1212,8 +1248,14 @@ async fn create_user_handler(
     .await
     {
         Ok(Ok(h)) => h,
-        Ok(Err(e)) => return Json(serde_json::json!({"ok": false, "error": format!("Hash error: {e}")})),
-        Err(e) => return Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+        Ok(Err(e)) => {
+            tracing::error!("create_user: Hash error: {e}");
+            return Json(serde_json::json!({"ok": false, "error": "Failed to process password"}));
+        }
+        Err(e) => {
+            tracing::error!("create_user: Spawn error: {e}");
+            return Json(serde_json::json!({"ok": false, "error": "Internal error"}));
+        }
     };
 
     let role = req.role.as_deref().unwrap_or("admin");
@@ -1232,7 +1274,13 @@ async fn create_user_handler(
         }
         Err(e) => {
             tracing::error!("create_user_handler: Error creating user: {e}");
-            Json(serde_json::json!({"ok": false, "error": e.to_string()}))
+            // Check for duplicate email
+            let msg = if e.to_string().contains("UNIQUE") {
+                "Email already exists"
+            } else {
+                "Failed to create user"
+            };
+            Json(serde_json::json!({"ok": false, "error": msg}))
         }
     }
 }
@@ -1336,8 +1384,8 @@ async fn admin_reset_user_password(
     if !is_super_admin(&claims) {
         return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền reset mật khẩu."}));
     }
-    if req.new_password.len() < 6 {
-        return Json(serde_json::json!({"ok": false, "error": "Password must be at least 6 characters"}));
+    if req.new_password.len() < 8 {
+        return Json(serde_json::json!({"ok": false, "error": "Password must be at least 8 characters"}));
     }
 
     let new_pwd = req.new_password.clone();
