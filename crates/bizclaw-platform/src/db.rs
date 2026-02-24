@@ -199,9 +199,38 @@ impl PlatformDb {
                 updated_at TEXT DEFAULT (datetime('now')),
                 UNIQUE(tenant_id, name)
             );
+            CREATE TABLE IF NOT EXISTS password_resets (
+                email TEXT PRIMARY KEY,
+                token TEXT NOT NULL,
+                expires_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS platform_configs (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT '',
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
         ",
             )
             .map_err(|e| BizClawError::Memory(format!("Migration error: {e}")))?;
+        Ok(())
+    }
+
+    // ── Platform Configs ────────────────────────────────────
+    
+    pub fn get_platform_config(&self, key: &str) -> Option<String> {
+        self.conn.query_row(
+            "SELECT value FROM platform_configs WHERE key=?1",
+            params![key],
+            |row| row.get::<_, String>(0)
+        ).ok()
+    }
+    
+    pub fn set_platform_config(&self, key: &str, value: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO platform_configs (key, value) VALUES (?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')",
+            params![key, value]
+        ).map_err(|e| BizClawError::Memory(format!("Set platform config: {e}")))?;
         Ok(())
     }
 
@@ -226,6 +255,25 @@ impl PlatformDb {
         ).map_err(|e| BizClawError::Memory(format!("Insert tenant: {e}")))?;
 
         self.get_tenant(&id)
+    }
+
+    /// Check if a slug is already taken (to enforce uniqueness during auto-provision).
+    pub fn is_slug_taken(&self, slug: &str) -> bool {
+        let count: i32 = self.conn.query_row(
+            "SELECT count(*) FROM tenants WHERE slug=?1",
+            params![slug],
+            |row| row.get(0)
+        ).unwrap_or(0);
+        count > 0
+    }
+
+    /// Get the next available port by looking at the maximum allocated port.
+    pub fn get_max_port(&self) -> Result<Option<u16>> {
+        self.conn.query_row(
+            "SELECT max(port) FROM tenants",
+            [],
+            |row| row.get::<_, Option<u16>>(0)
+        ).map_err(|e| BizClawError::Memory(format!("Get max port: {e}")))
     }
 
     /// Get a tenant by ID.
@@ -404,6 +452,40 @@ impl PlatformDb {
         self.conn
             .execute("DELETE FROM users WHERE id=?1", params![id])
             .map_err(|e| BizClawError::Memory(format!("Delete user: {e}")))?;
+        Ok(())
+    }
+
+    /// Update user password.
+    pub fn update_user_password(&self, id: &str, password_hash: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE users SET password_hash=?1 WHERE id=?2",
+            params![password_hash, id],
+        ).map_err(|e| BizClawError::Memory(format!("Update password: {e}")))?;
+        Ok(())
+    }
+
+    // ── Password Resets ────────────────────────────────────
+
+    pub fn save_password_reset_token(&self, email: &str, token: &str, expires_at: i64) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO password_resets (email, token, expires_at) VALUES (?1,?2,?3) ON CONFLICT(email) DO UPDATE SET token=excluded.token, expires_at=excluded.expires_at",
+            params![email, token, expires_at],
+        ).map_err(|e| BizClawError::Memory(format!("Save reset token: {e}")))?;
+        Ok(())
+    }
+
+    pub fn get_password_reset_email(&self, token: &str) -> Result<String> {
+        let email: String = self.conn.query_row(
+            "SELECT email FROM password_resets WHERE token=?1 AND expires_at > strftime('%s','now')",
+            params![token],
+            |row| row.get(0)
+        ).map_err(|_| BizClawError::Memory("Invalid or expired token".into()))?;
+        Ok(email)
+    }
+
+    pub fn delete_password_reset_token(&self, email: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM password_resets WHERE email=?1", params![email])
+            .map_err(|e| BizClawError::Memory(format!("Delete reset token: {e}")))?;
         Ok(())
     }
 

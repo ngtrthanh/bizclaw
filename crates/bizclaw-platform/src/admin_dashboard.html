@@ -176,6 +176,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
   <a href="#/users" data-page="users"><span class="nav-icon">👥</span> <span>Users</span></a>
   <a href="#/audit" data-page="audit"><span class="nav-icon">📋</span> <span>Audit Log</span></a>
   <a href="#/ollama" data-page="ollama"><span class="nav-icon">🧠</span> <span>Ollama</span></a>
+  <a href="#/profile" data-page="profile"><span class="nav-icon">👤</span> <span>Profile</span></a>
   <div class="bottom">
     <a href="#" onclick="logout()">⏏ Logout</a>
     <div class="shortcut-hint">⌘K Search · Esc Close</div>
@@ -208,13 +209,52 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       </div>
     </div>
     <!-- Login Form -->
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
+    <div id="login-form-box" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
       <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">🏢 BizClaw Admin</h2>
       <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Đăng nhập để quản lý hệ thống</p>
       <div id="login-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
       <input id="login-email" type="email" placeholder="Email" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
       <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doLogin()">🔑 Đăng nhập</button>
+      <div style="margin-top:16px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between">
+        <a href="#" onclick="showAuthBox('forgot-form-box')" style="color:var(--text2)">Quên mật khẩu?</a>
+        <a href="#" onclick="showAuthBox('register-form-box')" style="color:var(--accent)">Đăng ký SaaS ngay</a>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div id="register-form-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
+      <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">🏢 Đăng ký SaaS</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Tạo ngay một môi trường quản lý AI tự động</p>
+      <div id="register-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
+      <input id="register-company" type="text" placeholder="Tên công ty (Ví dụ: Vinamilk)" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
+      <input id="register-email" type="email" placeholder="Email quản trị" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
+      <input id="register-password" type="password" placeholder="Mật khẩu (ít nhất 6 ký tự)" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doRegister()">
+      <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doRegister()">🚀 Khởi tạo hệ thống</button>
+      <div style="margin-top:16px;font-size:13px;color:var(--muted)">
+        Đã có tài khoản? <a href="#" onclick="showAuthBox('login-form-box')" style="color:var(--accent)">Đăng nhập</a>
+      </div>
+    </div>
+
+    <!-- Forgot Password Form -->
+    <div id="forgot-form-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
+      <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">Lấy lại mật khẩu</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Nhập email để nhận link reset</p>
+      <div id="forgot-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
+      <input id="forgot-email" type="email" placeholder="Email" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doForgotPassword()">
+      <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doForgotPassword()">Gửi link</button>
+      <div style="margin-top:16px;font-size:13px;color:var(--muted)">
+        <a href="#" onclick="showAuthBox('login-form-box')" style="color:var(--accent)">Quay lại đăng nhập</a>
+      </div>
+    </div>
+
+    <!-- Reset Password Form -->
+    <div id="reset-form-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
+      <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">Đặt lại mật khẩu</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Nhập mật khẩu mới cho tài khoản</p>
+      <div id="reset-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
+      <input id="reset-password-input" type="password" placeholder="Mật khẩu mới" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doResetPassword()">
+      <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doResetPassword()">Cập nhật</button>
     </div>
   </div>
 </div>
@@ -235,6 +275,24 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       <div class="card"><h3>📋 Recent Activity <a href="#" onclick="showPage('audit')">View all →</a></h3><div id="activity-list"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div></div>
     </div>
   </div>
+  
+  <!-- Profile Page -->
+  <div id="page-profile" class="hidden">
+    <h1>👤 My Profile</h1>
+    <div class="card" style="max-width:500px;margin-top:16px">
+      <h3>Change Password</h3>
+      <div id="profile-msg" style="display:none;margin-bottom:12px;padding:12px;border-radius:6px;font-size:13px"></div>
+      <div style="margin-top:12px">
+        <label style="display:block;margin-bottom:6px;color:var(--text2);font-size:13px">Current Password</label>
+        <input type="password" id="profile-current-pwd" style="width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:16px">
+        
+        <label style="display:block;margin-bottom:6px;color:var(--text2);font-size:13px">New Password</label>
+        <input type="password" id="profile-new-pwd" style="width:100%;padding:10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);margin-bottom:16px">
+      </div>
+      <button class="btn btn-primary" onclick="doChangePassword()">Cập nhật thay đổi</button>
+    </div>
+  </div>
+
   <!-- Tenants -->
   <div id="page-tenants" class="hidden">
     <h1>🏢 Tenants <button class="btn btn-outline btn-sm" onclick="showPage('ollama')" style="margin-left:8px">🧠 Models</button> <button class="btn btn-primary" onclick="showCreateModal()" style="margin-left:auto">+ New Tenant</button></h1>
@@ -431,11 +489,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
     <label>Provider</label>
     <select id="f-provider"><option>openai</option><option>anthropic</option><option>ollama</option><option>gemini</option><option>deepseek</option><option>groq</option><option>brain</option></select>
     <label>Model</label><input id="f-model" value="gpt-4o-mini">
-    <label>Plan</label>
-    <select id="f-plan"><option>free</option><option>pro</option><option>business</option></select>
     <div class="actions">
       <button class="btn btn-outline" onclick="hideModal('modal-create')">Cancel</button>
-      <button class="btn btn-primary" onclick="createTenant()">Create</button>
+      <button id="btn-create-tenant" class="btn btn-primary" onclick="createTenant()">Create</button>
     </div>
   </div>
 </div>
@@ -551,6 +607,14 @@ function showLogin(){
   }
 }
 function hideLogin(){document.getElementById('login-screen').style.display='none';}
+function showAuthBox(boxId) {
+  ['login-form-box', 'register-form-box', 'forgot-form-box', 'reset-form-box'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById(boxId).style.display = 'block';
+  document.getElementById('credentials-banner').style.display = boxId === 'login-form-box' && localStorage.getItem('bizclaw_setup_done') !== '1' ? 'block' : 'none';
+}
+
 async function doLogin(){
   const email=document.getElementById('login-email').value;
   const password=document.getElementById('login-password').value;
@@ -563,7 +627,102 @@ async function doLogin(){
     else{errEl.textContent=r.error||'Login failed';errEl.style.display='block';}
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
+
+async function doRegister(){
+  const errEl=document.getElementById('register-error');
+  errEl.style.display='none';
+  const company_name=document.getElementById('register-company').value;
+  const email=document.getElementById('register-email').value;
+  const password=document.getElementById('register-password').value;
+  
+  if(!company_name || !email || !password){ errEl.textContent='Vui lòng nhập đủ thông tin';errEl.style.display='block';return; }
+  
+  errEl.style.color='var(--accent)';errEl.textContent='Đang khởi tạo hệ thống (vui lòng chờ)...';errEl.style.display='block';
+  try {
+    const res=await fetch(API+'/register', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({company_name, email, password})
+    });
+    const r=await res.json();
+    if(r.ok) {
+         errEl.style.color='var(--green)';
+         errEl.textContent=`SaaS khởi tạo thành công! Domain: ${r.slug}.bizclaw.vn`;
+         setTimeout(() => { showAuthBox('login-form-box'); document.getElementById('login-email').value = email; }, 3000);
+    } else {
+         errEl.style.color='var(--red)';
+         errEl.textContent=r.error;
+    }
+  } catch(e){ errEl.style.color='var(--red)'; errEl.textContent=e.message; }
+}
+
+async function doForgotPassword(){
+  const errEl=document.getElementById('forgot-error');
+  const email=document.getElementById('forgot-email').value;
+  if(!email){ errEl.textContent='Nhập email'; errEl.style.display='block'; return; }
+  
+  try {
+    const res=await fetch(API+'/password-reset', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})
+    });
+    const r=await res.json();
+    if(r.ok){ errEl.style.color='var(--green)'; errEl.textContent='Liên kết khôi phục đã được gửi vào email (nếu có tồn tại).'; errEl.style.display='block'; }
+    else{ errEl.style.color='var(--red)'; errEl.textContent=r.error; errEl.style.display='block'; }
+  } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+}
+
+async function doResetPassword() {
+  const errEl=document.getElementById('reset-error');
+  const new_password=document.getElementById('reset-password-input').value;
+  const urlParams = new URL(window.location.href).searchParams;
+  let token = urlParams.get('token');
+  if(!token) {
+      // It might be in the hash: #/reset-password?token=XYZ
+      const hash = window.location.hash;
+      if(hash.includes('?token=')) token = hash.split('?token=')[1];
+  }
+  
+  if(!token || !new_password){ errEl.textContent='Thiếu token hoặc mật khẩu'; errEl.style.display='block'; return;}
+  
+  try {
+    const res=await fetch(API+'/password-reset/confirm', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token, new_password})
+    });
+    const r=await res.json();
+    if(r.ok){ 
+      errEl.style.color='var(--green)'; errEl.textContent='Đổi mật khẩu thành công! Chuyển hướng...'; errEl.style.display='block';
+      setTimeout(()=>{ window.location.hash=''; showAuthBox('login-form-box'); }, 2000);
+    }
+    else { errEl.style.color='var(--red)'; errEl.textContent=r.error; errEl.style.display='block'; }
+  } catch(e) { errEl.textContent=e.message; errEl.style.display='block'; }
+}
+
+async function doChangePassword() {
+  const current_password=document.getElementById('profile-current-pwd').value;
+  const new_password=document.getElementById('profile-new-pwd').value;
+  const msg=document.getElementById('profile-msg');
+  if(!current_password || !new_password) { msg.textContent='Vui lòng nhập đủ thông tin'; msg.style.background='rgba(255,0,0,0.1)'; msg.style.color='var(--red)'; msg.style.display='block'; return; }
+  
+  msg.textContent='Đang xử lý...'; msg.style.color='var(--text2)'; msg.style.background='var(--bg2)'; msg.style.display='block';
+  
+  try {
+    const res=await req('/users/me/password', 'PUT', {current_password, new_password});
+    if(res.ok) {
+       msg.textContent='Đổi mật khẩu thành công!'; msg.style.color='var(--green)'; msg.style.background='rgba(0,255,0,0.1)';
+       document.getElementById('profile-current-pwd').value='';
+       document.getElementById('profile-new-pwd').value='';
+    } else {
+       msg.textContent=res.error; msg.style.color='var(--red)'; msg.style.background='rgba(255,0,0,0.1)';
+    }
+  } catch(e) { msg.textContent=e.message; msg.style.color='var(--red)'; msg.style.background='rgba(255,0,0,0.1)'; }
+}
 function checkAuth(){
+  const hash = window.location.hash;
+  if(hash.includes('reset-password?token=')) {
+    showLogin();
+    showAuthBox('reset-form-box');
+    return;
+  }
   if(!authToken){showLogin();}else{hideLogin();initRouter();}
 }
 
@@ -579,6 +738,7 @@ const ROUTE_MAP = {
   '/users': 'users',
   '/audit': 'audit',
   '/ollama': 'ollama',
+  '/profile': 'profile',
 };
 
 function showPage(p, updateHash = true){
@@ -927,14 +1087,33 @@ function showCreateModal(){document.getElementById('modal-create').classList.rem
 function hideModal(id){document.getElementById(id).classList.add('hidden')}
 
 async function createTenant(){
-  await authFetch(API+'/tenants',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-    name:document.getElementById('f-name').value,
-    slug:document.getElementById('f-slug').value,
-    provider:document.getElementById('f-provider').value,
-    model:document.getElementById('f-model').value,
-    plan:document.getElementById('f-plan').value
-  })});
-  hideModal('modal-create');toast('✅ Tenant created!');loadPage();
+  const btn = document.getElementById('btn-create-tenant');
+  btn.disabled = true;
+  btn.textContent = "Creating...";
+  try {
+    const res = await authFetch(API+'/tenants',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        name:document.getElementById('f-name').value,
+        slug:document.getElementById('f-slug').value,
+        provider:document.getElementById('f-provider').value,
+        model:document.getElementById('f-model').value,
+        plan:"free"
+      })
+    });
+    const r = await res.json();
+    if(r.ok) {
+      hideModal('modal-create');toast('✅ Tenant created!');loadPage();
+    } else {
+      toast('❌ ' + (r.error || 'Failed to create tenant'), 'error');
+    }
+  } catch(e) {
+    toast('❌ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create";
+  }
 }
 
 async function tenantAction(id,action){
@@ -981,7 +1160,6 @@ function openTenantDetail(id, name, slug, provider, model, status, plan, pairing
     `<div class="stat"><label>Status</label><div class="val ${status==='running'?'green':'red'}">${status}</div></div>`+
     `<div class="stat"><label>Provider</label><div class="val">${provider}</div></div>`+
     `<div class="stat"><label>Model</label><div class="val">${model}</div></div>`+
-    `<div class="stat"><label>Plan</label><div class="val">${plan}</div></div>`+
     `<div class="stat"><label>Port</label><div class="val">${port||'—'}</div></div>`;
 
   // Info card

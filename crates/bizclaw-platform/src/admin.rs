@@ -34,7 +34,9 @@ async fn require_auth(
         .unwrap_or("");
 
     if let Some(token) = auth_header.strip_prefix("Bearer ") {
-        if crate::auth::validate_token(token, &state.jwt_secret).is_ok() {
+        if let Ok(claims) = crate::auth::validate_token(token, &state.jwt_secret) {
+            let mut req = req;
+            req.extensions_mut().insert(claims);
             return next.run(req).await;
         }
     }
@@ -99,12 +101,17 @@ impl AdminServer {
             .route("/api/admin/users", post(create_user_handler))
             .route("/api/admin/users/{id}", delete(delete_user_handler))
             .route("/api/admin/users/{id}/tenant", put(assign_tenant_handler))
+            // Profile
+            .route("/api/admin/users/me/password", put(crate::self_serve::change_password_handler))
             .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
         // Public routes — no auth required
         let public = Router::new()
             .route("/api/admin/login", post(login))
             .route("/api/admin/pairing/validate", post(validate_pairing))
+            .route("/api/admin/register", post(crate::self_serve::register_handler))
+            .route("/api/admin/password-reset", post(crate::self_serve::forgot_password_handler))
+            .route("/api/admin/password-reset/confirm", post(crate::self_serve::reset_password_handler))
             .route("/", get(admin_dashboard_page));
 
         // SPA fallback — serve dashboard HTML for all non-API paths

@@ -496,6 +496,7 @@ dependencies = [
  "bizclaw-core",
  "chrono",
  "jsonwebtoken",
+ "lettre",
  "reqwest",
  "rusqlite",
  "serde",

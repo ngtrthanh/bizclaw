@@ -9,6 +9,7 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod tenant;
+pub mod self_serve;
 
 pub use admin::AdminServer;
 pub use db::PlatformDb;
