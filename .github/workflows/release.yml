@@ -167,11 +167,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download all artifacts
+      - name: Download Linux amd64
         uses: actions/download-artifact@v4
         with:
+          name: bizclaw-linux-amd64
           path: artifacts
-          merge-multiple: true
+
+      - name: Download Linux arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-linux-arm64
+          path: artifacts
+
+      - name: Download Linux armv7
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-linux-armv7
+          path: artifacts
+
+      - name: Download Linux armv6
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-linux-armv6
+          path: artifacts
+
+      - name: Download macOS arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-darwin-arm64
+          path: artifacts
+
+      - name: Download Windows amd64
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-windows-amd64
+          path: artifacts
 
       - name: Display structure of downloaded files
         run: ls -R artifacts
@@ -180,9 +210,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            artifacts/**/*.tar.gz
-            artifacts/**/*.zip
+          files: artifacts/*
 
   # ── Docker multi-arch image ──────────────────────────────────────────────────
   docker:
@@ -192,10 +220,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Linux artifacts
+      - name: Download Linux amd64
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: bizclaw-linux-amd64
+          path: artifacts/amd64
+
+      - name: Download Linux arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-linux-arm64
+          path: artifacts/arm64
+
+      - name: Download Linux armv7
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-linux-armv7
+          path: artifacts/armv7
+
+      - name: Download Linux armv6
+        uses: actions/download-artifact@v4
+        with:
+          name: bizclaw-linux-armv6
+          path: artifacts/armv6
 
       - name: Display downloaded artifacts
         run: ls -R artifacts
@@ -212,33 +259,17 @@ jobs:
             docker-bin/linux/arm/v7 \
             docker-bin/linux/arm/v6
 
-          # Extract artifacts - they're in subdirectories by artifact name
-          tar xzf artifacts/bizclaw-linux-amd64/bizclaw-linux-amd64.tar.gz \
-            -C docker-bin/linux/amd64 || \
-          tar xzf artifacts/bizclaw-linux-amd64.tar.gz \
-            -C docker-bin/linux/amd64
+          # Extract artifacts
+          tar xzf artifacts/amd64/bizclaw-linux-amd64.tar.gz -C docker-bin/linux/amd64
+          tar xzf artifacts/arm64/bizclaw-linux-arm64.tar.gz -C docker-bin/linux/arm64
+          tar xzf artifacts/armv7/bizclaw-linux-armv7.tar.gz -C docker-bin/linux/arm/v7
+          tar xzf artifacts/armv6/bizclaw-linux-armv6.tar.gz -C docker-bin/linux/arm/v6
 
-          tar xzf artifacts/bizclaw-linux-arm64/bizclaw-linux-arm64.tar.gz \
-            -C docker-bin/linux/arm64 || \
-          tar xzf artifacts/bizclaw-linux-arm64.tar.gz \
-            -C docker-bin/linux/arm64
-
-          tar xzf artifacts/bizclaw-linux-armv7/bizclaw-linux-armv7.tar.gz \
-            -C docker-bin/linux/arm/v7 || \
-          tar xzf artifacts/bizclaw-linux-armv7.tar.gz \
-            -C docker-bin/linux/arm/v7
-
-          tar xzf artifacts/bizclaw-linux-armv6/bizclaw-linux-armv6.tar.gz \
-            -C docker-bin/linux/arm/v6 || \
-          tar xzf artifacts/bizclaw-linux-armv6.tar.gz \
-            -C docker-bin/linux/arm/v6
-
-          # Rename all platform-specific binaries to just "bizclaw".
-          # find is used instead of a glob so nested dirs (arm/v7, arm/v6) are reached.
+          # Rename all platform-specific binaries to just "bizclaw"
           find docker-bin -mindepth 2 -name 'bizclaw-*' -exec sh -c \
             'mv "$1" "$(dirname "$1")/bizclaw"' _ {} \;
 
-          # Verify all four binaries are in place before handing off to Buildx
+          # Verify all four binaries are in place
           for platform in amd64 arm64 arm/v7 arm/v6; do
             if [ ! -f "docker-bin/linux/${platform}/bizclaw" ]; then
               echo "ERROR: missing binary for linux/${platform}" >&2
