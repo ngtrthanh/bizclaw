@@ -105,6 +105,7 @@ impl AdminServer {
             .route("/api/admin/users/{id}/tenant", put(assign_tenant_handler))
             .route("/api/admin/users/{id}/password/reset", put(admin_reset_user_password))
             .route("/api/admin/users/{id}/status", put(update_user_status_handler))
+            .route("/api/admin/users/{id}/role", put(update_user_role_handler))
             // Profile
             .route("/api/admin/users/me/password", put(crate::self_serve::change_password_handler))
             .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
@@ -233,11 +234,44 @@ server {{
     });
 }
 
-// ── Helper ──────────────────────────────────────────
+// ── RBAC Helpers ──────────────────────────────────────────
 
 /// Check if claims represent the super-admin (platform owner).
 fn is_super_admin(claims: &crate::auth::Claims) -> bool {
     claims.email == "admin@bizclaw.vn" || claims.role == "superadmin"
+}
+
+/// Check if a user can ACCESS (view) a specific tenant.
+/// - superadmin: any tenant
+/// - admin: only tenants where owner_id == claims.sub
+/// - viewer: only the tenant assigned via JWT tenant_id
+fn can_access_tenant(claims: &crate::auth::Claims, tenant_id: &str, db: &crate::db::PlatformDb) -> bool {
+    if is_super_admin(claims) {
+        return true;
+    }
+    // Admin can access tenants they own
+    if claims.role == "admin" {
+        if let Ok(tenant) = db.get_tenant(tenant_id) {
+            return tenant.owner_id.as_deref() == Some(&claims.sub);
+        }
+        return false;
+    }
+    // Viewer can access their assigned tenant
+    if claims.role == "viewer" {
+        return claims.tenant_id.as_deref() == Some(tenant_id);
+    }
+    false
+}
+
+/// Check if a user can WRITE (create/edit/delete/start/stop) a tenant.
+/// - superadmin: any tenant
+/// - admin: only tenants where owner_id == claims.sub
+/// - viewer: CANNOT write
+fn can_write_tenant(claims: &crate::auth::Claims, tenant_id: &str, db: &crate::db::PlatformDb) -> bool {
+    if claims.role == "viewer" {
+        return false;
+    }
+    can_access_tenant(claims, tenant_id, db)
 }
 
 // ── API Handlers ────────────────────────────────────
@@ -305,13 +339,26 @@ async fn list_tenants(
     Extension(claims): Extension<crate::auth::Claims>,
 ) -> Json<serde_json::Value> {
     if is_super_admin(&claims) {
+        // Superadmin sees ALL tenants
         let tenants = state.db.lock().unwrap().list_tenants().unwrap_or_default();
         Json(serde_json::json!({ "tenants": tenants }))
-    } else {
+    } else if claims.role == "admin" {
+        // Admin sees only their own tenants (owner_id match)
         let tenants = state.db.lock().unwrap()
             .list_tenants_by_owner(&claims.sub)
             .unwrap_or_default();
         Json(serde_json::json!({ "tenants": tenants }))
+    } else {
+        // Viewer sees only the single tenant assigned to them
+        let db = state.db.lock().unwrap();
+        if let Some(tid) = &claims.tenant_id {
+            match db.get_tenant(tid) {
+                Ok(tenant) => Json(serde_json::json!({ "tenants": [tenant] })),
+                Err(_) => Json(serde_json::json!({ "tenants": [] })),
+            }
+        } else {
+            Json(serde_json::json!({ "tenants": [] }))
+        }
     }
 }
 
@@ -329,6 +376,19 @@ async fn create_tenant(
     Extension(claims): Extension<crate::auth::Claims>,
     Json(req): Json<CreateTenantReq>,
 ) -> Json<serde_json::Value> {
+    // Role check: viewer cannot create tenants
+    if claims.role == "viewer" {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền tạo tenant. Liên hệ admin để nâng cấp role."}));
+    }
+
+    // Sanitize slug: only ASCII alphanumeric + hyphens allowed
+    let clean_slug = crate::self_serve::generate_safe_slug(&req.slug);
+    let slug = if clean_slug.is_empty() { 
+        crate::self_serve::generate_safe_slug(&req.name) 
+    } else { 
+        clean_slug 
+    };
+
     let port = {
         let db = state.db.lock().unwrap();
         let used_ports = db.used_ports().unwrap_or_default();
@@ -344,7 +404,7 @@ async fn create_tenant(
 
     match state.db.lock().unwrap().create_tenant(
         &req.name,
-        &req.slug,
+        &slug,
         port,
         req.provider.as_deref().unwrap_or("openai"),
         req.model.as_deref().unwrap_or("gpt-4o-mini"),
@@ -360,9 +420,30 @@ async fn create_tenant(
                     "tenant_created",
                     "admin",
                     &tenant.id,
-                    Some(&format!("slug={}", req.slug)),
+                    Some(&format!("slug={}", slug)),
                 )
                 .ok();
+
+            // Auto-start the tenant so subdomain works immediately
+            {
+                let mut mgr = state.manager.lock().unwrap();
+                let db = state.db.lock().unwrap();
+                match mgr.start_tenant(&tenant, &state.bizclaw_bin, &db) {
+                    Ok(pid) => {
+                        drop(db);
+                        state.db.lock().unwrap()
+                            .update_tenant_status(&tenant.id, "running", Some(pid)).ok();
+                        tracing::info!("auto-start: tenant '{}' started on port {} (pid={})", slug, port, pid);
+                    }
+                    Err(e) => {
+                        drop(db);
+                        state.db.lock().unwrap()
+                            .update_tenant_status(&tenant.id, "error", None).ok();
+                        tracing::warn!("auto-start: failed to start tenant '{}': {e}", slug);
+                    }
+                }
+            }
+
             sync_nginx_routing(&state);
             Json(serde_json::json!({"ok": true, "tenant": tenant}))
         }
@@ -372,9 +453,14 @@ async fn create_tenant(
 
 async fn get_tenant(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
-    match state.db.lock().unwrap().get_tenant(&id) {
+    let db = state.db.lock().unwrap();
+    if !can_access_tenant(&claims, &id, &db) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+    }
+    match db.get_tenant(&id) {
         Ok(t) => Json(serde_json::json!({"ok": true, "tenant": t})),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
     }
@@ -382,8 +468,13 @@ async fn get_tenant(
 
 async fn delete_tenant(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    // RBAC: only superadmin or owner-admin can delete
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền xóa tenant này."}));
+    }
     state.manager.lock().unwrap().stop_tenant(&id).ok();
     match state.db.lock().unwrap().delete_tenant(&id) {
         Ok(()) => {
@@ -402,8 +493,12 @@ async fn delete_tenant(
 
 async fn start_tenant(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền khởi động tenant này."}));
+    }
     let tenant = match state.db.lock().unwrap().get_tenant(&id) {
         Ok(t) => t,
         Err(e) => return Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -444,8 +539,12 @@ async fn start_tenant(
 
 async fn stop_tenant(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền dừng tenant này."}));
+    }
     state.manager.lock().unwrap().stop_tenant(&id).ok();
     state
         .db
@@ -465,8 +564,12 @@ async fn stop_tenant(
 
 async fn restart_tenant(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền khởi động lại tenant này."}));
+    }
     let tenant = match state.db.lock().unwrap().get_tenant(&id) {
         Ok(t) => t,
         Err(e) => return Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -482,8 +585,12 @@ async fn restart_tenant(
 
 async fn reset_pairing(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_write_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền reset pairing code."}));
+    }
     match state.db.lock().unwrap().reset_pairing_code(&id) {
         Ok(code) => {
             state
@@ -663,8 +770,12 @@ async fn admin_dashboard_page() -> axum::response::Html<&'static str> {
 
 async fn list_channels(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+    }
     match state.db.lock().unwrap().list_channels(&id) {
         Ok(channels) => Json(serde_json::json!({"ok": true, "channels": channels})),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -680,9 +791,13 @@ struct UpsertChannelReq {
 
 async fn upsert_channel(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
     Json(req): Json<UpsertChannelReq>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
+    }
     let config_json = serde_json::to_string(&req.config).unwrap_or_default();
     match state
         .db
@@ -713,8 +828,12 @@ async fn upsert_channel(
 
 async fn delete_channel(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path((tenant_id, channel_id)): Path<(String, String)>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &tenant_id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền xóa channel."}));
+    }
     match state.db.lock().unwrap().delete_channel(&channel_id) {
         Ok(()) => {
             state
@@ -907,11 +1026,14 @@ async fn ollama_delete_model(
 /// List all config entries for a tenant.
 async fn list_tenant_configs(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+    }
     match state.db.lock().unwrap().list_configs(&id) {
         Ok(configs) => {
-            // Convert Vec<TenantConfig> to a flat JSON object
             let mut obj = serde_json::Map::new();
             for cfg in &configs {
                 obj.insert(cfg.key.clone(), serde_json::Value::String(cfg.value.clone()));
@@ -926,9 +1048,13 @@ async fn list_tenant_configs(
 /// Body: {"configs": {"default_provider": "ollama", "default_model": "llama3.2", ...}}
 async fn set_tenant_configs(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
     Json(body): Json<serde_json::Value>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
+    }
     let configs = match body.get("configs").and_then(|c| c.as_object()) {
         Some(c) => c,
         None => return Json(serde_json::json!({"ok": false, "error": "Missing 'configs' object"})),
@@ -971,8 +1097,12 @@ async fn set_tenant_configs(
 /// List all agents for a tenant.
 async fn list_tenant_agents(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền truy cập tenant này."}));
+    }
     match state.db.lock().unwrap().list_agents(&id) {
         Ok(agents) => Json(serde_json::json!({"ok": true, "agents": agents})),
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
@@ -992,9 +1122,13 @@ struct UpsertAgentReq {
 /// Create or update an agent for a tenant.
 async fn upsert_tenant_agent(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path(id): Path<String>,
     Json(req): Json<UpsertAgentReq>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền cấu hình tenant này."}));
+    }
     let db = state.db.lock().unwrap();
 
     // Get tenant defaults for fallback values
@@ -1028,8 +1162,12 @@ async fn upsert_tenant_agent(
 /// Delete an agent by tenant_id + name.
 async fn delete_tenant_agent(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Path((id, name)): Path<(String, String)>,
 ) -> Json<serde_json::Value> {
+    if !can_access_tenant(&claims, &id, &state.db.lock().unwrap()) {
+        return Json(serde_json::json!({"ok": false, "error": "Không có quyền xóa agent."}));
+    }
     match state.db.lock().unwrap().delete_agent_by_name(&id, &name) {
         Ok(()) => {
             state.db.lock().unwrap().log_event(
@@ -1058,8 +1196,12 @@ struct CreateUserReq {
 
 async fn create_user_handler(
     State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
     Json(req): Json<CreateUserReq>,
 ) -> Json<serde_json::Value> {
+    if !is_super_admin(&claims) {
+        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền tạo user."}));
+    }
     tracing::info!("create_user_handler: Starting user creation for {}", req.email);
     if req.email.is_empty() || req.password.is_empty() {
         return Json(serde_json::json!({"ok": false, "error": "Email and password are required"}));
@@ -1263,12 +1405,24 @@ async fn update_user_status_handler(
                     .unwrap_or_default();
                 for tenant in &tenants {
                     if tenant.status == "stopped" {
-                        // Lock manager first, then db — same order as start_tenant handler
                         let mut mgr = state.manager.lock().unwrap();
                         let db_ref = state.db.lock().unwrap();
-                        let _ = mgr.start_tenant(tenant, &state.bizclaw_bin, &db_ref);
-                        drop(db_ref);
-                        drop(mgr);
+                        match mgr.start_tenant(tenant, &state.bizclaw_bin, &db_ref) {
+                            Ok(pid) => {
+                                drop(db_ref);
+                                drop(mgr);
+                                state.db.lock().unwrap()
+                                    .update_tenant_status(&tenant.id, "running", Some(pid)).ok();
+                                tracing::info!("user-activate: started tenant '{}' (pid={})", tenant.slug, pid);
+                            }
+                            Err(e) => {
+                                drop(db_ref);
+                                drop(mgr);
+                                state.db.lock().unwrap()
+                                    .update_tenant_status(&tenant.id, "error", None).ok();
+                                tracing::warn!("user-activate: failed to start tenant '{}': {e}", tenant.slug);
+                            }
+                        }
                     }
                 }
                 if !tenants.is_empty() {
@@ -1276,6 +1430,54 @@ async fn update_user_status_handler(
                 }
             }
             
+            Json(serde_json::json!({"ok": true}))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+// ═════════════════════════════════════════════════════════════
+// USER ROLE MANAGEMENT (Super Admin only)
+// ═════════════════════════════════════════════════════════════
+
+#[derive(serde::Deserialize)]
+struct UpdateUserRoleReq {
+    role: String, // superadmin, admin, viewer
+}
+
+/// Super Admin changes a user's role.
+async fn update_user_role_handler(
+    State(state): State<Arc<AdminState>>,
+    Extension(claims): Extension<crate::auth::Claims>,
+    Path(id): Path<String>,
+    Json(req): Json<UpdateUserRoleReq>,
+) -> Json<serde_json::Value> {
+    if !is_super_admin(&claims) {
+        return Json(serde_json::json!({"ok": false, "error": "Chỉ Super Admin mới có quyền đổi role."}));
+    }
+
+    let valid_roles = ["superadmin", "admin", "viewer"];
+    if !valid_roles.contains(&req.role.as_str()) {
+        return Json(serde_json::json!({"ok": false, "error": "Role không hợp lệ. Phải là: superadmin, admin, viewer"}));
+    }
+
+    // Protect the platform owner account
+    {
+        let db = state.db.lock().unwrap();
+        let users = db.list_users().unwrap_or_default();
+        if let Some(target) = users.iter().find(|u| u.id == id) {
+            if target.email == "admin@bizclaw.vn" {
+                return Json(serde_json::json!({"ok": false, "error": "Không thể thay đổi role của Super Admin gốc."}));
+            }
+        }
+    }
+
+    let db_res = state.db.lock().unwrap().update_user_role(&id, &req.role);
+    match db_res {
+        Ok(()) => {
+            state.db.lock().unwrap()
+                .log_event("user_role_changed", "admin", &id, Some(&format!("role={}", req.role)))
+                .ok();
             Json(serde_json::json!({"ok": true}))
         }
         Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),

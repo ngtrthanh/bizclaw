@@ -28,17 +28,26 @@ pub struct ResetPasswordReq {
 }
 
 pub fn generate_safe_slug(company_name: &str) -> String {
-    let mut slug = company_name
+    // Only keep ASCII alphanumeric + spaces, skip Unicode diacritics
+    let mut slug: String = company_name
         .to_lowercase()
         .chars()
-        .filter(|c| c.is_alphanumeric() || *c == ' ')
+        .filter(|c| c.is_ascii_alphanumeric() || *c == ' ' || *c == '-')
         .collect::<String>()
-        .replace(" ", "-");
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join("-");
+    
+    // Collapse multiple hyphens and trim
+    while slug.contains("--") {
+        slug = slug.replace("--", "-");
+    }
+    slug = slug.trim_matches('-').to_string();
         
     let blacklist = ["dev", "admin", "app", "apps", "www", "test", "staging", "api", "smtp", "mail", "ftp", "ns", "cdn", "local", "root", "sys", "system"];
     
     if blacklist.contains(&slug.as_str()) || slug.is_empty() {
-        slug = format!("{}-{}", slug, uuid::Uuid::new_v4().to_string().chars().take(4).collect::<String>());
+        slug = format!("tenant-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
     }
     
     slug

@@ -540,6 +540,15 @@ impl PlatformDb {
         Ok(())
     }
 
+    /// Update user role (superadmin/admin/viewer).
+    pub fn update_user_role(&self, id: &str, role: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE users SET role=?1 WHERE id=?2",
+            params![role, id],
+        ).map_err(|e| BizClawError::Memory(format!("Update user role: {e}")))?;
+        Ok(())
+    }
+
     /// Update user password.
     pub fn update_user_password(&self, id: &str, password_hash: &str) -> Result<()> {
         self.conn.execute(

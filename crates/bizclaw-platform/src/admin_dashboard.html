@@ -198,13 +198,13 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doLogin()">🔑 Đăng nhập</button>
       <div style="margin-top:16px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between">
         <a href="#" onclick="showAuthBox('forgot-form-box')" style="color:var(--text2)">Quên mật khẩu?</a>
-        <a href="#" onclick="showAuthBox('register-form-box')" style="color:var(--accent)">Đăng ký SaaS ngay</a>
+        <a href="#" onclick="showAuthBox('register-form-box')" style="color:var(--accent)">Đăng ký Cloud ngay</a>
       </div>
     </div>
 
     <!-- Register Form -->
     <div id="register-form-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
-      <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">🏢 Đăng ký SaaS</h2>
+      <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">🏢 Đăng ký Cloud</h2>
       <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Tạo ngay một môi trường quản lý AI tự động</p>
       <div id="register-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
       <input id="register-company" type="text" placeholder="Tên công ty (Ví dụ: Vinamilk)" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
@@ -514,8 +514,9 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
     <label>Password</label><input id="fu-password" type="password" placeholder="Minimum 8 characters">
     <label>Role</label>
     <select id="fu-role">
-      <option value="admin">Admin</option>
-      <option value="viewer">Viewer</option>
+      <option value="admin">🟡 Admin</option>
+      <option value="viewer">🟢 Viewer</option>
+      <option value="superadmin">🔴 Super Admin</option>
     </select>
     <label>Assign to Tenant (Optional)</label>
     <select id="fu-tenant">
@@ -555,6 +556,25 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
     <div class="actions">
       <button class="btn btn-outline" onclick="hideModal('modal-reset-password')">Cancel</button>
       <button class="btn btn-primary" onclick="adminResetUserPassword()">Reset Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Role Modal -->
+<div id="modal-change-role" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>🔄 Đổi Role</h2>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:10px">User: <strong id="cr-email" style="color:var(--accent)"></strong></p>
+    <input type="hidden" id="cr-id">
+    <label>Role mới</label>
+    <select id="cr-role">
+      <option value="superadmin">🔴 Super Admin — Full quyền toàn bộ hệ thống</option>
+      <option value="admin" selected>🟡 Admin — Quản lý tenant của mình</option>
+      <option value="viewer">🟢 Viewer — Xem và cấu hình tenant được gán</option>
+    </select>
+    <div class="actions">
+      <button class="btn btn-outline" onclick="hideModal('modal-change-role')">Cancel</button>
+      <button class="btn btn-primary" onclick="changeUserRole()">Save Role</button>
     </div>
   </div>
 </div>
@@ -964,6 +984,7 @@ async function loadUsers(){
             ${isSuperAdmin && u.status==='suspended' ? `<button class="btn btn-primary btn-sm" onclick="updateUserStatus('${esc(u.id)}','active')">✅ Reactivate</button>` : ''}
             <button class="btn btn-outline btn-sm" onclick="showResetPasswordModal('${esc(u.id)}','${esc(u.email)}')">🔑 Reset Pass</button>
             ${isSuperAdmin ? `<button class="btn btn-outline btn-sm" onclick="showAssignTenantModal('${esc(u.id)}','${esc(u.email)}')">🏢 Assign Tenant</button>` : ''}
+            ${isSuperAdmin && u.email!=='admin@bizclaw.vn' ? `<button class="btn btn-outline btn-sm" onclick="showChangeRoleModal('${esc(u.id)}','${esc(u.email)}','${esc(u.role)}')">🔄 Role</button>` : ''}
             ${isSuperAdmin && u.email!=='admin@bizclaw.vn' ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${esc(u.id)}','${esc(u.email)}')" title="Delete User">✕</button>` : ''}
           </div>
         </div>
@@ -1041,6 +1062,25 @@ async function adminResetUserPassword() {
   try {
     const r = await(await authFetch(API+'/users/'+id+'/password/reset',{method:'PUT',body:JSON.stringify({new_password})})).json();
     if(r.ok) { hideModal('modal-reset-password'); toast('✅ Mật khẩu đã được đặt lại thành công'); }
+    else { toast('❌ '+r.error,'error'); }
+  } catch(e) { toast('❌ '+e.message,'error'); }
+}
+
+function showChangeRoleModal(id, email, currentRole) {
+  document.getElementById('cr-id').value = id;
+  document.getElementById('cr-email').textContent = email;
+  document.getElementById('cr-role').value = currentRole || 'admin';
+  document.getElementById('modal-change-role').classList.remove('hidden');
+}
+
+async function changeUserRole() {
+  const id = document.getElementById('cr-id').value;
+  const role = document.getElementById('cr-role').value;
+  const roleLabels = {superadmin: 'Super Admin', admin: 'Admin', viewer: 'Viewer'};
+  if(!confirm(`Đổi role thành "${roleLabels[role] || role}"?`)) return;
+  try {
+    const r = await(await authFetch(API+'/users/'+id+'/role',{method:'PUT',body:JSON.stringify({role})})).json();
+    if(r.ok) { hideModal('modal-change-role'); toast(`✅ Role → ${roleLabels[role] || role}`); loadUsers(); }
     else { toast('❌ '+r.error,'error'); }
   } catch(e) { toast('❌ '+e.message,'error'); }
 }
