@@ -302,3 +302,48 @@ jobs:
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # ── Cleanup old artifacts ────────────────────────────────────────────────────
+  cleanup:
+    name: Cleanup Old Artifacts
+    needs: [release, docker]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Delete workflow artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: |
+            bizclaw-linux-amd64
+            bizclaw-linux-arm64
+            bizclaw-linux-armv7
+            bizclaw-linux-armv6
+            bizclaw-macos-amd64
+            bizclaw-windows-amd64
+          failOnError: false
+
+      - name: Delete old artifacts (>7 days)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Deleting artifacts older than 7 days..."
+          
+          # Get artifacts older than 7 days
+          ARTIFACTS=$(gh api repos/${{ github.repository }}/actions/artifacts \
+            --paginate \
+            --jq '.artifacts[] | select(.expired == false) | select((.created_at | fromdateiso8601) < (now - 604800)) | .id')
+          
+          if [ -z "$ARTIFACTS" ]; then
+            echo "No old artifacts to delete"
+            exit 0
+          fi
+          
+          # Delete each artifact
+          COUNT=0
+          for ARTIFACT_ID in $ARTIFACTS; do
+            echo "Deleting artifact ID: $ARTIFACT_ID"
+            gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID -X DELETE || true
+            COUNT=$((COUNT + 1))
+          done
+          
+          echo "Deleted $COUNT old artifacts"

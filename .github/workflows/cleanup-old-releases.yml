@@ -1,0 +1,116 @@
+name: Cleanup Old Releases
+
+on:
+  workflow_dispatch:
+    inputs:
+      keep_latest:
+        description: 'Number of latest releases to keep'
+        required: true
+        default: '2'
+        type: number
+  schedule:
+    # Run weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete Old Releases
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete old releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          KEEP_COUNT=${{ inputs.keep_latest || 2 }}
+          echo "Keeping latest $KEEP_COUNT releases"
+          
+          # Get all releases sorted by creation date (newest first)
+          RELEASES=$(gh release list --limit 100 --json tagName,createdAt --jq 'sort_by(.createdAt) | reverse | .[].tagName')
+          
+          # Convert to array
+          RELEASE_ARRAY=($RELEASES)
+          TOTAL=${#RELEASE_ARRAY[@]}
+          
+          echo "Found $TOTAL releases"
+          
+          if [ $TOTAL -le $KEEP_COUNT ]; then
+            echo "No releases to delete (total: $TOTAL, keeping: $KEEP_COUNT)"
+            exit 0
+          fi
+          
+          # Delete old releases
+          DELETE_COUNT=$((TOTAL - KEEP_COUNT))
+          echo "Deleting $DELETE_COUNT old releases..."
+          
+          for ((i=$KEEP_COUNT; i<$TOTAL; i++)); do
+            TAG="${RELEASE_ARRAY[$i]}"
+            echo "Deleting release: $TAG"
+            gh release delete "$TAG" --yes --cleanup-tag || echo "Failed to delete $TAG"
+          done
+          
+          echo "Cleanup complete!"
+
+  cleanup-artifacts:
+    name: Delete Old Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete old artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Delete artifacts older than 7 days
+          echo "Deleting artifacts older than 7 days..."
+          
+          # Get all artifacts
+          ARTIFACTS=$(gh api repos/${{ github.repository }}/actions/artifacts --paginate --jq '.artifacts[] | select(.expired == false) | select((.created_at | fromdateiso8601) < (now - 604800)) | .id')
+          
+          if [ -z "$ARTIFACTS" ]; then
+            echo "No old artifacts to delete"
+            exit 0
+          fi
+          
+          # Delete each artifact
+          for ARTIFACT_ID in $ARTIFACTS; do
+            echo "Deleting artifact ID: $ARTIFACT_ID"
+            gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID -X DELETE || echo "Failed to delete artifact $ARTIFACT_ID"
+          done
+          
+          echo "Artifact cleanup complete!"
+
+  cleanup-caches:
+    name: Delete Old Caches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete old caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Deleting old caches..."
+          
+          # Get all caches
+          CACHES=$(gh api repos/${{ github.repository }}/actions/caches --paginate --jq '.actions_caches[] | select((.created_at | fromdateiso8601) < (now - 604800)) | .id')
+          
+          if [ -z "$CACHES" ]; then
+            echo "No old caches to delete"
+            exit 0
+          fi
+          
+          # Delete each cache
+          for CACHE_ID in $CACHES; do
+            echo "Deleting cache ID: $CACHE_ID"
+            gh api repos/${{ github.repository }}/actions/caches/$CACHE_ID -X DELETE || echo "Failed to delete cache $CACHE_ID"
+          done
+          
+          echo "Cache cleanup complete!"
