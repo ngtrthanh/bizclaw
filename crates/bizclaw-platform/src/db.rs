@@ -277,13 +277,13 @@ impl PlatformDb {
 
     // ── Users ────────────────────────────────────
 
-    /// Create admin user.
-    pub fn create_user(&self, email: &str, password_hash: &str, role: &str) -> Result<String> {
+    /// Create user with optional tenant affiliation.
+    pub fn create_user(&self, email: &str, password_hash: &str, role: &str, tenant_id: Option<&str>) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         self.conn
             .execute(
-                "INSERT INTO users (id, email, password_hash, role) VALUES (?1,?2,?3,?4)",
-                params![id, email, password_hash, role],
+                "INSERT INTO users (id, email, password_hash, role, tenant_id) VALUES (?1,?2,?3,?4,?5)",
+                params![id, email, password_hash, role, tenant_id],
             )
             .map_err(|e| BizClawError::Memory(format!("Create user: {e}")))?;
         Ok(id)
@@ -582,7 +582,7 @@ mod tests {
     fn test_user_crud() {
         let db = temp_db();
         let hash = "$2b$12$fake_hash_for_testing";
-        let id = db.create_user("admin@bizclaw.vn", hash, "admin").unwrap();
+        let id = db.create_user("admin@bizclaw.vn", hash, "admin", None).unwrap();
 
         let user = db.get_user_by_email("admin@bizclaw.vn").unwrap();
         assert!(user.is_some());
