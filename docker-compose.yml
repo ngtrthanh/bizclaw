@@ -5,11 +5,18 @@ services:
     image: ghcr.io/ngtrthanh/bizclaw:latest
     container_name: bizclaw
     restart: unless-stopped
+    # Use init to handle signals properly
+    init: true
+    # Add SYS_PTRACE capability for signal handling
+    cap_add:
+      - SYS_PTRACE
     ports:
       - "8080:8080"
     volumes:
       - ./config:/home/bizclaw/.bizclaw
       - ./data:/home/bizclaw/data
+      # Mount /tmp with exec permissions for signal handling
+      - /tmp
     environment:
       - RUST_LOG=info
       - BIZCLAW_HOST=0.0.0.0

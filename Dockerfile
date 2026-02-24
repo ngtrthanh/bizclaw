@@ -19,10 +19,14 @@ RUN apt-get update && apt-get install -y \
 # Copy pre-built binary for the current target platform
 COPY docker-bin/${TARGETPLATFORM}/bizclaw /usr/local/bin/bizclaw
 
-# Create non-root user
+# Create non-root user and setup directories
 RUN useradd -m -u 1000 bizclaw && \
-    mkdir -p /home/bizclaw/.bizclaw && \
-    chown -R bizclaw:bizclaw /home/bizclaw
+    mkdir -p /home/bizclaw/.bizclaw /tmp/bizclaw && \
+    chown -R bizclaw:bizclaw /home/bizclaw /tmp/bizclaw && \
+    chmod 755 /usr/local/bin/bizclaw
+
+# Set environment for signal handling
+ENV TMPDIR=/tmp/bizclaw
 
 USER bizclaw
 WORKDIR /home/bizclaw
