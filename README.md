@@ -9,8 +9,10 @@ BizClaw là nền tảng AI Agent kiến trúc trait-driven, có thể chạy **
 [![Tests](https://img.shields.io/badge/tests-113%20passing-brightgreen)]()
 [![Crates](https://img.shields.io/badge/crates-14-success)]()
 [![LOC](https://img.shields.io/badge/lines-35792-informational)]()
+[![Website](https://img.shields.io/badge/🌐_Website-bizclaw.vn-blue)](https://bizclaw.vn)
+[![Facebook](https://img.shields.io/badge/📘_Fanpage-bizclaw.vn-1877F2?logo=facebook)](https://www.facebook.com/bizclaw.vn)
 
-<!-- AUTO-GENERATED STATS — updated 2026-02-24 @ aa521d3 -->
+<!-- AUTO-GENERATED STATS — updated 2026-02-24 @ ed2b951 -->
 
 ---
 
@@ -242,7 +244,7 @@ ollama pull qwen3         # ~4.7GB
 | **Gallery** | 51 business agent templates |
 | **Dashboard** | 12 pages, bilingual (VI/EN) |
 | **Binary Size** | bizclaw 12M, platform 7.6M |
-| **Last Updated** | 2026-02-24 (aa521d3) |
+| **Last Updated** | 2026-02-24 (ed2b951) |
 
 ---
 
@@ -281,9 +283,17 @@ cd bizclaw && cargo build --release
 ### Deployment
 
 BizClaw is deployed at [bizclaw.vn](https://bizclaw.vn):
-- Admin Platform: `bizclaw.vn/admin/`
+- Admin Platform: `apps.bizclaw.vn`
 - Demo Tenant: `demo.bizclaw.vn`
 - Sales Tenant: `sales.bizclaw.vn`
+
+### 🔗 Links
+
+| | |
+|--|--|
+| 🌐 **Website** | [https://bizclaw.vn](https://bizclaw.vn) |
+| 📘 **Fanpage** | [https://www.facebook.com/bizclaw.vn](https://www.facebook.com/bizclaw.vn) |
+| 💻 **GitHub** | [https://github.com/nguyenduchoai/bizclaw](https://github.com/nguyenduchoai/bizclaw) |
 
 ---
 

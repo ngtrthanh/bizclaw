@@ -272,7 +272,9 @@ jobs:
             cargo build --release --bin bizclaw --bin bizclaw-platform
             
             echo "🔄 Deploying binaries..."
+            # Stop ALL platform services (bizclaw + viagent)
             systemctl stop bizclaw-platform || true
+            systemctl stop viagent-platform || true
             sleep 3
             # Remove old binaries to avoid "Text file busy"
             rm -f /usr/local/bin/bizclaw.old /usr/local/bin/bizclaw-platform.old
@@ -284,9 +286,20 @@ jobs:
             # Set timezone
             timedatectl set-timezone Asia/Ho_Chi_Minh 2>/dev/null || true
             
+            # Start ALL platform services
             systemctl start bizclaw-platform
+            systemctl start viagent-platform || true
+            
+            # Sync landing pages
+            if [ -d "/var/www/bizclaw.vn" ]; then
+              cp -r landing/* /var/www/bizclaw.vn/ 2>/dev/null || true
+            fi
+            if [ -d "/var/www/viagent.vn" ]; then
+              cp -r landing/* /var/www/viagent.vn/ 2>/dev/null || true
+            fi
             
             echo "✅ Verifying..."
             sleep 3
-            systemctl is-active bizclaw-platform
-            echo "✅ Deployed at $(date)"
+            echo "  bizclaw-platform: $(systemctl is-active bizclaw-platform)"
+            echo "  viagent-platform: $(systemctl is-active viagent-platform 2>/dev/null || echo 'not configured')"
+            echo "✅ Deployed both domains at $(date)"
