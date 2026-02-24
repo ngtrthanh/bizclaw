@@ -196,13 +196,12 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
       <input id="login-email" type="email" placeholder="Email" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
       <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doLogin()">🔑 Đăng nhập</button>
-      <div style="margin-top:16px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between">
-        <a href="#" onclick="showAuthBox('forgot-form-box')" style="color:var(--text2)">Quên mật khẩu?</a>
-        <a href="#" onclick="showAuthBox('register-form-box')" style="color:var(--accent)">Đăng ký Cloud ngay</a>
+      <div style="margin-top:16px;font-size:13px;color:var(--muted);text-align:center">
+        <a href="#" onclick="showAuthBox('forgot-form-box')" style="color:var(--muted)">Quên mật khẩu?</a>
       </div>
     </div>
 
-    <!-- Register Form -->
+    <!-- Register Form — TEMPORARILY DISABLED
     <div id="register-form-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
       <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">🏢 Đăng ký Cloud</h2>
       <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Tạo ngay một môi trường quản lý AI tự động</p>
@@ -215,6 +214,7 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
         Đã có tài khoản? <a href="#" onclick="showAuthBox('login-form-box')" style="color:var(--accent)">Đăng nhập</a>
       </div>
     </div>
+    -->
 
     <!-- Forgot Password Form -->
     <div id="forgot-form-box" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
