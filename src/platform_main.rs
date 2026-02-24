@@ -166,6 +166,13 @@ async fn main() -> Result<()> {
     println!("   🔧 BizClaw Binary:  {}", cli.bizclaw_bin);
     println!("   🔌 Tenant Base Port: {}", cli.base_port);
     println!();
+    println!("   ┌──────────────────────────────────────────────┐");
+    println!("   │  🔑 Default Admin Credentials:               │");
+    println!("   │     Email:    admin@bizclaw.vn               │");
+    println!("   │     Password: BizClaw@2026                   │");
+    println!("   │     ⚠️  Change password after first login!    │");
+    println!("   └──────────────────────────────────────────────┘");
+    println!();
 
     // Auto-restart tenants that were previously running
     {

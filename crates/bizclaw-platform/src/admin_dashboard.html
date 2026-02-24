@@ -4,65 +4,115 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BizClaw — Admin Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--card:#21262d;--purple:#bc8cff;--cyan:#56d4dd;--orange:#f0883e}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
-.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column}
-.sidebar .logo{padding:0 20px 20px;border-bottom:1px solid var(--border);margin-bottom:10px}
-.sidebar .logo h2{font-size:18px;color:var(--accent)}
-.sidebar .logo p{font-size:12px;color:var(--muted)}
-.sidebar a{display:flex;align-items:center;padding:10px 20px;color:var(--muted);text-decoration:none;font-size:14px;gap:8px;transition:all .15s;cursor:pointer}
-.sidebar a:hover,.sidebar a.active{background:var(--card);color:var(--text)}
+:root{--bg:#0a0e14;--surface:#12161e;--border:#1e2533;--text:#e6edf3;--muted:#6b7a8d;--accent:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--card:#161d28;--purple:#bc8cff;--cyan:#56d4dd;--orange:#f0883e;--glass:rgba(22,29,40,0.85);--glow:0 0 20px rgba(88,166,255,0.08)}
+body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{width:230px;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;display:flex;flex-direction:column;position:relative;z-index:10}
+.sidebar::after{content:'';position:absolute;right:0;top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,rgba(88,166,255,0.15),transparent)}
+.sidebar .logo{padding:0 20px 16px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.sidebar .logo h2{font-size:18px;color:var(--accent);font-weight:700;letter-spacing:-0.3px}
+.sidebar .logo p{font-size:11px;color:var(--muted);margin-top:2px}
+.sidebar .logo .version-badge{display:inline-block;font-size:9px;padding:2px 6px;background:rgba(88,166,255,0.12);color:var(--accent);border-radius:4px;margin-left:6px;font-weight:600;vertical-align:middle}
+.sidebar .logo .health-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-left:6px;vertical-align:middle;box-shadow:0 0 6px var(--green);animation:healthPulse 2s ease-in-out infinite}
+@keyframes healthPulse{0%,100%{opacity:1;box-shadow:0 0 4px var(--green)}50%{opacity:0.6;box-shadow:0 0 10px var(--green)}}
+.sidebar a{display:flex;align-items:center;padding:10px 20px;color:var(--muted);text-decoration:none;font-size:13px;gap:10px;transition:all .2s;cursor:pointer;position:relative;border-left:2px solid transparent}
+.sidebar a:hover{background:rgba(88,166,255,0.05);color:var(--text)}
+.sidebar a.active{background:rgba(88,166,255,0.08);color:var(--accent);border-left-color:var(--accent);font-weight:500}
+.sidebar a .nav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
 .sidebar .bottom{margin-top:auto;padding:10px 20px;border-top:1px solid var(--border)}
-.sidebar .bottom a{padding:5px 0;font-size:13px}
-.main{flex:1;padding:30px;overflow-y:auto}
-.main h1{font-size:24px;margin-bottom:20px;display:flex;align-items:center;gap:10px}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:15px;margin-bottom:25px}
-.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px}
-.stat label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-.stat .val{font-size:28px;font-weight:700}
+.sidebar .bottom a{padding:5px 0;font-size:12px}
+.sidebar .bottom .shortcut-hint{font-size:10px;color:var(--border);margin-top:6px;letter-spacing:0.3px}
+
+/* ── Main area ── */
+.main{flex:1;padding:30px 36px;overflow-y:auto;background:var(--bg)}
+.main h1{font-size:22px;margin-bottom:22px;display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:-0.3px}
+
+/* ── Stats cards with gradient ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:25px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--glow)}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:12px 12px 0 0}
+.stat:nth-child(1)::before{background:linear-gradient(90deg,var(--accent),var(--cyan))}
+.stat:nth-child(2)::before{background:linear-gradient(90deg,var(--green),#2ea043)}
+.stat:nth-child(3)::before{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.stat:nth-child(4)::before{background:linear-gradient(90deg,var(--red),#da3633)}
+.stat:nth-child(5)::before{background:linear-gradient(90deg,var(--purple),var(--accent))}
+.stat label{font-size:11px;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;font-weight:500}
+.stat .val{font-size:28px;font-weight:700;letter-spacing:-1px}
 .stat .val.green{color:var(--green)}.stat .val.red{color:var(--red)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
-.card h3{font-size:14px;margin-bottom:12px;display:flex;justify-content:space-between}
-.card h3 a{color:var(--accent);font-size:12px;text-decoration:none;cursor:pointer}
-.tenant-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+
+/* ── Grid & Card ── */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .2s}
+.card:hover{border-color:rgba(88,166,255,0.2)}
+.card h3{font-size:13px;margin-bottom:12px;display:flex;justify-content:space-between;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;color:var(--muted)}
+.card h3 a{color:var(--accent);font-size:11px;text-decoration:none;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:500}
+.card h3 a:hover{text-decoration:underline}
+
+/* ── Tenant rows ── */
+.tenant-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);transition:background .15s}
 .tenant-row:last-child{border:none}
+.tenant-row:hover{background:rgba(88,166,255,0.03);margin:0 -8px;padding:10px 8px;border-radius:6px}
 .tenant-name{color:var(--accent);font-weight:500;cursor:pointer}
 .tenant-slug{color:var(--muted);font-size:12px}
-.badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
-.badge.running{background:#1a3a2a;color:var(--green)}.badge.stopped{background:#2a2a2a;color:var(--muted)}.badge.error{background:#3a1a1a;color:var(--red)}
-.badge.connected{background:#1a3a2a;color:var(--green)}.badge.disconnected{background:#2a2a2a;color:var(--muted)}
+
+/* ── Badges ── */
+.badge{padding:3px 10px;border-radius:10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.badge.running{background:rgba(63,185,80,0.12);color:var(--green);border:1px solid rgba(63,185,80,0.2)}
+.badge.stopped{background:rgba(139,148,158,0.08);color:var(--muted);border:1px solid rgba(139,148,158,0.15)}
+.badge.error{background:rgba(248,81,73,0.12);color:var(--red);border:1px solid rgba(248,81,73,0.2)}
+.badge.connected{background:rgba(63,185,80,0.12);color:var(--green);border:1px solid rgba(63,185,80,0.2)}
+.badge.disconnected{background:rgba(139,148,158,0.08);color:var(--muted);border:1px solid rgba(139,148,158,0.15)}
+
+/* ── Events ── */
 .event{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
 .event:last-child{border:none}
 .event .type{font-weight:500}.event .meta{color:var(--muted);font-size:11px}
 .event .time{color:var(--muted);font-size:11px;white-space:nowrap}
-.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
-.btn-primary{background:var(--accent);color:#fff}.btn-danger{background:var(--red);color:#fff}
+
+/* ── Buttons ── */
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;font-family:inherit}
+.btn:hover{transform:translateY(-1px);filter:brightness(1.1)}
+.btn:active{transform:translateY(0);filter:brightness(0.95)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(88,166,255,0.2)}
+.btn-danger{background:var(--red);color:#fff}
 .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
 .btn-green{background:var(--green);color:#fff}.btn-purple{background:var(--purple);color:#000}
-.btn-sm{padding:5px 10px;font-size:11px}
+.btn-sm{padding:5px 10px;font-size:11px;border-radius:6px}
 .hidden{display:none!important}
-.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:30px;min-width:400px;max-width:720px;max-height:85vh;overflow-y:auto}
-.modal h2{margin-bottom:15px;display:flex;align-items:center;gap:8px}
+
+/* ── Modals with glass effect ── */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100;animation:overlayIn .2s}
+@keyframes overlayIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;min-width:400px;max-width:720px;max-height:85vh;overflow-y:auto;animation:modalIn .25s cubic-bezier(.22,1,.36,1);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+@keyframes modalIn{from{opacity:0;transform:scale(0.96) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal h2{margin-bottom:15px;display:flex;align-items:center;gap:8px;font-size:18px}
 .modal label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;margin-top:10px}
-.modal input,.modal select,.modal textarea{width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:inherit}
+.modal input,.modal select,.modal textarea{width:100%;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit;transition:border-color .15s}
+.modal input:focus,.modal select:focus,.modal textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(88,166,255,0.1)}
 .modal textarea{resize:vertical;min-height:60px;font-family:'Menlo','Courier New',monospace;font-size:12px}
 .modal .actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
-/* Channel config cards */
+
+/* ── Channel config cards ── */
 .ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-.ch-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:15px;transition:border-color .2s}
-.ch-card:hover{border-color:var(--accent)}
+.ch-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all .2s}
+.ch-card:hover{border-color:rgba(88,166,255,0.25);box-shadow:var(--glow)}
 .ch-card .ch-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .ch-card .ch-icon{font-size:22px}
 .ch-card .ch-name{font-weight:600;font-size:14px}
 .ch-card .ch-status{font-size:11px;padding:2px 8px;border-radius:8px}
 .ch-card .ch-fields{font-size:12px;color:var(--muted)}
-.ch-card input,.ch-card textarea{margin-top:6px;width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px;font-family:inherit}
+.ch-card input,.ch-card textarea{margin-top:6px;width:100%;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;font-family:inherit;transition:border-color .15s}
+.ch-card input:focus,.ch-card textarea:focus{outline:none;border-color:var(--accent)}
 .ch-card textarea{font-family:'Menlo','Courier New',monospace;min-height:50px;resize:vertical}
-.ch-card .ch-actions{display:flex;gap:6px;margin-top:8px}
+.ch-card .ch-actions{display:flex;gap:6px;margin-top:10px}
 .toggle{position:relative;display:inline-block;width:38px;height:20px}
 .toggle input{opacity:0;width:0;height:0}
 .toggle .slider{position:absolute;cursor:pointer;inset:0;background:var(--border);border-radius:20px;transition:.3s}
@@ -72,33 +122,99 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .qr-container{text-align:center;padding:15px}
 .qr-container img{max-width:200px;border-radius:8px;border:2px solid var(--accent)}
 .qr-container p{font-size:12px;color:var(--muted);margin-top:8px}
-.toast{position:fixed;top:20px;right:20px;background:var(--green);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;z-index:200;animation:fadeIn .3s,fadeOut .3s 2.5s}
-.toast.error{background:var(--red)}
-@keyframes fadeIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeOut{from{opacity:1}to{opacity:0}}
-@media(max-width:768px){.sidebar{width:60px}.sidebar a span,.sidebar .logo p{display:none}.grid{grid-template-columns:1fr}.ch-grid{grid-template-columns:1fr}}
+
+/* ── Toast (stacking) ── */
+#toast-container{position:fixed;top:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:rgba(63,185,80,0.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;animation:toastIn .3s cubic-bezier(.22,1,.36,1),toastOut .3s 2.5s forwards;backdrop-filter:blur(8px);box-shadow:0 8px 24px rgba(0,0,0,.3);pointer-events:auto}
+.toast.error{background:rgba(248,81,73,0.95)}
+@keyframes toastIn{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(40px)}}
+
+/* ── Loading skeleton ── */
+.skeleton{background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skeleton-stat{height:72px;border-radius:12px}
+.skeleton-row{height:48px;margin-bottom:8px;border-radius:8px}
+.skeleton-card{height:120px;border-radius:12px}
+
+/* ── Page transitions ── */
+.page-enter{animation:pageIn .25s ease-out}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Search bar ── */
+.search-bar{position:relative;margin-bottom:16px}
+.search-bar input{width:100%;padding:10px 14px 10px 36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:13px;font-family:inherit;transition:all .2s}
+.search-bar input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(88,166,255,0.1)}
+.search-bar input::placeholder{color:var(--muted)}
+.search-bar .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--muted)}
+.search-bar .search-shortcut{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--border);background:var(--card);padding:2px 6px;border-radius:4px;border:1px solid var(--border)}
+
+/* ── Provider icons ── */
+.provider-icon{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500}
+.provider-icon.openai{background:rgba(116,204,143,0.1);color:#74cc8c}
+.provider-icon.anthropic{background:rgba(204,145,100,0.1);color:#cc9164}
+.provider-icon.ollama{background:rgba(88,166,255,0.1);color:var(--accent)}
+.provider-icon.gemini{background:rgba(188,140,255,0.1);color:var(--purple)}
+.provider-icon.deepseek{background:rgba(86,212,221,0.1);color:var(--cyan)}
+.provider-icon.groq{background:rgba(240,136,62,0.1);color:var(--orange)}
+.provider-icon.brain{background:rgba(248,81,73,0.1);color:var(--red)}
+.provider-icon.llamacpp{background:rgba(210,153,34,0.1);color:var(--yellow)}
+
+/* ── Responsive ── */
+@media(max-width:768px){.sidebar{width:60px}.sidebar a span:not(.nav-icon),.sidebar .logo p,.sidebar .bottom .shortcut-hint,.sidebar .logo .version-badge{display:none}.grid{grid-template-columns:1fr}.ch-grid{grid-template-columns:1fr}.main{padding:20px 16px}}
 </style>
 </head>
 <body>
 <aside class="sidebar">
-  <div class="logo"><h2>BizClaw</h2><p>Admin Platform</p></div>
-  <a class="active" href="/dashboard" data-page="dashboard"><span>📊</span> <span>Dashboard</span></a>
-  <a href="/tenants" data-page="tenants"><span>🏢</span> <span>Tenants</span></a>
-  <a href="/users" data-page="users"><span>👥</span> <span>Users</span></a>
-  <a href="/audit" data-page="audit"><span>📋</span> <span>Audit Log</span></a>
-  <a href="/ollama" data-page="ollama"><span>🧠</span> <span>Ollama</span></a>
-  <div class="bottom"><a href="#" onclick="logout()">⏏ Logout</a></div>
+  <div class="logo">
+    <h2>BizClaw <span class="version-badge">v0.2</span> <span class="health-dot" id="sidebar-health" title="Platform healthy"></span></h2>
+    <p>Admin Platform</p>
+  </div>
+  <a class="active" href="#/dashboard" data-page="dashboard"><span class="nav-icon">📊</span> <span>Dashboard</span></a>
+  <a href="#/tenants" data-page="tenants"><span class="nav-icon">🏢</span> <span>Tenants</span></a>
+  <a href="#/users" data-page="users"><span class="nav-icon">👥</span> <span>Users</span></a>
+  <a href="#/audit" data-page="audit"><span class="nav-icon">📋</span> <span>Audit Log</span></a>
+  <a href="#/ollama" data-page="ollama"><span class="nav-icon">🧠</span> <span>Ollama</span></a>
+  <div class="bottom">
+    <a href="#" onclick="logout()">⏏ Logout</a>
+    <div class="shortcut-hint">⌘K Search · Esc Close</div>
+  </div>
 </aside>
 
 <!-- Login Screen -->
 <div id="login-screen" style="position:fixed;inset:0;background:var(--bg);z-index:300;display:flex;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:380px;text-align:center">
-    <h2 style="color:var(--accent);margin-bottom:8px">🔒 BizClaw Admin</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:24px">Đăng nhập để quản lý hệ thống</p>
-    <div id="login-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
-    <input id="login-email" type="email" placeholder="Email" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
-    <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="btn btn-primary" style="width:100%;padding:12px" onclick="doLogin()">🔑 Login</button>
+  <div style="width:420px">
+    <!-- Credentials Banner — prominent, above login -->
+    <div id="credentials-banner" style="background:linear-gradient(135deg,#1a2a1a,#1a3a2a);border:1px solid var(--green);border-radius:12px;padding:20px 24px;margin-bottom:16px;text-align:left;display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="font-size:20px">🔑</span>
+        <h3 style="color:var(--green);font-size:16px;font-weight:700">Thông tin đăng nhập mặc định</h3>
+      </div>
+      <p style="color:var(--text);font-size:13px;margin-bottom:10px">Hệ thống đã tạo tài khoản admin mặc định. <strong style="color:var(--yellow)">Hãy lưu lại</strong> thông tin bên dưới:</p>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="color:var(--muted);font-size:12px">Email</span>
+          <code style="color:var(--accent);font-size:14px;font-weight:600;letter-spacing:0.3px">admin@bizclaw.vn</code>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="color:var(--muted);font-size:12px">Password</span>
+          <code style="color:var(--accent);font-size:14px;font-weight:600;letter-spacing:0.3px">BizClaw@2026</code>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:6px;background:rgba(210,153,34,0.12);border:1px solid rgba(210,153,34,0.3);border-radius:6px;padding:8px 12px">
+        <span style="font-size:14px;line-height:1.4">⚠️</span>
+        <p style="color:var(--yellow);font-size:12px;line-height:1.4"><strong>Bắt buộc:</strong> Đổi mật khẩu ngay sau khi đăng nhập lần đầu để đảm bảo an toàn hệ thống!</p>
+      </div>
+    </div>
+    <!-- Login Form -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:32px 36px;text-align:center">
+      <h2 style="color:var(--accent);margin-bottom:6px;font-size:20px">🏢 BizClaw Admin</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Đăng nhập để quản lý hệ thống</p>
+      <div id="login-error" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none"></div>
+      <input id="login-email" type="email" placeholder="Email" style="width:100%;padding:10px 14px;margin-bottom:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px">
+      <input id="login-password" type="password" placeholder="Password" style="width:100%;padding:10px 14px;margin-bottom:16px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px" onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px" onclick="doLogin()">🔑 Đăng nhập</button>
+    </div>
   </div>
 </div>
 
@@ -106,15 +222,26 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
   <!-- Dashboard -->
   <div id="page-dashboard">
     <h1>📊 Dashboard</h1>
-    <div class="stats" id="stats-row"></div>
+    <div class="stats" id="stats-row">
+      <div class="stat skeleton skeleton-stat"></div>
+      <div class="stat skeleton skeleton-stat"></div>
+      <div class="stat skeleton skeleton-stat"></div>
+      <div class="stat skeleton skeleton-stat"></div>
+      <div class="stat skeleton skeleton-stat"></div>
+    </div>
     <div class="grid">
-      <div class="card"><h3>⚡ Tenant Health <a href="#" onclick="showPage('tenants')">View all</a></h3><div id="health-list"></div></div>
-      <div class="card"><h3>📋 Recent Activity <a href="#" onclick="showPage('audit')">View all</a></h3><div id="activity-list"></div></div>
+      <div class="card"><h3>⚡ Tenant Health <a href="#" onclick="showPage('tenants')">View all →</a></h3><div id="health-list"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div></div>
+      <div class="card"><h3>📋 Recent Activity <a href="#" onclick="showPage('audit')">View all →</a></h3><div id="activity-list"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-row"></div></div></div>
     </div>
   </div>
   <!-- Tenants -->
   <div id="page-tenants" class="hidden">
-    <h1>🏢 Tenants <button class="btn btn-outline" onclick="showPage('ollama')" style="margin-left:8px;font-size:12px">🧠 Models (Shared)</button> <button class="btn btn-primary" onclick="showCreateModal()" style="margin-left:auto">+ New Tenant</button></h1>
+    <h1>🏢 Tenants <button class="btn btn-outline btn-sm" onclick="showPage('ollama')" style="margin-left:8px">🧠 Models</button> <button class="btn btn-primary" onclick="showCreateModal()" style="margin-left:auto">+ New Tenant</button></h1>
+    <div class="search-bar">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="tenant-search" placeholder="Search tenants by name, slug..." oninput="filterTenants(this.value)">
+      <span class="search-shortcut">⌘K</span>
+    </div>
     <div id="tenants-list"></div>
   </div>
   <!-- Tenant Detail -->
@@ -331,6 +458,20 @@ let currentPage='dashboard';
 let channelTenantId=null;
 let channelTenantName='';
 let authToken=localStorage.getItem('bizclaw_admin_token')||'';
+let allTenants=[]; // Cache for filtering
+
+const PROVIDER_ICONS = {
+  openai: '🟢', anthropic: '🟤', ollama: '🔵', gemini: '🟣',
+  deepseek: '🔷', groq: '🟠', brain: '🔴', llamacpp: '🟡'
+};
+function providerBadge(p,m){
+  const icon = PROVIDER_ICONS[p]||'⚪';
+  return `<span class="provider-icon ${p||''}">${icon} ${p||'—'}/${m||'—'}</span>`;
+}
+function escapeHtml(s){
+  if(!s)return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
 // ── Auth helpers ───────────────────────────────────────
 function authHeaders(extra={}){
@@ -342,7 +483,14 @@ async function authFetch(url,opts={}){
   if(res.status===401){localStorage.removeItem('bizclaw_admin_token');authToken='';showLogin();throw new Error('Session expired');}
   return res;
 }
-function showLogin(){document.getElementById('login-screen').style.display='flex';}
+function showLogin(){
+  document.getElementById('login-screen').style.display='flex';
+  // Show credentials banner only on first-time setup (never logged in before)
+  const banner=document.getElementById('credentials-banner');
+  if(banner && !localStorage.getItem('bizclaw_setup_done')){
+    banner.style.display='block';
+  }
+}
 function hideLogin(){document.getElementById('login-screen').style.display='none';}
 async function doLogin(){
   const email=document.getElementById('login-email').value;
@@ -352,7 +500,7 @@ async function doLogin(){
   try{
     const res=await fetch(API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
     const r=await res.json();
-    if(r.ok){authToken=r.token;localStorage.setItem('bizclaw_admin_token',authToken);hideLogin();initRouter();toast('\u2705 Login successful');}
+    if(r.ok){authToken=r.token;localStorage.setItem('bizclaw_admin_token',authToken);localStorage.setItem('bizclaw_setup_done','1');hideLogin();initRouter();toast('\u2705 Login successful');}
     else{errEl.textContent=r.error||'Login failed';errEl.style.display='block';}
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';}
 }
@@ -360,8 +508,12 @@ function checkAuth(){
   if(!authToken){showLogin();}else{hideLogin();initRouter();}
 }
 
-// ── Navigation (URL-based routing) ──────────────────────────────────
+// ── Navigation (Hash-based routing — F5 safe) ──────────────────────
+// Uses hash (#/tenants) instead of pathname (/tenants) so Nginx
+// always serves the admin page and routing is purely client-side.
+
 const ROUTE_MAP = {
+  '': 'dashboard',
   '/': 'dashboard',
   '/dashboard': 'dashboard',
   '/tenants': 'tenants',
@@ -370,43 +522,49 @@ const ROUTE_MAP = {
   '/ollama': 'ollama',
 };
 
-function showPage(p, pushState = true){
+function showPage(p, updateHash = true){
   document.querySelectorAll('.main>div').forEach(d=>d.classList.add('hidden'));
   const page = document.getElementById('page-'+p);
-  if(page) page.classList.remove('hidden');
+  if(page) {
+    page.classList.remove('hidden');
+    page.classList.add('page-enter');
+    setTimeout(()=>page.classList.remove('page-enter'), 300);
+  }
 
   // Update sidebar active state
   document.querySelectorAll('.sidebar a[data-page]').forEach(a=>{
     a.classList.toggle('active', a.dataset.page === p);
   });
 
-  // Push URL to browser history (so back/forward works)
-  const url = p === 'dashboard' ? '/dashboard' : '/' + p;
-  if(pushState && window.location.pathname !== url){
-    history.pushState({page: p}, '', url);
+  // Update hash in URL (e.g. #/tenants)
+  if(updateHash){
+    const hash = '#/' + (p === 'dashboard' ? 'dashboard' : p);
+    if(window.location.hash !== hash){
+      window.location.hash = hash;
+    }
   }
 
   currentPage=p;loadPage();
 }
 
-// Handle browser back/forward
-window.addEventListener('popstate', (e) => {
-  const p = e.state?.page || routeFromPath();
+// Handle browser back/forward + hash changes
+window.addEventListener('hashchange', () => {
+  const p = routeFromHash();
   showPage(p, false);
 });
 
-// Read route from current URL path
-function routeFromPath(){
-  const path = window.location.pathname;
+// Read route from current URL hash
+function routeFromHash(){
+  const hash = window.location.hash.replace(/^#/, '') || '/';
   // Check for /tenants/{id} pattern
-  const tenantMatch = path.match(/^\/tenants\/(.+)/);
+  const tenantMatch = hash.match(/^\/tenants\/(.+)/);
   if(tenantMatch) return 'tenant-detail';
-  return ROUTE_MAP[path] || 'dashboard';
+  return ROUTE_MAP[hash] || 'dashboard';
 }
 
-// Initialize routing — sidebar link interception + URL-based page load
+// Initialize routing — sidebar link interception + hash-based page load
 function initRouter(){
-  // Intercept sidebar link clicks (prevent full page reload)
+  // Intercept sidebar link clicks
   document.querySelectorAll('.sidebar a[data-page]').forEach(a => {
     a.addEventListener('click', (e) => {
       e.preventDefault();
@@ -414,11 +572,8 @@ function initRouter(){
     });
   });
 
-  // Also intercept inline links like "View all" that call showPage
-  // These still use onclick="showPage(...)" which works fine
-
-  // Load the page based on current URL
-  const page = routeFromPath();
+  // Load the page based on current hash
+  const page = routeFromHash();
   showPage(page, false);
 }
 
@@ -431,55 +586,101 @@ function loadPage(){
   else if(currentPage==='ollama')loadOllama();
 }
 
-// ── Toast ──────────────────────────────────
+// ── Toast (stacking) ──────────────────────────────────
 function toast(msg,type='success'){
   const t=document.createElement('div');t.className='toast'+(type==='error'?' error':'');
-  t.textContent=msg;document.getElementById('toast-container').appendChild(t);
-  setTimeout(()=>t.remove(),3000);
+  t.textContent=msg;
+  const container=document.getElementById('toast-container');
+  container.appendChild(t);
+  // Limit to 5 visible toasts
+  while(container.children.length>5) container.firstChild.remove();
+  setTimeout(()=>{if(t.parentNode) t.remove();},3200);
 }
 
 // ── Dashboard ──────────────────────────────────
 async function loadDashboard(){
-  const s=await(await authFetch(API+'/stats')).json();
-  document.getElementById('stats-row').innerHTML=
-    `<div class="stat"><label>Total Tenants</label><div class="val">${s.total_tenants}</div></div>`+
-    `<div class="stat"><label>▶ Running</label><div class="val green">${s.running}</div></div>`+
-    `<div class="stat"><label>⏹ Stopped</label><div class="val">${s.stopped}</div></div>`+
-    `<div class="stat"><label>⚠ Error</label><div class="val red">${s.error}</div></div>`+
-    `<div class="stat"><label>👥 Users</label><div class="val">${s.users}</div></div>`;
-  const t=await(await authFetch(API+'/tenants')).json();
-  document.getElementById('health-list').innerHTML=t.tenants.slice(0,5).map(t=>
-    `<div class="tenant-row"><div><span class="tenant-name">${t.name}</span><div class="tenant-slug">${t.slug}</div></div><span class="badge ${t.status}">${t.status}</span></div>`).join('');
-  const a=await(await authFetch(API+'/activity')).json();
-  document.getElementById('activity-list').innerHTML=(a.events||[]).slice(0,8).map(e=>
-    `<div class="event"><div><div class="type">${e.event_type}</div><div class="meta">${e.actor_type} (${e.actor_id.slice(0,8)}…)</div></div><div class="time">${e.created_at}</div></div>`).join('')
+  try {
+    const s=await(await authFetch(API+'/stats')).json();
+    document.getElementById('stats-row').innerHTML=
+      `<div class="stat"><label>Total Tenants</label><div class="val">${s.total_tenants}</div></div>`+
+      `<div class="stat"><label>Running</label><div class="val green">${s.running}</div></div>`+
+      `<div class="stat"><label>Stopped</label><div class="val">${s.stopped}</div></div>`+
+      `<div class="stat"><label>Error</label><div class="val red">${s.error}</div></div>`+
+      `<div class="stat"><label>Users</label><div class="val">${s.users}</div></div>`;
+  } catch(e) {
+    document.getElementById('stats-row').innerHTML='<div class="stat" style="grid-column:1/-1;text-align:center;color:var(--red)">❌ Failed to load stats</div>';
+  }
+  try {
+    const t=await(await authFetch(API+'/tenants')).json();
+    document.getElementById('health-list').innerHTML=t.tenants.slice(0,5).map(t=>
+      `<div class="tenant-row"><div><span class="tenant-name">${escapeHtml(t.name)}</span><div class="tenant-slug">${escapeHtml(t.slug)} · ${providerBadge(t.provider,t.model)}</div></div><span class="badge ${t.status}">${t.status}</span></div>`).join('')||'<p style="color:var(--muted);font-size:13px;padding:12px 0">No tenants yet</p>';
+  } catch(e) {
+    document.getElementById('health-list').innerHTML='<p style="color:var(--red);font-size:13px">Failed to load tenants</p>';
+  }
+  try {
+    const a=await(await authFetch(API+'/activity')).json();
+    document.getElementById('activity-list').innerHTML=(a.events||[]).slice(0,8).map(e=>
+      `<div class="event"><div><div class="type">${escapeHtml(e.event_type)}</div><div class="meta">${escapeHtml(e.actor_type)} (${(e.actor_id||'').slice(0,8)}…)</div></div><div class="time">${timeAgo(e.created_at)}</div></div>`).join('')||'<p style="color:var(--muted);font-size:13px;padding:12px 0">No recent activity</p>';
+  } catch(e) {
+    document.getElementById('activity-list').innerHTML='<p style="color:var(--red);font-size:13px">Failed to load activity</p>';
+  }
+}
+function timeAgo(ts){
+  if(!ts) return '—';
+  try {
+    const d=new Date(ts);
+    const now=new Date();
+    const diff=Math.floor((now-d)/1000);
+    if(diff<60) return 'just now';
+    if(diff<3600) return Math.floor(diff/60)+'m ago';
+    if(diff<86400) return Math.floor(diff/3600)+'h ago';
+    return Math.floor(diff/86400)+'d ago';
+  } catch { return ts; }
 }
 
 // ── Tenants ──────────────────────────────────
 async function loadTenants(){
   const d=await(await authFetch(API+'/tenants')).json();
+  allTenants = d.tenants || [];
+  renderTenantList(allTenants);
+}
+function filterTenants(query){
+  const q=query.toLowerCase().trim();
+  if(!q) { renderTenantList(allTenants); return; }
+  renderTenantList(allTenants.filter(t=>
+    (t.name||'').toLowerCase().includes(q)||
+    (t.slug||'').toLowerCase().includes(q)||
+    (t.provider||'').toLowerCase().includes(q)||
+    (t.status||'').toLowerCase().includes(q)
+  ));
+}
+function renderTenantList(tenants){
   const baseDomain=location.hostname.replace(/^admin\./,'');
   const proto=location.protocol;
-  document.getElementById('tenants-list').innerHTML=d.tenants.map(t=>{
+  if(!tenants.length){
+    document.getElementById('tenants-list').innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)"><p style="font-size:16px;margin-bottom:8px">🔍 No tenants found</p><p style="font-size:13px">Try adjusting your search or create a new tenant.</p></div>';
+    return;
+  }
+  document.getElementById('tenants-list').innerHTML=tenants.map(t=>{
     return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div>
-          <strong>${t.name}</strong> <span class="badge ${t.status}">${t.status}</span>
+          <strong>${escapeHtml(t.name)}</strong> <span class="badge ${t.status}">${t.status}</span>
           <div class="tenant-slug" style="margin-top:4px">
-            <a href="${proto}//${t.slug}.${baseDomain}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600">🔗 ${t.slug}.${baseDomain}</a>
-            · ${t.provider}/${t.model} · ${t.plan}
+            <a href="${proto}//${escapeHtml(t.slug)}.${baseDomain}" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500">🔗 ${escapeHtml(t.slug)}.${baseDomain}</a>
+            · ${providerBadge(t.provider,t.model)} · <span style="color:var(--muted);font-size:11px">${escapeHtml(t.plan)}</span>
           </div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="openTenantDetail('${t.id}','${esc(t.name)}','${esc(t.slug)}','${esc(t.provider)}','${esc(t.model)}','${t.status}','${esc(t.plan)}','${esc(t.pairing_code||'')}','${t.port||''}')" title="Tenant Detail">⚙️ Detail</button>
           ${t.status!=='running'
             ?`<button class="btn btn-primary btn-sm" onclick="tenantAction('${t.id}','start')">▶ Start</button>`
             :`<button class="btn btn-outline btn-sm" onclick="tenantAction('${t.id}','stop')">⏹ Stop</button>`}
-          <button class="btn btn-outline btn-sm" onclick="tenantAction('${t.id}','restart')">🔄</button>
-          <button class="btn btn-danger btn-sm" onclick="tenantAction('${t.id}','delete')">✕</button>
+          <button class="btn btn-outline btn-sm" onclick="tenantAction('${t.id}','restart')" title="Restart">🔄</button>
+          <button class="btn btn-danger btn-sm" onclick="tenantAction('${t.id}','delete')" title="Delete">✕</button>
         </div>
       </div>
-      ${t.pairing_code?`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Pairing: <strong style="color:var(--yellow);font-size:16px">${t.pairing_code}</strong></div>`:''}
+      ${t.pairing_code?`<div style="margin-top:10px;font-size:12px;color:var(--muted)">Pairing: <strong style="color:var(--yellow);font-size:16px;font-family:monospace;letter-spacing:2px">${t.pairing_code}</strong></div>`:''}
     </div>`;
   }).join('');
 }
@@ -524,7 +725,8 @@ function openTenantDetail(id, name, slug, provider, model, status, plan, pairing
   channelTenantName = name;
 
   // Push URL for this tenant detail
-  history.pushState({page: 'tenant-detail', tenantId: id}, '', '/tenants/' + id);
+  // Use hash-based route for tenant detail
+  window.location.hash = '#/tenants/' + id;
 
   document.getElementById('detail-tenant-name').textContent = name;
 
@@ -1083,16 +1285,16 @@ async function loadTenantAgents() {
         <div class="card" style="margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div>
-              <strong style="color:var(--accent)">${a.name}</strong>
-              <span class="badge running" style="margin-left:8px">${a.role}</span>
-              <span style="font-size:12px;color:var(--muted);margin-left:8px">${a.provider}/${a.model}</span>
+              <strong style="color:var(--accent)">${escapeHtml(a.name)}</strong>
+              <span class="badge running" style="margin-left:8px">${escapeHtml(a.role)}</span>
+              <span style="margin-left:8px">${providerBadge(a.provider,a.model)}</span>
             </div>
             <div style="display:flex;gap:6px">
-              <button class="btn btn-danger btn-sm" onclick="deleteTenantAgent('${esc(a.name)}')">✕</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteTenantAgent('${esc(a.name)}')" title="Delete agent">✕</button>
             </div>
           </div>
-          ${a.description ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">${a.description}</div>` : ''}
-          ${a.system_prompt ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:monospace;max-height:40px;overflow:hidden;text-overflow:ellipsis">📝 ${a.system_prompt.slice(0,120)}${a.system_prompt.length>120?'...':''}</div>` : ''}
+          ${a.description ? `<div style="font-size:12px;color:var(--muted);margin-top:6px">${escapeHtml(a.description)}</div>` : ''}
+          ${a.system_prompt ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;font-family:monospace;max-height:40px;overflow:hidden;text-overflow:ellipsis">📝 ${escapeHtml(a.system_prompt.slice(0,120))}${a.system_prompt.length>120?'...':''}</div>` : ''}
         </div>
       `).join('');
     } else {
@@ -1131,6 +1333,38 @@ async function deleteTenantAgent(name) {
     else { toast(r.error||'Delete failed', 'error'); }
   } catch(e) { toast('❌ '+e.message, 'error'); }
 }
+
+// ── Keyboard shortcuts ──────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  // Escape → close any open modal
+  if(e.key==='Escape'){
+    document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(m=>m.classList.add('hidden'));
+  }
+  // Ctrl/Cmd+K → focus tenant search
+  if((e.ctrlKey||e.metaKey) && e.key==='k'){
+    e.preventDefault();
+    if(currentPage!=='tenants') showPage('tenants');
+    setTimeout(()=>{
+      const s=document.getElementById('tenant-search');
+      if(s) s.focus();
+    },100);
+  }
+});
+
+// ── Platform health check ──────────────────────────────
+async function checkPlatformHealth(){
+  try {
+    const dot=document.getElementById('sidebar-health');
+    if(!dot) return;
+    const r=await authFetch(API+'/stats');
+    if(r.ok) { dot.style.background='var(--green)'; dot.title='Platform healthy'; }
+    else { dot.style.background='var(--red)'; dot.title='Platform error'; }
+  } catch {
+    const dot=document.getElementById('sidebar-health');
+    if(dot) { dot.style.background='var(--red)'; dot.title='Platform unreachable'; }
+  }
+}
+setInterval(checkPlatformHealth, 30000); // Check every 30s
 
 // ── Init ──────────────────────────────────
 checkAuth();

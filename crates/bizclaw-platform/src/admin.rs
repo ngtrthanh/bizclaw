@@ -96,6 +96,8 @@ impl AdminServer {
             )
             // Users
             .route("/api/admin/users", get(list_users))
+            .route("/api/admin/users", post(create_user_handler))
+            .route("/api/admin/users/{id}", delete(delete_user_handler))
             .route_layer(middleware::from_fn_with_state(state.clone(), require_auth));
 
         // Public routes — no auth required
@@ -838,3 +840,68 @@ async fn delete_tenant_agent(
     }
 }
 
+// ═════════════════════════════════════════════════════════════
+// USER MANAGEMENT HANDLERS
+// ═════════════════════════════════════════════════════════════
+
+#[derive(serde::Deserialize)]
+struct CreateUserReq {
+    email: String,
+    password: String,
+    role: Option<String>,
+}
+
+/// Create a new admin user.
+async fn create_user_handler(
+    State(state): State<Arc<AdminState>>,
+    Json(req): Json<CreateUserReq>,
+) -> Json<serde_json::Value> {
+    if req.email.is_empty() || req.password.is_empty() {
+        return Json(serde_json::json!({"ok": false, "error": "Email and password are required"}));
+    }
+
+    // Hash password in blocking thread
+    let password = req.password.clone();
+    let hash = match tokio::task::spawn_blocking(move || {
+        crate::auth::hash_password(&password)
+    })
+    .await
+    {
+        Ok(Ok(h)) => h,
+        Ok(Err(e)) => return Json(serde_json::json!({"ok": false, "error": format!("Hash error: {e}")})),
+        Err(e) => return Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    };
+
+    let role = req.role.as_deref().unwrap_or("admin");
+    match state.db.lock().unwrap().create_user(&req.email, &hash, role) {
+        Ok(id) => {
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event("user_created", "admin", &id, Some(&format!("email={}", req.email)))
+                .ok();
+            Json(serde_json::json!({"ok": true, "id": id}))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}
+
+/// Delete a user by ID.
+async fn delete_user_handler(
+    State(state): State<Arc<AdminState>>,
+    Path(id): Path<String>,
+) -> Json<serde_json::Value> {
+    match state.db.lock().unwrap().delete_user(&id) {
+        Ok(()) => {
+            state
+                .db
+                .lock()
+                .unwrap()
+                .log_event("user_deleted", "admin", &id, None)
+                .ok();
+            Json(serde_json::json!({"ok": true}))
+        }
+        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+    }
+}

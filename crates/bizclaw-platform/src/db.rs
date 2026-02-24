@@ -380,6 +380,14 @@ impl PlatformDb {
         Ok(users)
     }
 
+    /// Delete a user by ID.
+    pub fn delete_user(&self, id: &str) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM users WHERE id=?1", params![id])
+            .map_err(|e| BizClawError::Memory(format!("Delete user: {e}")))?;
+        Ok(())
+    }
+
     // ── Audit Log ────────────────────────────────────
 
     /// Log an audit event.
