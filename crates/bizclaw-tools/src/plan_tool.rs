@@ -123,7 +123,7 @@ pub struct Plan {
 }
 
 impl Plan {
-    fn new(title: &str, description: &str) -> Self {
+    pub fn new(title: &str, description: &str) -> Self {
         let now = chrono::Utc::now()
             .format("%Y-%m-%d %H:%M:%S UTC")
             .to_string();
@@ -138,7 +138,7 @@ impl Plan {
         }
     }
 
-    fn add_task(
+    pub fn add_task(
         &mut self,
         title: &str,
         description: &str,
@@ -242,18 +242,46 @@ impl Plan {
 /// Shared plan store
 pub type PlanStore = Arc<Mutex<Vec<Plan>>>;
 
+/// Create a new plan store, optionally backed by SQLite.
+/// Loads persisted plans from `~/.bizclaw/plans.db` if available.
 pub fn new_plan_store() -> PlanStore {
-    Arc::new(Mutex::new(Vec::new()))
+    let store = Arc::new(Mutex::new(Vec::new()));
+
+    // Try to load persisted plans from SQLite
+    match crate::plan_store::SqlitePlanStore::open_default() {
+        Ok(db) => {
+            let plans = db.load_all();
+            if !plans.is_empty() {
+                tracing::info!("📋 Loaded {} persisted plan(s) from SQLite", plans.len());
+                if let Ok(mut s) = store.try_lock() {
+                    *s = plans;
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!("⚠️ Failed to open plan DB: {e} — plans will be in-memory only");
+        }
+    }
+    store
 }
 
-/// Plan Mode tool
+/// Plan Mode tool with optional SQLite persistence.
 pub struct PlanTool {
     store: PlanStore,
+    db: Option<crate::plan_store::SqlitePlanStore>,
 }
 
 impl PlanTool {
     pub fn new(store: PlanStore) -> Self {
-        Self { store }
+        let db = crate::plan_store::SqlitePlanStore::open_default().ok();
+        Self { store, db }
+    }
+
+    /// Persist current plans to SQLite.
+    fn persist(&self, plans: &[Plan]) {
+        if let Some(db) = &self.db {
+            db.save_all(plans);
+        }
     }
 }
 
@@ -335,6 +363,7 @@ impl Tool for PlanTool {
                 let plan = Plan::new(title, description);
                 let id = plan.id.clone();
                 store.push(plan);
+                self.persist(&store);
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: format!(
@@ -382,6 +411,7 @@ impl Tool for PlanTool {
 
                 plan.add_task(title, description, task_type, complexity, dependencies);
                 let task_id = plan.tasks.len();
+                self.persist(&store);
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: format!("✅ Task #{} added: {}", task_id, title),
@@ -403,6 +433,7 @@ impl Tool for PlanTool {
                     .format("%Y-%m-%d %H:%M:%S UTC")
                     .to_string();
                 let display = plan.display();
+                self.persist(&store);
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: format!("✅ Plan finalized and ready for review!\n\n{}", display),
@@ -426,11 +457,13 @@ impl Tool for PlanTool {
                 plan.updated_at = chrono::Utc::now()
                     .format("%Y-%m-%d %H:%M:%S UTC")
                     .to_string();
+                let title = plan.title.clone();
+                self.persist(&store);
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: format!(
                         "✅ Plan '{}' approved! Start executing tasks with start_task.",
-                        plan.title
+                        title
                     ),
                     success: true,
                 })
@@ -442,9 +475,11 @@ impl Tool for PlanTool {
                 plan.updated_at = chrono::Utc::now()
                     .format("%Y-%m-%d %H:%M:%S UTC")
                     .to_string();
+                let title = plan.title.clone();
+                self.persist(&store);
                 Ok(ToolResult {
                     tool_call_id: String::new(),
-                    output: format!("❌ Plan '{}' rejected.", plan.title),
+                    output: format!("❌ Plan '{}' rejected.", title),
                     success: true,
                 })
             }
@@ -482,6 +517,7 @@ impl Tool for PlanTool {
                     // Now mutate
                     plan.tasks[idx].status = TaskStatus::InProgress;
                     let title = plan.tasks[idx].title.clone();
+                    self.persist(&store);
                     Ok(ToolResult {
                         tool_call_id: String::new(),
                         output: format!("▶ Task #{} started: {}", task_id, title),
@@ -532,6 +568,7 @@ impl Tool for PlanTool {
                             task_id, done, total
                         )
                     };
+                    self.persist(&store);
                     Ok(ToolResult {
                         tool_call_id: String::new(),
                         output: msg,
@@ -553,9 +590,11 @@ impl Tool for PlanTool {
                 if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
                     task.status = TaskStatus::Failed;
                     task.result = result_text;
+                    let title = task.title.clone();
+                    self.persist(&store);
                     Ok(ToolResult {
                         tool_call_id: String::new(),
-                        output: format!("❌ Task #{} failed: {}", task_id, task.title),
+                        output: format!("❌ Task #{} failed: {}", task_id, title),
                         success: true,
                     })
                 } else {
@@ -572,9 +611,11 @@ impl Tool for PlanTool {
                 let task_id = args["task_id"].as_u64().unwrap_or(0) as usize;
                 if let Some(task) = plan.tasks.iter_mut().find(|t| t.id == task_id) {
                     task.status = TaskStatus::Skipped;
+                    let title = task.title.clone();
+                    self.persist(&store);
                     Ok(ToolResult {
                         tool_call_id: String::new(),
-                        output: format!("⏭ Task #{} skipped: {}", task_id, task.title),
+                        output: format!("⏭ Task #{} skipped: {}", task_id, title),
                         success: true,
                     })
                 } else {
@@ -621,6 +662,10 @@ impl Tool for PlanTool {
             "delete" => {
                 let plan_id = get_plan_id(&store, &args)?;
                 store.retain(|p| p.id != plan_id);
+                // Also delete from SQLite
+                if let Some(db) = &self.db {
+                    db.delete_plan(&plan_id);
+                }
                 Ok(ToolResult {
                     tool_call_id: String::new(),
                     output: format!("🗑️ Plan {} deleted.", plan_id),

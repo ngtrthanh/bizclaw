@@ -140,6 +140,12 @@ pub async fn get_config(State(state): State<Arc<AppState>>) -> Json<serde_json::
                 "access_token": mask_secret(&w.access_token),
                 "business_id": w.business_id,
             })),
+            "webhook": cfg.channel.webhook.as_ref().map(|wh| serde_json::json!({
+                "enabled": wh.enabled,
+                "secret": mask_secret(&wh.secret),
+                "secret_set": !wh.secret.is_empty(),
+                "outbound_url": wh.outbound_url,
+            })),
         },
     }))
 }
@@ -993,6 +999,99 @@ pub async fn delete_agent(
     }))
 }
 
+/// Update an existing agent's configuration.
+pub async fn update_agent(
+    State(state): State<Arc<AppState>>,
+    axum::extract::Path(name): axum::extract::Path<String>,
+    Json(body): Json<serde_json::Value>,
+) -> Json<serde_json::Value> {
+    let role = body["role"].as_str();
+    let description = body["description"].as_str();
+    let provider = body["provider"].as_str();
+    let model = body["model"].as_str();
+    let system_prompt = body["system_prompt"].as_str();
+
+    let mut orch = state.orchestrator.lock().await;
+
+    // Check if agent exists
+    let agents_list = orch.list_agents();
+    let current = agents_list
+        .iter()
+        .find(|a| a["name"].as_str() == Some(&name));
+    if current.is_none() {
+        return Json(
+            serde_json::json!({"ok": false, "message": format!("Agent '{}' not found", name)}),
+        );
+    }
+
+    // Get current values as fallback
+    let current_role = current
+        .and_then(|a| a["role"].as_str())
+        .unwrap_or("assistant");
+    let current_desc = current
+        .and_then(|a| a["description"].as_str())
+        .unwrap_or("");
+
+    let final_role = role.unwrap_or(current_role);
+    let final_desc = description.unwrap_or(current_desc);
+
+    // If provider/model/system_prompt changed, we need to re-create the agent
+    let needs_recreate = provider.is_some() || model.is_some() || system_prompt.is_some();
+    if needs_recreate {
+        // Build new config based on current system config + overrides
+        let mut agent_config = state.full_config.lock().unwrap().clone();
+
+        // Apply overrides
+        if let Some(p) = provider {
+            if !p.is_empty() {
+                agent_config.default_provider = p.to_string();
+            }
+        }
+        if let Some(m) = model {
+            if !m.is_empty() {
+                agent_config.default_model = m.to_string();
+            }
+        }
+        if let Some(sp) = system_prompt {
+            agent_config.identity.system_prompt = sp.to_string();
+        }
+        agent_config.identity.name = name.clone();
+
+        // Re-create agent with new config
+        match bizclaw_agent::Agent::new_with_mcp(agent_config).await {
+            Ok(new_agent) => {
+                orch.remove_agent(&name);
+                orch.add_agent(&name, final_role, final_desc, new_agent);
+                tracing::info!("🔄 Agent '{}' re-created with new config", name);
+            }
+            Err(e) => {
+                tracing::warn!("⚠️ Agent '{}' re-create failed: {}", name, e);
+                return Json(serde_json::json!({
+                    "ok": false,
+                    "message": format!("Failed to update agent: {}", e),
+                }));
+            }
+        }
+    } else {
+        // Just update metadata by recreating with same config
+        let agent_config = state.full_config.lock().unwrap().clone();
+        match bizclaw_agent::Agent::new_with_mcp(agent_config).await {
+            Ok(new_agent) => {
+                orch.remove_agent(&name);
+                orch.add_agent(&name, final_role, final_desc, new_agent);
+            }
+            Err(e) => {
+                tracing::warn!("⚠️ Agent '{}' metadata update failed: {}", name, e);
+            }
+        }
+    }
+
+    Json(serde_json::json!({
+        "ok": true,
+        "message": format!("Agent '{}' updated", name),
+    }))
+}
+
 /// Chat with a specific agent.
 pub async fn agent_chat(
     State(state): State<Arc<AppState>>,
@@ -1059,6 +1158,8 @@ mod tests {
     use std::sync::Mutex;
 
     fn test_state() -> State<Arc<AppState>> {
+        let temp_db = std::env::temp_dir().join("bizclaw-test-gateway.db");
+        let db = crate::db::GatewayDb::open(&temp_db).unwrap();
         State(Arc::new(AppState {
             gateway_config: bizclaw_core::config::GatewayConfig::default(),
             full_config: Arc::new(Mutex::new(bizclaw_core::config::BizClawConfig::default())),
@@ -1075,6 +1176,7 @@ mod tests {
                 ),
             )),
             knowledge: Arc::new(tokio::sync::Mutex::new(None)),
+            db: Arc::new(db),
         }))
     }
 

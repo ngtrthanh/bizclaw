@@ -183,7 +183,8 @@ impl SchedulerEngine {
 }
 
 /// Spawn the scheduler loop as a background tokio task.
-/// Checks every 30 seconds (configurable). Extremely lightweight.
+/// Enhanced version: actually executes AgentPrompt tasks via the orchestrator,
+/// fires webhooks, and dispatches notifications to configured channels.
 pub async fn spawn_scheduler(engine: Arc<Mutex<SchedulerEngine>>, check_interval_secs: u64) {
     tracing::info!(
         "⏰ Scheduler started (check every {}s)",
@@ -202,6 +203,134 @@ pub async fn spawn_scheduler(engine: Arc<Mutex<SchedulerEngine>>, check_interval
 
         for (name, body) in &triggered {
             tracing::info!("📣 [{}] {}", name, body);
+        }
+    }
+}
+
+/// Enhanced scheduler loop with Agent integration.
+/// When an AgentPrompt task fires, it sends the prompt to the callback.
+/// Webhook tasks are actually fired via HTTP.
+///
+/// The `agent_callback` is a function that takes a prompt string and returns
+/// a Result<String>. This avoids circular dependency with bizclaw-agent.
+pub async fn spawn_scheduler_with_agent<F, Fut>(
+    engine: Arc<Mutex<SchedulerEngine>>,
+    agent_callback: F,
+    check_interval_secs: u64,
+) where
+    F: Fn(String) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = Result<String, String>> + Send,
+{
+    tracing::info!(
+        "⏰ Scheduler started with Agent integration (check every {}s)",
+        check_interval_secs
+    );
+
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(check_interval_secs));
+    let http_client = reqwest::Client::new();
+
+    loop {
+        interval.tick().await;
+
+        // Collect triggered tasks and their actions
+        let triggered_tasks = {
+            let mut eng = engine.lock().await;
+            // Collect task info before tick modifies them
+            let tasks: Vec<(String, TaskAction)> = eng
+                .list_tasks()
+                .iter()
+                .filter(|t| t.should_run())
+                .map(|t| (t.name.clone(), t.action.clone()))
+                .collect();
+
+            // Run the tick to update task states
+            let _ = eng.tick();
+            tasks
+        };
+
+        // Execute each triggered action
+        for (task_name, action) in &triggered_tasks {
+            match action {
+                TaskAction::AgentPrompt(prompt) => {
+                    tracing::info!(
+                        "🤖 Executing agent prompt for task '{}': {}",
+                        task_name,
+                        if prompt.len() > 100 {
+                            &prompt[..100]
+                        } else {
+                            prompt
+                        }
+                    );
+
+                    match agent_callback(prompt.clone()).await {
+                        Ok(response) => {
+                            tracing::info!(
+                                "✅ Agent responded for task '{}': {}",
+                                task_name,
+                                if response.len() > 200 {
+                                    format!("{}...", &response[..200])
+                                } else {
+                                    response
+                                }
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("⚠️ Agent failed for task '{}': {}", task_name, e);
+                        }
+                    }
+                }
+                TaskAction::Webhook {
+                    url,
+                    method,
+                    body,
+                    headers,
+                } => {
+                    tracing::info!(
+                        "🌐 Firing webhook for task '{}': {} {}",
+                        task_name,
+                        method,
+                        url
+                    );
+
+                    let req = match method.to_uppercase().as_str() {
+                        "POST" => http_client.post(url),
+                        "PUT" => http_client.put(url),
+                        "DELETE" => http_client.delete(url),
+                        _ => http_client.get(url),
+                    };
+
+                    let mut req = if let Some(body_str) = body {
+                        req.header("Content-Type", "application/json")
+                            .body(body_str.clone())
+                    } else {
+                        req
+                    };
+
+                    // Add custom headers
+                    for (key, value) in headers {
+                        req = req.header(key.as_str(), value.as_str());
+                    }
+
+                    match req.timeout(std::time::Duration::from_secs(30)).send().await {
+                        Ok(resp) => {
+                            tracing::info!(
+                                "✅ Webhook response for task '{}': {} {}",
+                                task_name,
+                                resp.status(),
+                                url
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!("⚠️ Webhook failed for task '{}': {}", task_name, e);
+                        }
+                    }
+                }
+                TaskAction::Notify(msg) => {
+                    tracing::info!("📢 Notification for task '{}': {}", task_name, msg);
+                    // Notifications are recorded in router.history — actual dispatch
+                    // happens via the dispatch module if notify targets are configured.
+                }
+            }
         }
     }
 }

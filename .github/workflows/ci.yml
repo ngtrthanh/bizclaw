@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, features/upstream-sync, infra/stable]
   pull_request:
     branches: [master]
 
