@@ -371,7 +371,10 @@ async fn login(
 
     tracing::info!("login: Locking DB to get_user_by_email for {}", req.email);
     let user = state.db.lock().unwrap().get_user_by_email(&req.email);
-    tracing::info!("login: DB unlocked. Found user: {}", user.as_ref().map(|x| x.is_some()).unwrap_or(false));
+    tracing::info!(
+        "login: DB unlocked. Found user: {}",
+        user.as_ref().map(|x| x.is_some()).unwrap_or(false)
+    );
     match user {
         Ok(Some((id, hash, role))) => {
             // Run bcrypt in blocking thread to avoid stalling the async runtime

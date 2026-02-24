@@ -1043,11 +1043,13 @@ pub async fn update_agent(
 
         // Apply overrides
         if let Some(p) = provider
-            && !p.is_empty() {
+            && !p.is_empty()
+        {
             agent_config.default_provider = p.to_string();
         }
         if let Some(m) = model
-            && !m.is_empty() {
+            && !m.is_empty()
+        {
             agent_config.default_model = m.to_string();
         }
         if let Some(sp) = system_prompt {

@@ -72,13 +72,14 @@ impl PlatformDb {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)
             .map_err(|e| BizClawError::Memory(format!("DB open error: {e}")))?;
-            
+
         // Enable WAL mode to allow concurrent readers/writers and prevent "database is locked" errors
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;
              PRAGMA synchronous = NORMAL;
-             PRAGMA busy_timeout = 5000;"
-        ).map_err(|e| BizClawError::Memory(format!("DB pragma error: {e}")))?;
+             PRAGMA busy_timeout = 5000;",
+        )
+        .map_err(|e| BizClawError::Memory(format!("DB pragma error: {e}")))?;
 
         let db = Self { conn };
         db.migrate()?;
@@ -286,7 +287,13 @@ impl PlatformDb {
     // ── Users ────────────────────────────────────
 
     /// Create user with optional tenant affiliation.
-    pub fn create_user(&self, email: &str, password_hash: &str, role: &str, tenant_id: Option<&str>) -> Result<String> {
+    pub fn create_user(
+        &self,
+        email: &str,
+        password_hash: &str,
+        role: &str,
+        tenant_id: Option<&str>,
+    ) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         self.conn
             .execute(
@@ -590,7 +597,9 @@ mod tests {
     fn test_user_crud() {
         let db = temp_db();
         let hash = "$2b$12$fake_hash_for_testing";
-        let id = db.create_user("admin@bizclaw.vn", hash, "admin", None).unwrap();
+        let id = db
+            .create_user("admin@bizclaw.vn", hash, "admin", None)
+            .unwrap();
 
         let user = db.get_user_by_email("admin@bizclaw.vn").unwrap();
         assert!(user.is_some());
