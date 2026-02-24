@@ -175,13 +175,60 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 
 **Last Sync Date**: February 24, 2025
 **Branch**: `features/upstream-sync`
-**Commits Ahead**: 27 (our infrastructure + integrated features)
-**Commits Behind**: 83 (upstream features not yet integrated)
-**Upstream Position**: `d05f0e9` (latest)
+**Commits Ahead**: 30 (our infrastructure + integrated features)
+**Commits Behind**: 96 (upstream features not yet integrated)
+**Upstream Position**: `036321e` (latest)
 **Build**: ✅ Compiles successfully
 **Clippy**: ✅ Clean
 **CI**: ✅ Running on feature branches
-**Next Action**: Continue Phase 5 or merge current progress to master
+**Next Action**: Continue Phase 5 - integrate remaining bug fixes
+
+## Phase 5: Bug Fixes & Improvements (IN PROGRESS)
+
+**Commits**: `293351c` (pushed to origin)
+**Upstream Source**: `d05f0e9`, `811974e`, `ed3671e`
+
+### Features Integrated (3 commits):
+1. **Platform User Creation Fix** (`src/platform_main.rs`, `crates/bizclaw-platform/src/db.rs`)
+   - Added optional `tenant_id` parameter to `create_user` function
+   - Updated all calls to include `None` for tenant_id
+   - Fixed test cases
+   - Upstream: `d05f0e9`
+
+2. **Tracing Logs for Lock Debugging** (`crates/bizclaw-platform/src/admin.rs`)
+   - Added tracing logs to login function
+   - Helps identify database lock hangs
+   - Logs DB lock/unlock operations
+   - Logs password verification and token generation
+   - Upstream: `811974e`
+
+3. **WAL Mode for Platform Database** (`crates/bizclaw-platform/src/db.rs`)
+   - Enabled WAL (Write-Ahead Logging) mode for SQLite
+   - Allows concurrent readers/writers
+   - Prevents "database is locked" errors
+   - Added busy_timeout and synchronous pragmas
+   - Upstream: `ed3671e`
+
+### Quality Checks:
+- ✅ Code compiles successfully
+- ✅ Clippy clean with `-D warnings`
+- ✅ Code formatted with `cargo fmt`
+- ✅ No breaking changes
+
+### Files Modified:
+- `src/platform_main.rs` - Updated create_user calls
+- `crates/bizclaw-platform/src/db.rs` - Updated create_user signature, added WAL mode
+- `crates/bizclaw-platform/src/admin.rs` - Added tracing logs
+
+### Skipped Commits (require larger refactoring):
+- `78571ef` - Webhook inbound route (requires webhook_inbound function)
+- `b734fc9` - Bidirectional channels (large feature, requires channel framework)
+- `62b8c5e` - Auto-retry without tools (requires openai_compatible.rs refactoring)
+
+### Next Commits to Review:
+- Provider refactoring commits (openai_compatible.rs)
+- Channel persistence and auto-connect features
+- Security fixes and RBAC improvements
 
 ## Notes
 

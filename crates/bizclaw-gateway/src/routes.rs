@@ -1042,15 +1042,13 @@ pub async fn update_agent(
         let mut agent_config = state.full_config.lock().unwrap().clone();
 
         // Apply overrides
-        if let Some(p) = provider {
-            if !p.is_empty() {
-                agent_config.default_provider = p.to_string();
-            }
+        if let Some(p) = provider
+            && !p.is_empty() {
+            agent_config.default_provider = p.to_string();
         }
-        if let Some(m) = model {
-            if !m.is_empty() {
-                agent_config.default_model = m.to_string();
-            }
+        if let Some(m) = model
+            && !m.is_empty() {
+            agent_config.default_model = m.to_string();
         }
         if let Some(sp) = system_prompt {
             agent_config.identity.system_prompt = sp.to_string();
