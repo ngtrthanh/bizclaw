@@ -382,12 +382,15 @@ async fn login(
         entry.0 += 1;
     }
 
+    tracing::info!("login: Locking DB to get_user_by_email for {}", req.email);
     let user = state.db.lock().unwrap().get_user_by_email(&req.email);
+    tracing::info!("login: DB unlocked. Found user: {}", user.as_ref().map(|x| x.is_some()).unwrap_or(false));
     match user {
         Ok(Some((id, hash, role))) => {
             // Run bcrypt in blocking thread to avoid stalling the async runtime
             let password = req.password.clone();
             let hash_clone = hash.clone();
+            tracing::info!("login: Hashing password to verify");
             let ok = tokio::task::spawn_blocking(move || {
                 crate::auth::verify_password(&password, &hash_clone)
             })
@@ -395,24 +398,34 @@ async fn login(
             .unwrap_or(false);
 
             if ok {
+                tracing::info!("login: Password verified, generating token");
                 match crate::auth::create_token(&id, &req.email, &role, &state.jwt_secret) {
                     Ok(token) => {
+                        tracing::info!("login: Locking DB to log_event");
                         state
                             .db
                             .lock()
                             .unwrap()
                             .log_event("login_success", "user", &id, None)
                             .ok();
+                        tracing::info!("login: DB unlocked after log_event");
                         Json(serde_json::json!({"ok": true, "token": token, "role": role}))
                     }
-                    Err(e) => Json(serde_json::json!({"ok": false, "error": e})),
+                    Err(e) => {
+                        tracing::error!("login: Token error: {e}");
+                        Json(serde_json::json!({"ok": false, "error": e}))
+                    }
                 }
             } else {
+                tracing::warn!("login: Invalid credentials for {}", req.email);
                 Json(serde_json::json!({"ok": false, "error": "Invalid credentials"}))
             }
         }
         Ok(None) => Json(serde_json::json!({"ok": false, "error": "User not found"})),
-        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("login: DB error: {e}");
+            Json(serde_json::json!({"ok": false, "error": e.to_string()}))
+        }
     }
 }
 
@@ -853,17 +866,18 @@ struct CreateUserReq {
     tenant_id: Option<String>,
 }
 
-/// Create a new admin user.
 async fn create_user_handler(
     State(state): State<Arc<AdminState>>,
     Json(req): Json<CreateUserReq>,
 ) -> Json<serde_json::Value> {
+    tracing::info!("create_user_handler: Starting user creation for {}", req.email);
     if req.email.is_empty() || req.password.is_empty() {
         return Json(serde_json::json!({"ok": false, "error": "Email and password are required"}));
     }
 
     // Hash password in blocking thread
     let password = req.password.clone();
+    tracing::info!("create_user_handler: Hashing password");
     let hash = match tokio::task::spawn_blocking(move || {
         crate::auth::hash_password(&password)
     })
@@ -875,43 +889,56 @@ async fn create_user_handler(
     };
 
     let role = req.role.as_deref().unwrap_or("admin");
+    tracing::info!("create_user_handler: Locking DB to create_user");
     
     // Extracted lock to avoid deadlock with subsequent log_event lock
     let db_res = state.db.lock().unwrap().create_user(&req.email, &hash, role, req.tenant_id.as_deref().filter(|s| !s.is_empty()));
+    tracing::info!("create_user_handler: DB unlocked. Result: {:?}", db_res.is_ok());
     
     match db_res {
         Ok(id) => {
+            tracing::info!("create_user_handler: Locking DB to log_event");
             state
                 .db
                 .lock()
                 .unwrap()
                 .log_event("user_created", "admin", &id, Some(&format!("email={}", req.email)))
                 .ok();
+            tracing::info!("create_user_handler: DB unlocked after log_event");
             Json(serde_json::json!({"ok": true, "id": id}))
         }
-        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("create_user_handler: Error creating user: {e}");
+            Json(serde_json::json!({"ok": false, "error": e.to_string()}))
+        }
     }
 }
 
-/// Delete a user by ID.
 async fn delete_user_handler(
     State(state): State<Arc<AdminState>>,
     Path(id): Path<String>,
 ) -> Json<serde_json::Value> {
+    tracing::info!("delete_user_handler: Locking DB to delete_user {}", id);
     // Extracted lock to avoid deadlock
     let db_res = state.db.lock().unwrap().delete_user(&id);
+    tracing::info!("delete_user_handler: DB unlocked. Result: {:?}", db_res.is_ok());
     
     match db_res {
         Ok(()) => {
+            tracing::info!("delete_user_handler: Locking DB to log_event");
             state
                 .db
                 .lock()
                 .unwrap()
                 .log_event("user_deleted", "admin", &id, None)
                 .ok();
+            tracing::info!("delete_user_handler: DB unlocked after log_event");
             Json(serde_json::json!({"ok": true}))
         }
-        Err(e) => Json(serde_json::json!({"ok": false, "error": e.to_string()})),
+        Err(e) => {
+            tracing::error!("delete_user_handler: Error deleting user: {e}");
+            Json(serde_json::json!({"ok": false, "error": e.to_string()}))
+        }
     }
 }
 
