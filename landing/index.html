@@ -191,7 +191,8 @@ footer a{color:var(--accent2);text-decoration:none}
       <a href="#features" data-vi="Năng lực" data-en="Features">Năng lực</a>
       <a href="#showcase" data-vi="Showcase" data-en="Showcase">Showcase</a>
       <a href="#how" data-vi="Bắt đầu" data-en="Get Started">Bắt đầu</a>
-      <a href="#register" data-vi="Đăng ký" data-en="Register">Đăng ký</a>
+      <!-- Registration temporarily disabled -->
+      <!-- <a href="#register" data-vi="Đăng ký" data-en="Register">Đăng ký</a> -->
       <button class="lang-toggle" onclick="toggleLang()">🌐 EN</button>
       <a href="#" onclick="goLogin()" class="nav-cta" style="background:transparent;border:1px solid var(--border);color:var(--text);margin-right:8px" data-vi="🔑 Đăng nhập" data-en="🔑 Login">🔑 Đăng nhập</a>
       <a href="https://github.com/nguyenduchoai/bizclaw" target="_blank" class="nav-cta" data-vi="⭐ GitHub" data-en="⭐ GitHub">⭐ GitHub</a>
@@ -210,8 +211,8 @@ footer a{color:var(--accent2);text-decoration:none}
     </h1>
     <p class="hero-desc" data-vi="BizClaw biến mọi thiết bị thành trợ lý AI riêng cho doanh nghiệp — từ Raspberry Pi bỏ túi đến VPS. Kết nối Zalo, quản lý email, lịch hẹn, khách hàng — hoạt động 24/7, không phụ thuộc cloud, không cần internet liên tục." data-en="BizClaw turns any device into your private business AI assistant — from a pocket-sized Raspberry Pi to a VPS. Connect Zalo, manage emails, appointments, clients — running 24/7, cloud-free, no constant internet required.">BizClaw biến mọi thiết bị thành trợ lý AI riêng cho doanh nghiệp — từ Raspberry Pi bỏ túi đến VPS. Kết nối Zalo, quản lý email, lịch hẹn, khách hàng — hoạt động 24/7, không phụ thuộc cloud, không cần internet liên tục.</p>
     <div class="hero-actions">
-      <a href="#register" class="btn-primary" data-vi="🚀 Dùng thử SaaS Miễn phí" data-en="🚀 Try SaaS for Free">🚀 Dùng thử SaaS Miễn phí</a>
-      <a href="https://github.com/nguyenduchoai/bizclaw" target="_blank" class="btn-secondary">⭐ GitHub — Tự Host</a>
+      <a href="https://github.com/nguyenduchoai/bizclaw" target="_blank" class="btn-primary" data-vi="⭐ GitHub — Xem mã nguồn" data-en="⭐ GitHub — View Source">⭐ GitHub — Xem mã nguồn</a>
+      <a href="/docs.html" class="btn-secondary" data-vi="📖 Hướng dẫn cài đặt" data-en="📖 Installation Guide">📖 Hướng dẫn cài đặt</a>
     </div>
     <div class="hero-stats">
       <div class="hero-stat"><div class="num">50+</div><div class="label" data-vi="Agent Templates" data-en="Agent Templates">Agent Templates</div></div>
@@ -498,8 +499,8 @@ footer a{color:var(--accent2);text-decoration:none}
         </div>
       </div>
 
-      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-        <a href="#register" class="btn-primary" data-vi="🚀 Đăng ký miễn phí" data-en="🚀 Register for Free">🚀 Đăng ký miễn phí</a>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;align-items:center">
+        <div style="background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.3);border-radius:12px;padding:12px 24px;color:var(--orange);font-weight:600;font-size:14px" data-vi="⏸️ Đăng ký Cloud tạm ngưng — Sẽ mở lại sớm" data-en="⏸️ Cloud registration paused — Reopening soon">⏸️ Đăng ký Cloud tạm ngưng — Sẽ mở lại sớm</div>
         <a href="https://github.com/nguyenduchoai/bizclaw" target="_blank" class="btn-secondary" data-vi="⭐ Tự Host (GitHub)" data-en="⭐ Self-Host (GitHub)">⭐ Tự Host (GitHub)</a>
       </div>
       <p style="color:var(--muted);font-size:12px;margin-top:16px" data-vi="💻 Nền tảng cloud — sử dụng ngay trên trình duyệt, không cần cài đặt." data-en="💻 Cloud platform — use directly in browser, no installation needed.">💻 Nền tảng cloud — sử dụng ngay trên trình duyệt, không cần cài đặt.</p>
@@ -591,39 +592,22 @@ footer a{color:var(--accent2);text-decoration:none}
   </div>
 </section>
 
-<!-- REGISTER / SaaS CTA -->
+<!-- REGISTER / Cloud CTA — TEMPORARILY DISABLED -->
 <section id="register">
   <div class="container" style="text-align:center">
-    <div class="section-label" data-vi="ĐĂNG KÝ" data-en="REGISTER">ĐĂNG KÝ</div>
-    <div class="section-title" data-vi="Dùng thử BizClaw SaaS — Miễn phí" data-en="Try BizClaw SaaS — Free">Dùng thử BizClaw SaaS — Miễn phí</div>
-    <div class="section-desc" style="margin:0 auto 32px" data-vi="Không cần cài đặt — đăng ký ngay, có hệ thống AI riêng trong 30 giây. Hoặc tự host 100% trên thiết bị của bạn." data-en="No installation needed — register now, get your own AI system in 30 seconds. Or self-host 100% on your own device.">Không cần cài đặt — đăng ký ngay, có hệ thống AI riêng trong 30 giây. Hoặc tự host 100% trên thiết bị của bạn.</div>
+    <div class="section-label" data-vi="THÔNG BÁO" data-en="NOTICE">THÔNG BÁO</div>
+    <div class="section-title" data-vi="Đăng ký Cloud tạm ngưng" data-en="Cloud Registration Paused">Đăng ký Cloud tạm ngưng</div>
+    <div class="section-desc" style="margin:0 auto 32px" data-vi="Chúng tôi đang nâng cấp hệ thống. Đăng ký mới sẽ mở lại sớm. Bạn vẫn có thể tự host BizClaw trên thiết bị của mình." data-en="We are upgrading the system. New registration will reopen soon. You can still self-host BizClaw on your own device.">Chúng tôi đang nâng cấp hệ thống. Đăng ký mới sẽ mở lại sớm. Bạn vẫn có thể tự host BizClaw trên thiết bị của mình.</div>
     
-    <div class="register-box" style="text-align:left">
-      <h2 data-vi="🚀 Đăng ký SaaS" data-en="🚀 Register SaaS">🚀 Đăng ký SaaS</h2>
-      <p class="sub" data-vi="Tạo hệ thống AI Agent riêng cho doanh nghiệp" data-en="Create your own AI Agent system for business">Tạo hệ thống AI Agent riêng cho doanh nghiệp</p>
-      <div id="register-error-landing" style="color:#f85149;font-size:13px;margin-bottom:12px;display:none"></div>
-      <div class="form-group">
-        <label data-vi="Tên công ty" data-en="Company name">Tên công ty</label>
-        <input type="text" id="reg-company" placeholder="Ví dụ: Công ty ABC">
+    <div class="register-box" style="text-align:center">
+      <div style="font-size:64px;margin-bottom:16px">🔧</div>
+      <h2 data-vi="⏸️ Tạm ngưng đăng ký" data-en="⏸️ Registration Paused">⏸️ Tạm ngưng đăng ký</h2>
+      <p class="sub" data-vi="Hệ thống đang được nâng cấp để phục vụ bạn tốt hơn. Vui lòng quay lại sau hoặc tự host BizClaw ngay." data-en="System is being upgraded to serve you better. Please come back later or self-host BizClaw now.">Hệ thống đang được nâng cấp để phục vụ bạn tốt hơn. Vui lòng quay lại sau hoặc tự host BizClaw ngay.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:24px">
+        <a href="https://github.com/nguyenduchoai/bizclaw" target="_blank" class="btn-primary" data-vi="⭐ Tự Host trên GitHub" data-en="⭐ Self-Host on GitHub">⭐ Tự Host trên GitHub</a>
+        <a href="mailto:hello@bizclaw.vn" class="btn-secondary" data-vi="📧 Liên hệ hỗ trợ" data-en="📧 Contact support">📧 Liên hệ hỗ trợ</a>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" id="reg-email" placeholder="admin@company.com">
-        </div>
-        <div class="form-group">
-          <label data-vi="Mật khẩu" data-en="Password">Mật khẩu</label>
-          <input type="password" id="reg-password" placeholder="Ít nhất 6 ký tự">
-        </div>
-      </div>
-      <button class="form-submit" onclick="doLandingRegister()" data-vi="🚀 Khởi tạo hệ thống" data-en="🚀 Start your system">🚀 Khởi tạo hệ thống</button>
-      <p class="form-note" data-vi="Miễn phí vĩnh viễn · Không cần thẻ tín dụng · Sở hữu toàn bộ dữ liệu" data-en="Free forever · No credit card · Own all your data">Miễn phí vĩnh viễn · Không cần thẻ tín dụng · Sở hữu toàn bộ dữ liệu</p>
-    </div>
-    <div id="register-success-landing" class="form-success">
-      <div class="icon">🎉</div>
-      <h3 data-vi="Khởi tạo thành công!" data-en="Setup complete!">Khởi tạo thành công!</h3>
-      <p id="register-success-msg"></p>
-      <a id="register-success-link" href="#" target="_blank" class="btn-primary" style="margin-top:16px;display:inline-flex" data-vi="🔑 Đăng nhập ngay" data-en="🔑 Login now">🔑 Đăng nhập ngay</a>
+      <p class="form-note" data-vi="Mã nguồn mở · MIT License · Miễn phí vĩnh viễn" data-en="Open source · MIT License · Free forever">Mã nguồn mở · MIT License · Miễn phí vĩnh viễn</p>
     </div>
   </div>
 </section>
@@ -723,7 +707,7 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.1 });
 document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
 
-// ═══ Registration — Landing Page SaaS Signup ═══
+// ═══ Registration — Landing Page Cloud Signup ═══
 async function doLandingRegister() {
   const errEl = document.getElementById('register-error-landing');
   const company_name = document.getElementById('reg-company').value.trim();
