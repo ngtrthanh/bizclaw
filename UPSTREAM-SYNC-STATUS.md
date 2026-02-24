@@ -175,13 +175,46 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 
 **Last Sync Date**: February 24, 2025
 **Branch**: `features/upstream-sync`
-**Commits Ahead**: 27 (our infrastructure + integrated features)
-**Commits Behind**: 83 (upstream features not yet integrated)
+**Commits Ahead**: 29 (our infrastructure + integrated features)
+**Commits Behind**: 81 (upstream features not yet integrated)
 **Upstream Position**: `d05f0e9` (latest)
 **Build**: ✅ Compiles successfully
 **Clippy**: ✅ Clean
 **CI**: ✅ Running on feature branches
-**Next Action**: Continue Phase 5 or merge current progress to master
+**Next Action**: Continue Phase 5 - integrate remaining bug fixes
+
+## Phase 5: Bug Fixes & Improvements (IN PROGRESS)
+
+**Commits**: `9b5e7ea` (pushed to origin)
+**Upstream Source**: `d05f0e9`, `811974e`
+
+### Features Integrated:
+1. **Platform User Creation Fix** (`src/platform_main.rs`, `crates/bizclaw-platform/src/db.rs`)
+   - Added optional `tenant_id` parameter to `create_user` function
+   - Updated all calls to include `None` for tenant_id
+   - Fixed test cases
+
+2. **Tracing Logs for Lock Debugging** (`crates/bizclaw-platform/src/admin.rs`)
+   - Added tracing logs to login function
+   - Helps identify database lock hangs
+   - Logs DB lock/unlock operations
+   - Logs password verification and token generation
+
+### Quality Checks:
+- ✅ Code compiles successfully
+- ✅ Clippy clean with `-D warnings`
+- ✅ Code formatted with `cargo fmt`
+- ✅ No breaking changes
+
+### Files Modified:
+- `src/platform_main.rs` - Updated create_user calls
+- `crates/bizclaw-platform/src/db.rs` - Updated create_user signature
+- `crates/bizclaw-platform/src/admin.rs` - Added tracing logs
+
+### Next Commits to Integrate:
+- `ed3671e` - WAL mode for platform DB
+- `78571ef` - Webhook inbound as public route
+- `b734fc9` - Bidirectional channels for ALL types
 
 ## Notes
 
