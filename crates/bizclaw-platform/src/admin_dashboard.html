@@ -848,7 +848,7 @@ function filterTenants(query){
   ));
 }
 function renderTenantList(tenants){
-  const baseDomain=location.hostname.replace(/^admin\./,'');
+  const baseDomain=location.hostname.replace(/^(admin|apps)\./,'');
   const proto=location.protocol;
   if(!tenants.length){
     document.getElementById('tenants-list').innerHTML='<div style="text-align:center;padding:40px;color:var(--muted)"><p style="font-size:16px;margin-bottom:8px">🔍 No tenants found</p><p style="font-size:13px">Try adjusting your search or create a new tenant.</p></div>';
@@ -1128,7 +1128,7 @@ function openTenantDetail(id, name, slug, provider, model, status, plan, pairing
   document.getElementById('detail-tenant-name').textContent = name;
 
   // Stats
-  const baseDomain = location.hostname.replace(/^admin\./, '');
+  const baseDomain = location.hostname.replace(/^(admin|apps)\./, '');
   const proto = location.protocol;
   document.getElementById('detail-stats').innerHTML =
     `<div class="stat"><label>Status</label><div class="val ${status==='running'?'green':'red'}">${status}</div></div>`+
