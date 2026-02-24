@@ -72,6 +72,14 @@ impl PlatformDb {
     pub fn open(path: &Path) -> Result<Self> {
         let conn = Connection::open(path)
             .map_err(|e| BizClawError::Memory(format!("DB open error: {e}")))?;
+            
+        // Enable WAL mode to allow concurrent readers/writers and prevent "database is locked" errors
+        conn.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = NORMAL;
+             PRAGMA busy_timeout = 5000;"
+        ).map_err(|e| BizClawError::Memory(format!("DB pragma error: {e}")))?;
+
         let db = Self { conn };
         db.migrate()?;
         Ok(db)
