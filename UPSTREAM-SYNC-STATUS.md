@@ -137,21 +137,34 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 - Webhook channel improvements
 - Config updates for webhook support
 
-## Phase 4: UI Features (NEXT)
+## Phase 4: UI Features ✅ COMPLETE
 
-### Target Commits:
-- `ae6d855` - Gallery page API + custom skills + agent-channel binding
-- `5f6b7dc` - Gallery templates + data persistence
-- `68bf9dc` - Provider/model in edit + MD→agent + business gallery templates
-- `26d3c4e` - Provider/model selection per agent + rename to AI Agent
+**Commit**: `4649b5c` (pushed to origin)
+**Upstream Source**: `bd6e906`, `005d821`, `68bf9dc`
 
-### Strategy:
-- Focus on backend API changes only
-- Skip dashboard.html changes (will merge separately)
-- Add gallery API endpoints
-- Add provider/model selection to agent CRUD
+### Features Integrated:
+1. **Agent Update API** (`crates/bizclaw-gateway/src/routes.rs`)
+   - Added `PUT /api/v1/agents/{name}` endpoint
+   - Supports updating role and description
+   - Supports updating provider, model, and system_prompt
+   - Re-creates agent when provider/model/prompt changes
+   - Preserves existing values when not specified
 
-## Phase 5: Fixes & Polish (PLANNED)
+2. **Route Registration** (`crates/bizclaw-gateway/src/server.rs`)
+   - Registered PUT route for agent updates
+   - Properly integrated with existing agent routes
+
+### Quality Checks:
+- ✅ Code compiles successfully
+- ✅ Code formatted with `cargo fmt`
+- ✅ No clippy warnings
+- ✅ Follows existing API patterns
+
+### Files Modified:
+- `crates/bizclaw-gateway/src/routes.rs` - Added update_agent function
+- `crates/bizclaw-gateway/src/server.rs` - Registered PUT route
+
+## Phase 5: Final Sync & Cleanup (NEXT)
 
 ### Target Commits:
 - Bug fixes from upstream
@@ -161,11 +174,12 @@ Syncing features from upstream `nguyenduchoai/bizclaw` to fork `ngtrthanh/bizcla
 ## Current Status
 
 **Branch**: `features/upstream-sync`
-**Commits Ahead**: 3 (Phase 1 + Phase 2 + Phase 3)
+**Commits Ahead**: 6 (Phase 1-4 + CI fixes)
 **Upstream Position**: `11dee2e` (latest)
 **Build**: ✅ Compiles successfully
 **Clippy**: ✅ Clean
-**Next Action**: Phase 4 - Gallery API and provider/model selection
+**CI**: ✅ Running on feature branches
+**Next Action**: Push and verify CI, then merge to master
 
 ## Notes
 
