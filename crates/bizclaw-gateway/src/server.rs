@@ -155,6 +155,10 @@ pub fn build_router(state: AppState) -> Router {
             axum::routing::delete(super::routes::delete_agent),
         )
         .route(
+            "/api/v1/agents/{name}",
+            axum::routing::put(super::routes::update_agent),
+        )
+        .route(
             "/api/v1/agents/{name}/chat",
             post(super::routes::agent_chat),
         )
