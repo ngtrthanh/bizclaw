@@ -1,0 +1,172 @@
+name: Upstream Sync Check
+
+on:
+  schedule:
+    # Run daily at 9 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+    inputs:
+      force_sync:
+        description: 'Force sync even if less than threshold'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  check-upstream:
+    name: Check Upstream Status
+    runs-on: ubuntu-latest
+    outputs:
+      commits_behind: ${{ steps.check.outputs.commits_behind }}
+      should_sync: ${{ steps.check.outputs.should_sync }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: features/upstream-sync
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/nguyenduchoai/bizclaw.git || true
+          git fetch upstream
+
+      - name: Check commits behind
+        id: check
+        run: |
+          BEHIND=$(git log --oneline upstream/master --not HEAD | wc -l)
+          echo "commits_behind=$BEHIND" >> $GITHUB_OUTPUT
+          echo "📊 Commits behind: $BEHIND"
+          
+          # Sync if more than 5 commits behind or force_sync is true
+          if [ "$BEHIND" -gt 5 ] || [ "${{ inputs.force_sync }}" = "true" ]; then
+            echo "should_sync=true" >> $GITHUB_OUTPUT
+            echo "✅ Should sync: YES"
+          else
+            echo "should_sync=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Should sync: NO (threshold not met)"
+          fi
+
+      - name: Get recent upstream commits
+        id: commits
+        if: steps.check.outputs.commits_behind > 0
+        run: |
+          echo "recent_commits<<EOF" >> $GITHUB_OUTPUT
+          git log --oneline upstream/master --not HEAD -10 >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create or update sync issue
+        if: steps.check.outputs.should_sync == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const behind = ${{ steps.check.outputs.commits_behind }};
+            const recentCommits = `${{ steps.commits.outputs.recent_commits }}`;
+            
+            const title = `🔄 Upstream sync needed: ${behind} commits behind`;
+            const body = `## Upstream Sync Status
+            
+            **Commits Behind**: ${behind}
+            **Branch**: features/upstream-sync
+            **Upstream**: nguyenduchoai/bizclaw:master
+            
+            ### Recent Upstream Commits
+            
+            \`\`\`
+            ${recentCommits}
+            \`\`\`
+            
+            ### Action Required
+            
+            Please review and integrate these commits following the [Upstream Sync Workflow](../blob/master/UPSTREAM-SYNC-WORKFLOW.md).
+            
+            ### Quick Start
+            
+            \`\`\`bash
+            git checkout features/upstream-sync
+            git fetch upstream
+            
+            # Review commits
+            git log --oneline upstream/master --not HEAD -20
+            
+            # Cherry-pick or manually integrate
+            # Follow UPSTREAM-SYNC-WORKFLOW.md
+            \`\`\`
+            
+            ### Checklist
+            
+            - [ ] Review upstream commits
+            - [ ] Integrate application features
+            - [ ] Skip infrastructure changes
+            - [ ] Run tests: \`cargo test --workspace\`
+            - [ ] Run clippy: \`cargo clippy --workspace --all-targets -- -D warnings\`
+            - [ ] Format code: \`cargo fmt --all\`
+            - [ ] Update UPSTREAM-SYNC-STATUS.md
+            - [ ] Push to features/upstream-sync
+            - [ ] Merge to master when ready
+            
+            ---
+            
+            *This issue was automatically created by the upstream sync check workflow.*
+            *Last checked: ${new Date().toISOString()}*
+            `;
+            
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream-sync'
+            });
+            
+            const existingIssue = issues.data.find(issue => 
+              issue.title.includes('Upstream sync needed')
+            );
+            
+            if (existingIssue) {
+              // Update existing issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                title: title,
+                body: body
+              });
+              console.log(`Updated issue #${existingIssue.number}`);
+            } else {
+              // Create new issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['upstream-sync', 'maintenance', 'automated']
+              });
+              console.log(`Created issue #${issue.data.number}`);
+            }
+
+  notify-status:
+    name: Notify Status
+    needs: check-upstream
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## Upstream Sync Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commits Behind**: ${{ needs.check-upstream.outputs.commits_behind }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Should Sync**: ${{ needs.check-upstream.outputs.should_sync }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.check-upstream.outputs.should_sync }}" = "true" ]; then
+            echo "✅ Sync issue created/updated" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the issue and follow the sync workflow." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No action needed at this time" >> $GITHUB_STEP_SUMMARY
+          fi

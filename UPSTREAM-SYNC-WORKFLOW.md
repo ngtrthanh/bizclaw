@@ -20,9 +20,13 @@ master (production)
 
 ## Sync Workflow
 
-### Weekly Sync Routine
+### Daily Sync Routine
 
-**Every Monday (or as needed):**
+**Every Day (automated check at 9 AM UTC):**
+
+The automated workflow checks upstream status and creates/updates an issue if more than 5 commits behind.
+
+**Manual Sync Process:**
 
 1. **Fetch Latest Upstream**
    ```bash
@@ -229,51 +233,33 @@ Include upstream commit reference:
 feat: add webhook channel support (upstream: 7936063)
 ```
 
-## Automation Opportunities
+## Automation
 
 ### GitHub Actions Workflow
 
-Create `.github/workflows/upstream-sync-check.yml`:
+The `.github/workflows/upstream-sync-check.yml` workflow:
 
-```yaml
-name: Upstream Sync Check
+**Schedule:**
+- Runs daily at 9 AM UTC
+- Can be manually triggered via workflow_dispatch
 
-on:
-  schedule:
-    - cron: '0 9 * * 1'  # Every Monday at 9 AM
-  workflow_dispatch:
+**Behavior:**
+- Fetches upstream repository
+- Counts commits behind
+- Creates/updates issue if >5 commits behind
+- Provides recent commit list
+- Includes sync checklist
 
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Add upstream remote
-        run: |
-          git remote add upstream https://github.com/nguyenduchoai/bizclaw.git || true
-          git fetch upstream
-      
-      - name: Check commits behind
-        run: |
-          BEHIND=$(git log --oneline upstream/master --not HEAD | wc -l)
-          echo "Commits behind: $BEHIND"
-          echo "COMMITS_BEHIND=$BEHIND" >> $GITHUB_ENV
-      
-      - name: Create issue if behind
-        if: env.COMMITS_BEHIND > 10
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Upstream sync needed: ${{ env.COMMITS_BEHIND }} commits behind',
-              body: 'The fork is ${{ env.COMMITS_BEHIND }} commits behind upstream. Consider running the sync workflow.',
-              labels: ['upstream-sync', 'maintenance']
-            })
+**Manual Trigger:**
+```bash
+# Via GitHub UI: Actions → Upstream Sync Check → Run workflow
+# Or via gh CLI:
+gh workflow run upstream-sync-check.yml
+```
+
+**Force Sync:**
+```bash
+gh workflow run upstream-sync-check.yml -f force_sync=true
 ```
 
 ## Current Status
