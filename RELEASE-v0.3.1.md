@@ -1,4 +1,4 @@
-# Release v0.3.1 - Critical Bug Fixes
+# Release v0.3.1 - Critical Bug Fixes + Docker Improvements
 
 **Release Date**: February 24, 2025
 **Branch**: master
@@ -6,7 +6,7 @@
 
 ## Overview
 
-This release integrates 3 critical bug fixes from upstream focusing on platform stability and database performance.
+This release integrates 3 critical bug fixes from upstream focusing on platform stability and database performance, plus Docker signal handling fixes and storage cleanup automation.
 
 ## What's New
 
@@ -43,6 +43,42 @@ This release integrates 3 critical bug fixes from upstream focusing on platform 
 - `crates/bizclaw-platform/src/db.rs`
 
 **Upstream Commit**: `ed3671e`
+
+### 4. Docker Signal Handling Fix
+- Fixed Unix signal handling permission denied error
+- Added `init: true` to docker-compose for proper signal forwarding
+- Added `SYS_PTRACE` capability for Unix socket creation
+- Configured `/tmp` directory with proper permissions
+- Created comprehensive troubleshooting guide
+
+**Files Changed:**
+- `Dockerfile`
+- `docker-compose.yml`
+- `DOCKER-SIGNAL-HANDLING.md` (new)
+
+### 5. Storage Cleanup Automation
+- Automated workflow to clean up old releases, artifacts, and caches
+- Runs weekly (Sunday 2 AM UTC) or manually triggered
+- Keeps latest 2 releases by default
+- Deletes artifacts older than 7 days
+- Helps manage GitHub Free plan storage limits (500 MB)
+
+**Files Added:**
+- `.github/workflows/cleanup-old-releases.yml`
+- `STORAGE-CLEANUP.md`
+- `scripts/cleanup-releases.sh`
+- `scripts/cleanup-releases.ps1`
+
+### 6. Local Docker Build Support
+- Added scripts for building Docker images locally
+- Support for cross-compilation with `cross`
+- WSL2 build support
+- Comprehensive build documentation
+
+**Files Added:**
+- `BUILD-DOCKER-LOCAL.md`
+- `build-docker-local.ps1`
+- `build-docker-wsl.ps1`
 
 ## Technical Details
 
