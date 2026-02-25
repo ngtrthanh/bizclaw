@@ -258,7 +258,8 @@ async fn main() -> Result<()> {
                     }
 
                     println!("\nChannels are running. Press Ctrl+C to stop.");
-                    tokio::signal::ctrl_c().await?;
+                    // Wait for shutdown signal (gracefully handle permission errors in containers)
+                    wait_for_shutdown().await;
                     println!("\n👋 Channels stopped.");
                 }
                 ChannelAction::List => {
@@ -907,4 +908,30 @@ where
     }
 
     tracing::warn!("📡 Channel '{channel_name}' stream ended — channel may have disconnected");
+}
+
+/// Wait for shutdown signal with graceful fallback for Docker containers.
+/// In Docker, signal handling may fail due to permission issues.
+/// This function handles that gracefully by falling back to a long sleep.
+async fn wait_for_shutdown() {
+    #[cfg(unix)]
+    {
+        // Try to set up signal handler, but don't panic if it fails (Docker permission issue)
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => {
+                tracing::info!("Received Ctrl+C signal");
+            }
+            Err(e) => {
+                tracing::warn!("Signal handler failed ({}), using fallback", e);
+                // Fallback: sleep indefinitely (container will be stopped externally)
+                tokio::time::sleep(tokio::time::Duration::from_secs(u64::MAX)).await;
+            }
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        // On non-Unix systems, use the standard signal handler
+        tokio::signal::ctrl_c().await.ok();
+    }
 }
