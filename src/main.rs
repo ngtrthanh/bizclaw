@@ -919,27 +919,10 @@ where
 }
 
 /// Wait for shutdown signal with graceful fallback for Docker containers.
-/// In Docker, signal handling may fail due to permission issues.
-/// This function handles that gracefully by falling back to a long sleep.
+/// Since we disabled tokio signal feature to avoid Docker permission issues,
+/// we just sleep indefinitely and let Docker handle the shutdown.
 async fn wait_for_shutdown() {
-    #[cfg(unix)]
-    {
-        // Try to set up signal handler, but don't panic if it fails (Docker permission issue)
-        match tokio::signal::ctrl_c().await {
-            Ok(()) => {
-                tracing::info!("Received Ctrl+C signal");
-            }
-            Err(e) => {
-                tracing::warn!("Signal handler failed ({}), using fallback", e);
-                // Fallback: sleep indefinitely (container will be stopped externally)
-                tokio::time::sleep(tokio::time::Duration::from_secs(u64::MAX)).await;
-            }
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        // On non-Unix systems, use the standard signal handler
-        tokio::signal::ctrl_c().await.ok();
-    }
+    tracing::info!("Service running. Stop with: docker stop <container>");
+    // Sleep indefinitely - Docker will send SIGTERM/SIGKILL to stop the container
+    tokio::time::sleep(tokio::time::Duration::from_secs(u64::MAX)).await;
 }
