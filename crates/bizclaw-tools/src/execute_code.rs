@@ -192,11 +192,19 @@ impl Tool for ExecuteCodeTool {
                         success: false,
                     });
                 }
-                Ok(Err(e)) | Err(e) => {
+                Ok(Err(e)) => {
                     let _ = tokio::fs::remove_file(&file_path).await;
                     return Ok(ToolResult {
                         tool_call_id: String::new(),
                         output: format!("Compiler not found ({}): {}", config.command, e),
+                        success: false,
+                    });
+                }
+                Err(e) => {
+                    let _ = tokio::fs::remove_file(&file_path).await;
+                    return Ok(ToolResult {
+                        tool_call_id: String::new(),
+                        output: format!("Task join error: {}", e),
                         success: false,
                     });
                 }
