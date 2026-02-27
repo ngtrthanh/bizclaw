@@ -54,39 +54,50 @@ impl Sandbox {
 
     /// Execute a command within the sandbox.
     pub async fn execute(&self, command: &str) -> Result<SandboxResult> {
-        let mut cmd = tokio::process::Command::new("sh");
-        cmd.arg("-c").arg(command);
-        cmd.current_dir(&self.config.workdir);
+        let command = command.to_string();
+        let workdir = self.config.workdir.clone();
+        let env_passthrough = self.config.env_passthrough.clone();
+        let timeout = self.config.timeout;
+        let max_output_bytes = self.config.max_output_bytes;
 
-        // Clear environment and only pass through allowed vars
-        cmd.env_clear();
-        for var in &self.config.env_passthrough {
-            if let Ok(val) = std::env::var(var) {
-                cmd.env(var, val);
+        let result = tokio::task::spawn_blocking(move || {
+            let mut cmd = std::process::Command::new("sh");
+            cmd.arg("-c").arg(&command);
+            cmd.current_dir(&workdir);
+
+            // Clear environment and only pass through allowed vars
+            cmd.env_clear();
+            for var in &env_passthrough {
+                if let Ok(val) = std::env::var(var) {
+                    cmd.env(var, val);
+                }
             }
-        }
+
+            cmd.output()
+        });
 
         // Execute with timeout
-        let output = tokio::time::timeout(self.config.timeout, cmd.output())
+        let output = tokio::time::timeout(timeout, result)
             .await
             .map_err(|_| {
                 bizclaw_core::error::BizClawError::Timeout(format!(
                     "Command timed out after {:?}",
-                    self.config.timeout
+                    timeout
                 ))
             })?
+            .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?
             .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
         let mut stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let mut stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
         // Truncate if exceeding max output
-        if stdout.len() > self.config.max_output_bytes {
-            stdout.truncate(self.config.max_output_bytes);
+        if stdout.len() > max_output_bytes {
+            stdout.truncate(max_output_bytes);
             stdout.push_str("\n... [output truncated]");
         }
-        if stderr.len() > self.config.max_output_bytes {
-            stderr.truncate(self.config.max_output_bytes);
+        if stderr.len() > max_output_bytes {
+            stderr.truncate(max_output_bytes);
             stderr.push_str("\n... [output truncated]");
         }
 

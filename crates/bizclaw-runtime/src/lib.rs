@@ -17,12 +17,19 @@ impl RuntimeAdapter for NativeRuntime {
     }
 
     async fn execute_command(&self, command: &str, workdir: Option<&str>) -> Result<String> {
-        let mut cmd = tokio::process::Command::new("sh");
-        cmd.arg("-c").arg(command);
-        if let Some(dir) = workdir {
-            cmd.current_dir(dir);
-        }
-        let output = cmd.output().await?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let command = command.to_string();
+        let workdir = workdir.map(|s| s.to_string());
+
+        tokio::task::spawn_blocking(move || {
+            let mut cmd = std::process::Command::new("sh");
+            cmd.arg("-c").arg(&command);
+            if let Some(dir) = &workdir {
+                cmd.current_dir(dir);
+            }
+            let output = cmd.output()?;
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        })
+        .await
+        .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Task join error: {}", e)))?
     }
 }

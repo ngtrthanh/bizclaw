@@ -160,25 +160,30 @@ impl Tool for ExecuteCodeTool {
             let out_path =
                 temp_dir.join(format!("exec_{}", &uuid::Uuid::new_v4().to_string()[..8]));
 
-            let compile_output = if config.command == "rustc" {
-                tokio::process::Command::new(config.command)
-                    .arg(file_path.to_str().unwrap())
-                    .arg("-o")
-                    .arg(out_path.to_str().unwrap())
-                    .output()
-                    .await
-            } else {
-                // gcc
-                tokio::process::Command::new(config.command)
-                    .arg(file_path.to_str().unwrap())
-                    .arg("-o")
-                    .arg(out_path.to_str().unwrap())
-                    .output()
-                    .await
-            };
+            let command = config.command.to_string();
+            let file_path_str = file_path.to_str().unwrap().to_string();
+            let out_path_str = out_path.to_str().unwrap().to_string();
+
+            let compile_output = tokio::task::spawn_blocking(move || {
+                if command == "rustc" {
+                    std::process::Command::new(&command)
+                        .arg(&file_path_str)
+                        .arg("-o")
+                        .arg(&out_path_str)
+                        .output()
+                } else {
+                    // gcc
+                    std::process::Command::new(&command)
+                        .arg(&file_path_str)
+                        .arg("-o")
+                        .arg(&out_path_str)
+                        .output()
+                }
+            })
+            .await;
 
             match compile_output {
-                Ok(co) if !co.status.success() => {
+                Ok(Ok(co)) if !co.status.success() => {
                     let stderr = String::from_utf8_lossy(&co.stderr);
                     let _ = tokio::fs::remove_file(&file_path).await;
                     return Ok(ToolResult {
@@ -187,7 +192,7 @@ impl Tool for ExecuteCodeTool {
                         success: false,
                     });
                 }
-                Err(e) => {
+                Ok(Err(e)) | Err(e) => {
                     let _ = tokio::fs::remove_file(&file_path).await;
                     return Ok(ToolResult {
                         tool_call_id: String::new(),
@@ -198,30 +203,36 @@ impl Tool for ExecuteCodeTool {
                 _ => {}
             }
 
+            let out_path_clone = out_path.clone();
             let run = tokio::time::timeout(
                 std::time::Duration::from_secs(timeout),
-                tokio::process::Command::new(out_path.to_str().unwrap()).output(),
+                tokio::task::spawn_blocking(move || {
+                    std::process::Command::new(out_path_clone.to_str().unwrap()).output()
+                }),
             )
             .await;
 
             let _ = tokio::fs::remove_file(&file_path).await;
             let _ = tokio::fs::remove_file(&out_path).await;
-            run
+            run.map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?)
         } else {
             // Interpreted — just run
             let mut cmd_args: Vec<String> = config.args;
             cmd_args.push(file_path.to_str().unwrap().to_string());
 
+            let command = config.command.to_string();
             let run = tokio::time::timeout(
                 std::time::Duration::from_secs(timeout),
-                tokio::process::Command::new(config.command)
-                    .args(&cmd_args)
-                    .output(),
+                tokio::task::spawn_blocking(move || {
+                    std::process::Command::new(&command)
+                        .args(&cmd_args)
+                        .output()
+                }),
             )
             .await;
 
             let _ = tokio::fs::remove_file(&file_path).await;
-            run
+            run.map(|r| r.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?)
         };
 
         let elapsed = start.elapsed();

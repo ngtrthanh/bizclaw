@@ -18,7 +18,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.3.5"
+version = "0.3.7"
 edition = "2024"
 authors = ["BizClaw Team"]
 license = "MIT OR Apache-2.0"
@@ -27,7 +27,7 @@ rust-version = "1.93"
 
 [workspace.dependencies]
 # Async runtime
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "io-std", "net", "time", "sync", "fs", "process"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "io-std", "net", "time", "sync", "fs"], default-features = false }
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

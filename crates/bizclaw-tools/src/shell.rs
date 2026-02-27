@@ -56,16 +56,20 @@ impl Tool for ShellTool {
 
         let workdir = args["workdir"].as_str();
 
-        let mut cmd = tokio::process::Command::new("sh");
-        cmd.arg("-c").arg(command);
-        if let Some(dir) = workdir {
-            cmd.current_dir(dir);
-        }
+        let command = command.to_string();
+        let workdir = workdir.map(|s| s.to_string());
 
-        let output = cmd
-            .output()
-            .await
-            .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
+        let output = tokio::task::spawn_blocking(move || {
+            let mut cmd = std::process::Command::new("sh");
+            cmd.arg("-c").arg(&command);
+            if let Some(dir) = &workdir {
+                cmd.current_dir(dir);
+            }
+            cmd.output()
+        })
+        .await
+        .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?
+        .map_err(|e| bizclaw_core::error::BizClawError::Tool(e.to_string()))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();

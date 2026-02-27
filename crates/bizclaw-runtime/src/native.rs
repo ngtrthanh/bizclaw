@@ -26,33 +26,40 @@ pub async fn execute_with_stderr(
     command: &str,
     workdir: Option<&str>,
 ) -> Result<(String, String, i32)> {
-    #[cfg(windows)]
-    let mut cmd = {
-        let mut c = tokio::process::Command::new("cmd");
-        c.arg("/C").arg(command);
-        c
-    };
+    let command = command.to_string();
+    let workdir = workdir.map(|s| s.to_string());
 
-    #[cfg(not(windows))]
-    let mut cmd = {
-        let mut c = tokio::process::Command::new("sh");
-        c.arg("-c").arg(command);
-        c
-    };
+    tokio::task::spawn_blocking(move || {
+        #[cfg(windows)]
+        let mut cmd = {
+            let mut c = std::process::Command::new("cmd");
+            c.arg("/C").arg(&command);
+            c
+        };
 
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
+        #[cfg(not(windows))]
+        let mut cmd = {
+            let mut c = std::process::Command::new("sh");
+            c.arg("-c").arg(&command);
+            c
+        };
 
-    if let Some(dir) = workdir {
-        cmd.current_dir(dir);
-    }
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
 
-    let output = cmd.output().await?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    let exit_code = output.status.code().unwrap_or(-1);
+        if let Some(dir) = &workdir {
+            cmd.current_dir(dir);
+        }
 
-    Ok((stdout, stderr, exit_code))
+        let output = cmd.output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let exit_code = output.status.code().unwrap_or(-1);
+
+        Ok((stdout, stderr, exit_code))
+    })
+    .await
+    .map_err(|e| bizclaw_core::error::BizClawError::Tool(format!("Task join error: {}", e)))?
 }
 
 #[cfg(test)]
